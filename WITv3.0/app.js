@@ -79,7 +79,6 @@ client.updateIncursions = async function (isManualRefresh = false) {
         const response = await axios.get('https://esi.evetech.net/latest/incursions/', { timeout: 5000 });
         const allIncursions = response.data;
 
-        // Helper function to get system data for the security status check
         const getSystemData = async (systemId) => {
             try {
                 const sysResponse = await axios.get(`https://esi.evetech.net/latest/universe/systems/${systemId}/`, { timeout: 5000 });
@@ -90,15 +89,12 @@ client.updateIncursions = async function (isManualRefresh = false) {
             }
         };
 
-        // Fetch system data for all active incursions to check their security status
         const enrichedIncursions = await Promise.all(allIncursions.map(async (incursion) => {
             const systemData = await getSystemData(incursion.staging_solar_system_id);
             return { ...incursion, systemData };
         }));
 
-        // Reliably find the high-sec incursion by checking the live security status
         const highSecIncursion = enrichedIncursions.find(inc => inc.systemData && inc.systemData.security_status >= 0.5);
-
         const currentState = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
 
         if (currentState === lastIncursionState && !isManualRefresh) {
@@ -111,7 +107,6 @@ client.updateIncursions = async function (isManualRefresh = false) {
 
         let embed;
         if (highSecIncursion) {
-            // Find the matching constellation in our incursionsystem.json data using the correct key
             const spawnData = incursionSystems.find(constellation => constellation['ConstellationID'] === highSecIncursion.constellation_id);
 
             if (!spawnData) {
@@ -120,34 +115,27 @@ client.updateIncursions = async function (isManualRefresh = false) {
             }
 
             const currentHqId = spawnData['Dock Up System ID'];
-            const currentHqName = spawnData['Headquarter System'].split(' ')[0]; // Get just the name, e.g., "Orduin"
             let lastHqRouteString = '';
 
-            // Calculate route from the previous HQ if a new spawn is detected
             if (lastHqSystemId && lastHqSystemId !== currentHqId) {
+                // --- NEW DEBUG LOG ---
+                console.log(`DEBUG: Calculating route from last HQ. Origin ID: ${lastHqSystemId} (Type: ${typeof lastHqSystemId}), Destination ID: ${currentHqId} (Type: ${typeof currentHqId})`);
+
                 const lastHqNameData = incursionSystems.find(sys => sys['Dock Up System ID'] === lastHqSystemId);
                 const lastHqName = lastHqNameData ? lastHqNameData['Headquarter System'].split(' ')[0] : 'Last HQ';
                 try {
-                    // Create Gatecheck URLs with names
-                    const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:secure`;
-                    const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:shortest`;
-
-                    // ESI URLs for fetching jump counts
-                    const secureEsiUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=secure`;
-                    const shortestEsiUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=shortest`;
-
+                    const secureUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=secure`;
+                    const shortestUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=shortest`;
                     const [secureResponse, shortestResponse] = await Promise.all([
-                        axios.get(secureEsiUrl, { timeout: 5000 }),
-                        axios.get(shortestEsiUrl, { timeout: 5000 })
+                        axios.get(secureUrl, { timeout: 5000 }),
+                        axios.get(shortestUrl, { timeout: 5000 })
                     ]);
-
                     const secureJumps = secureResponse.data.length - 1;
                     const shortestJumps = shortestResponse.data.length - 1;
-
                     if (secureJumps === shortestJumps) {
-                        lastHqRouteString = `**From ${lastHqName}**: [${shortestJumps} jumps](${shortestGatecheckUrl})`;
+                        lastHqRouteString = `**From ${lastHqName}**: [${shortestJumps} jumps](https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:shortest)`;
                     } else {
-                        lastHqRouteString = `**From ${lastHqName}**: [${secureJumps}j (secure)](${secureGatecheckUrl}), [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
+                        lastHqRouteString = `**From ${lastHqName}**: [${secureJumps}j (secure)](https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:secure), [${shortestJumps}j (shortest)](https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:shortest)`;
                     }
                 } catch (e) {
                     console.error('Failed to calculate route from last HQ:', e.message);
@@ -156,33 +144,24 @@ client.updateIncursions = async function (isManualRefresh = false) {
             }
             lastHqSystemId = currentHqId;
 
-            // Calculate jumps to trade hubs
             const jumpPromises = Object.entries(config.tradeHubs).map(async ([name, id]) => {
                 const originId = currentHqId;
                 const destinationId = id;
-                const originName = currentHqName;
+                const originName = spawnData['Headquarter System'].split(' ')[0];
                 const destinationName = name;
-
                 try {
-                    // Create Gatecheck URLs with names
-                    const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${originName}:${destinationName}:secure`;
-                    const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${originName}:${destinationName}:shortest`;
-
-                    // ESI URLs for fetching jump counts
-                    const secureEsiUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=secure`;
-                    const shortestEsiUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=shortest`;
-
+                    const secureUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=secure`;
+                    const shortestUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=shortest`;
                     const [secureResponse, shortestResponse] = await Promise.all([
-                        axios.get(secureEsiUrl, { timeout: 5000 }),
-                        axios.get(shortestEsiUrl, { timeout: 5000 })
+                        axios.get(secureUrl, { timeout: 5000 }),
+                        axios.get(shortestUrl, { timeout: 5000 })
                     ]);
-
                     const secureJumps = secureResponse.data.length - 1;
                     const shortestJumps = shortestResponse.data.length - 1;
                     if (secureJumps === shortestJumps) {
-                        return `**${name}**: [${shortestJumps} jumps](${shortestGatecheckUrl})`;
+                        return `**${name}**: [${shortestJumps} jumps](https://eve-gatecheck.space/eve/#${originName}:${destinationName}:shortest)`;
                     } else {
-                        return `**${name}**: [${secureJumps}j (secure)](${secureGatecheckUrl}), [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
+                        return `**${name}**: [${secureJumps}j (secure)](https://eve-gatecheck.space/eve/#${originName}:${destinationName}:secure), [${shortestJumps}j (shortest)](https://eve-gatecheck.space/eve/#${originName}:${destinationName}:shortest)`;
                     }
                 } catch (e) {
                     return `**${name}**: N/A`;
@@ -199,8 +178,8 @@ client.updateIncursions = async function (isManualRefresh = false) {
                     { name: 'Constellation', value: spawnData.Constellation, inline: true },
                     { name: 'State', value: `\`${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}\``, inline: true },
                     { name: 'Headquarters', value: spawnData['Headquarter System'], inline: false },
-                    { name: 'Vanguard Systems', value: spawnData['Vanguard Systems'] || 'None', inline: false },
-                    { name: 'Assault Systems', value: spawnData['Assault Systems'] || 'None', inline: false },
+                    { name: 'Vanguard Systems', value: spawnData['VG Systems'] || 'None', inline: false },
+                    { name: 'Assault Systems', value: spawnData['AS Systems'] || 'None', inline: false },
                     { name: 'Suggested Dockup', value: spawnData.Dockup, inline: false },
                     ...(lastHqRouteString ? [{ name: 'Jumps from Last HQ', value: lastHqRouteString, inline: false }] : []),
                     { name: 'Jumps from HQ', value: jumpCounts.join('\n'), inline: false }
