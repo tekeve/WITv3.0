@@ -1,8 +1,9 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { google } = require('googleapis');
-const { googleDocId } = require('../../config.js');
+// Import the entire docs object from our config
+const { googleDocs } = require('../../config.js');
 
-// Helper function for Google Auth
+// Helper functions (no changes here)
 async function getAuth() {
     const auth = new google.auth.GoogleAuth({
         keyFile: 'credentials.json',
@@ -11,8 +12,6 @@ async function getAuth() {
     const client = await auth.getClient();
     return google.docs({ version: 'v1', auth: client });
 }
-
-// Helper to get text from Google Docs response
 function readDocContent(doc) {
     let text = '';
     if (doc.body && doc.body.content) {
@@ -29,6 +28,9 @@ function readDocContent(doc) {
     return text.trim() ? text : 'The document is empty.';
 }
 
+// Dynamically create the choices for the command option
+const docChoices = Object.keys(googleDocs).map(key => ({ name: key, value: key }));
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('doc')
@@ -36,11 +38,21 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('read')
-                .setDescription('Read the content of the document'))
+                .setDescription('Read the content of a specific document')
+                .addStringOption(option =>
+                    option.setName('name')
+                        .setDescription('The name of the document to access')
+                        .setRequired(true)
+                        .addChoices(...docChoices)))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('append')
-                .setDescription('Append text to the end of the document')
+                .setDescription('Append text to the end of a specific document')
+                .addStringOption(option =>
+                    option.setName('name')
+                        .setDescription('The name of the document to access')
+                        .setRequired(true)
+                        .addChoices(...docChoices))
                 .addStringOption(option =>
                     option.setName('text').setDescription('The text to append').setRequired(true))),
 
@@ -51,43 +63,41 @@ module.exports = {
             const docs = await getAuth();
             const subcommand = interaction.options.getSubcommand();
 
+            // Get the chosen doc name and look up its ID
+            const docName = interaction.options.getString('name');
+            const documentId = googleDocs[docName];
+
+            if (!documentId) {
+                await interaction.editReply('Could not find a document with that name in the configuration.');
+                return;
+            }
+
             if (subcommand === 'read') {
                 const response = await docs.documents.get({
-                    documentId: googleDocId,
+                    documentId: documentId, // Use the dynamic ID
                 });
                 const content = readDocContent(response.data);
-                // Discord has a 2000 character limit for replies
-                await interaction.editReply(`**Document Content:**\n\n${content.substring(0, 1900)}`);
+                await interaction.editReply(`**Content of ${docName}:**\n\n${content.substring(0, 1900)}`);
 
             } else if (subcommand === 'append') {
                 const textToAppend = interaction.options.getString('text');
 
-                // First, get the document to find the end index
-                const docData = await docs.documents.get({
-                    documentId: googleDocId,
-                    fields: 'body(content(endIndex))',
-                });
-
-                // The end index of the body content segment.
+                const docData = await docs.documents.get({ documentId: documentId, fields: 'body(content(endIndex))' });
                 const endIndex = docData.data.body.content[docData.data.body.content.length - 1].endIndex - 1;
 
                 await docs.documents.batchUpdate({
-                    documentId: googleDocId,
+                    documentId: documentId, // Use the dynamic ID
                     requestBody: {
-                        requests: [
-                            {
-                                insertText: {
-                                    location: {
-                                        index: endIndex,
-                                    },
-                                    text: `\n${textToAppend}`, // Add a newline before the text
-                                },
+                        requests: [{
+                            insertText: {
+                                location: { index: endIndex },
+                                text: `\n${textToAppend}`,
                             },
-                        ],
+                        }],
                     },
                 });
 
-                await interaction.editReply(`Successfully appended text to the document.`);
+                await interaction.editReply(`Successfully appended text to the **${docName}** document.`);
             }
         } catch (error) {
             console.error('Error with Google Docs API:', error);
