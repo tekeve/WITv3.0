@@ -41,67 +41,34 @@ for (const folder of commandFolders) {
 // ================================================================= //
 const STATE_FILE = path.join(__dirname, 'state.json');
 
-// --- NEW, MORE ROBUST STATE LOADING LOGIC ---
-let stateData;
-try {
-    stateData = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-} catch (error) {
-    console.log('State file not found or invalid, creating a fresh state.');
-    stateData = {}; // On error, start with an empty object.
-}
-
-// Use destructuring with default values to ensure no variable is ever undefined.
+// MODIFIED: This no longer loads or manages idCacheData.
 let {
     lastIncursionState = '',
     incursionMessageId = null,
-    idCacheData = {},
     lastHqSystemId = null
-} = stateData;
-// --- END OF NEW LOADING LOGIC ---
-
+} = (() => {
+    try {
+        const data = fs.readFileSync(STATE_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.log('State file not found or invalid, creating a fresh state.');
+        return { lastIncursionState: '', incursionMessageId: null, lastHqSystemId: null };
+    }
+})();
 
 let isUpdating = false;
-const idCache = new Map(Object.entries(idCacheData || {}));
 const factionMap = { 500019: 'Sansha\'s Nation', 500020: 'Triglavian Collective' };
+const incursionSystems = require('./helpers/incursionsystem.json');
 
+// MODIFIED: This no longer saves idCacheData.
 function saveState() {
-    const state = { lastIncursionState, incursionMessageId, idCacheData: Object.fromEntries(idCache), lastHqSystemId };
+    const state = { lastIncursionState, incursionMessageId, lastHqSystemId };
     try {
         fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
     } catch (error) {
         console.error('Failed to save state to file:', error);
     }
 }
-
-async function resolveId(id, type) {
-    if (idCache.has(id)) { return idCache.get(id); }
-    let url;
-    if (type === 'system') { url = `https://esi.evetech.net/latest/universe/systems/${id}/`; }
-    else if (type === 'constellation') { url = `https://esi.evetech.net/latest/universe/constellations/${id}/`; }
-    else if (type === 'region') { url = `https://esi.evetech.net/latest/universe/regions/${id}/`; }
-    else { return null; }
-    try {
-        const response = await axios.get(url, { timeout: 5000 });
-        const data = response.data;
-        idCache.set(id, data);
-        saveState();
-        return data;
-    } catch (error) {
-        console.error(`Failed to resolve ID ${id} for type ${type}:`, error.message);
-        idCache.set(id, { name: `ID ${id}` });
-        saveState();
-        return { name: `ID ${id}` };
-    }
-}
-
-async function resolveIdToName(id, type) {
-    const data = await resolveId(id, type);
-    return data ? data.name : `ID ${id}`;
-}
-
-// ... your client.updateIncursions function and other code should remain below this ...
-
-// ... your client.updateIncursions function and other code should remain below this ...
 
 // FINALLY, define the main function that uses all the helpers
 client.updateIncursions = async function (isManualRefresh = false) {
@@ -111,11 +78,27 @@ client.updateIncursions = async function (isManualRefresh = false) {
         console.log('Checking for incursion updates...');
         const response = await axios.get('https://esi.evetech.net/latest/incursions/', { timeout: 5000 });
         const allIncursions = response.data;
+
+        // Helper function to get system data for the security status check
+        const getSystemData = async (systemId) => {
+            try {
+                const sysResponse = await axios.get(`https://esi.evetech.net/latest/universe/systems/${systemId}/`, { timeout: 5000 });
+                return sysResponse.data;
+            } catch (e) {
+                console.error(`Could not resolve system ID ${systemId}:`, e.message);
+                return null;
+            }
+        };
+
+        // Fetch system data for all active incursions to check their security status
         const enrichedIncursions = await Promise.all(allIncursions.map(async (incursion) => {
-            const systemData = await resolveId(incursion.staging_solar_system_id, 'system');
+            const systemData = await getSystemData(incursion.staging_solar_system_id);
             return { ...incursion, systemData };
         }));
+
+        // Reliably find the high-sec incursion by checking the live security status
         const highSecIncursion = enrichedIncursions.find(inc => inc.systemData && inc.systemData.security_status >= 0.5);
+
         const currentState = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
 
         if (currentState === lastIncursionState && !isManualRefresh) {
@@ -128,11 +111,20 @@ client.updateIncursions = async function (isManualRefresh = false) {
 
         let embed;
         if (highSecIncursion) {
-            const currentHqId = highSecIncursion.staging_solar_system_id;
+            // Correctly look for "ConstellationID" to match your updated JSON file
+            const spawnData = incursionSystems.find(constellation => constellation['ConstellationID'] === highSecIncursion.constellation_id);
+
+            if (!spawnData) {
+                console.log(`No matching spawn data found for Constellation ID: ${highSecIncursion.constellation_id}`);
+                return;
+            }
+
+            const currentHqId = spawnData['Dock Up System']; // Using the key from your snippet
             let lastHqRouteString = '';
 
             if (lastHqSystemId && lastHqSystemId !== currentHqId) {
-                const lastHqName = await resolveIdToName(lastHqSystemId, 'system');
+                const lastHqNameData = incursionSystems.find(sys => sys['Dock Up System'] === lastHqSystemId);
+                const lastHqName = lastHqNameData ? lastHqNameData['Headquarter System'].split(' ')[0] : 'Last HQ';
                 try {
                     const secureUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=secure`;
                     const shortestUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=shortest`;
@@ -148,20 +140,14 @@ client.updateIncursions = async function (isManualRefresh = false) {
                         lastHqRouteString = `**From ${lastHqName}**: [${secureJumps}j (secure)](https://eve-gatecheck.space/eve/#${lastHqSystemId}:${currentHqId}:secure), [${shortestJumps}j (shortest)](https://eve-gatecheck.space/eve/#${lastHqSystemId}:${currentHqId}:shortest)`;
                     }
                 } catch (e) {
+                    console.error('Failed to calculate route from last HQ:', e.message);
                     lastHqRouteString = `**From ${lastHqName}**: N/A`;
                 }
             }
-
             lastHqSystemId = currentHqId;
 
-            const constellationData = await resolveId(highSecIncursion.constellation_id, 'constellation');
-            const regionName = await resolveIdToName(constellationData.region_id, 'region');
-            const influencePercent = (highSecIncursion.influence * 100).toFixed(2);
-            const hqSecStatus = highSecIncursion.systemData.security_status.toFixed(1);
-            const otherSystemIds = highSecIncursion.infested_solar_systems.filter(id => id !== currentHqId);
-            const otherSystemNames = await Promise.all(otherSystemIds.map(id => resolveIdToName(id, 'system')));
             const jumpPromises = Object.entries(config.tradeHubs).map(async ([name, id]) => {
-                const originId = highSecIncursion.staging_solar_system_id;
+                const originId = currentHqId;
                 const destinationId = id;
                 try {
                     const secureUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=secure`;
@@ -188,9 +174,13 @@ client.updateIncursions = async function (isManualRefresh = false) {
                 .setTitle(`High-Sec Incursion Active: ${factionMap[highSecIncursion.faction_id] || 'Unknown Faction'}`)
                 .setThumbnail(`https://images.evetech.net/corporations/${highSecIncursion.faction_id === 500019 ? 1000179 : 1000182}/logo?size=64`)
                 .addFields(
-                    { name: 'Region', value: regionName, inline: true }, { name: 'Constellation', value: constellationData.name, inline: true }, { name: 'State', value: `\`${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}\``, inline: true },
-                    { name: 'Headquarters', value: `${highSecIncursion.systemData.name} (${hqSecStatus})`, inline: true }, { name: 'Influence', value: `${influencePercent}%`, inline: true }, { name: 'Boss Present', value: highSecIncursion.has_boss ? '✅ Yes' : '❌ No', inline: true },
-                    { name: 'Assault & Vanguard Systems', value: otherSystemNames.join('\n') || 'None', inline: false },
+                    { name: 'Region', value: spawnData.REGION, inline: true },
+                    { name: 'Constellation', value: spawnData.Constellation, inline: true },
+                    { name: 'State', value: `\`${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}\``, inline: true },
+                    { name: 'Headquarters', value: spawnData['Headquarter System'], inline: false },
+                    { name: 'Vanguard Systems', value: spawnData['Vanguard Systems'] || 'None', inline: false },
+                    { name: 'Assault Systems', value: spawnData['Assault Systems'] || 'None', inline: false },
+                    { name: 'Suggested Dockup', value: spawnData.Dockup, inline: false },
                     ...(lastHqRouteString ? [{ name: 'Jumps from Last HQ', value: lastHqRouteString, inline: false }] : []),
                     { name: 'Jumps from HQ', value: jumpCounts.join('\n'), inline: false }
                 ).setTimestamp();
@@ -273,10 +263,30 @@ client.on(Events.InteractionCreate, async interaction => {
                 const requestChannel = await client.channels.fetch(config.requestChannelId);
                 const originalMessage = await requestChannel.messages.fetch(messageId);
                 const originalEmbed = originalMessage.embeds[0];
-                const archiveEmbed = new EmbedBuilder().setColor(action === 'Solved' ? 0x3BA55D : 0xED4245).setTitle(`Request ${action}`).setAuthor(originalEmbed.author).setDescription(originalEmbed.description)
+
+                // --- NEW LOGIC START ---
+                // Find the original creation timestamp from the old embed
+                const createdOnField = originalEmbed.fields.find(field => field.name === 'Created On');
+                const createdOnValue = createdOnField ? createdOnField.value : 'N/A';
+
+                // Get the current time for the "Resolved On" timestamp
+                const resolvedTimestamp = Math.floor(Date.now() / 1000);
+                // --- NEW LOGIC END ---
+
+                const archiveEmbed = new EmbedBuilder()
+                    .setColor(action === 'Solved' ? 0x3BA55D : 0xED4245)
+                    .setTitle(`Request ${action}`)
+                    .setAuthor(originalEmbed.author)
+                    .setDescription(originalEmbed.description)
                     .addFields(
-                        { name: 'Status', value: action, inline: true }, { name: 'Resolved By', value: resolverName, inline: true }, { name: 'Closing Comment', value: closingComment }
-                    ).setTimestamp();
+                        { name: 'Status', value: action, inline: true },
+                        { name: 'Resolved By', value: resolverName, inline: true },
+                        { name: 'Closing Comment', value: closingComment, inline: false },
+                        // Add the new timestamp fields
+                        { name: 'Created On', value: createdOnValue, inline: true },
+                        { name: 'Resolved On', value: `<t:${resolvedTimestamp}:f>`, inline: true }
+                    );
+
                 const archiveChannel = await client.channels.fetch(config.archiveChannelId);
                 await archiveChannel.send({ embeds: [archiveEmbed] });
                 await originalMessage.delete();

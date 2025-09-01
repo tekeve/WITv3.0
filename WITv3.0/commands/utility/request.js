@@ -16,16 +16,22 @@ module.exports = {
 
         const requestChannel = await interaction.client.channels.fetch(requestChannelId);
         if (!requestChannel) {
-            return interaction.reply({ content: 'Error: The request channel is not configured correctly.'});
+            return interaction.reply({ content: 'Error: The request channel is not configured correctly.' });
         }
+
+        // Get the current time as a Unix timestamp in seconds
+        const timestamp = Math.floor(Date.now() / 1000);
 
         const embed = new EmbedBuilder()
             .setColor(0xFFA500) // Orange for 'Open'
             .setTitle('New Request Ticket')
             .setAuthor({ name: requester.tag, iconURL: requester.displayAvatarURL() })
             .setDescription(requestDetails)
-            .addFields({ name: 'Status', value: 'Open', inline: true })
-            .setTimestamp();
+            .addFields(
+                { name: 'Status', value: 'Open', inline: true },
+                // NEW: Add the dynamic timestamp field
+                { name: 'Created On', value: `<t:${timestamp}:f>`, inline: true }
+            );
 
         const buttons = new ActionRowBuilder()
             .addComponents(
