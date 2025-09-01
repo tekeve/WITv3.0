@@ -1,7 +1,12 @@
-// You can get these IDs from the URL of your Google Sheet and Doc
-// Example URL: https://docs.google.com/spreadsheets/d/THIS_IS_THE_ID/edit
-// Use simple, lowercase names as the keys (e.g., 'roster', 'rules').
 module.exports = {
+    // Add the system IDs for the major trade hubs.
+    tradeHubs: {
+        'Jita': 30000617,
+        'Amarr': 30002187,
+        'Dodixie': 30002659,
+        'Hek': 30002053,
+        'Rens': 30002510,
+    },
 
     // Channel IDs for the request system
     requestChannelId: '1411962383978725436',
@@ -36,6 +41,10 @@ module.exports = {
 
     // Add your channel ID here
     incursionChannelId: '1364223029814759444',
+
+    // You can get these IDs from the URL of your Google Sheet and Doc
+    // Example URL: https://docs.google.com/spreadsheets/d/THIS_IS_THE_ID/edit
+    // Use simple, lowercase names as the keys (e.g., 'roster', 'rules').
 
     //Google Sheets/Docs Info
     googleSheets: {

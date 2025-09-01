@@ -16,7 +16,7 @@ module.exports = {
 
         const requestChannel = await interaction.client.channels.fetch(requestChannelId);
         if (!requestChannel) {
-            return interaction.reply({ content: 'Error: The request channel is not configured correctly.', ephemeral: true });
+            return interaction.reply({ content: 'Error: The request channel is not configured correctly.'});
         }
 
         const embed = new EmbedBuilder()

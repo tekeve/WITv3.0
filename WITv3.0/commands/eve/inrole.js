@@ -12,7 +12,6 @@ module.exports = {
     async execute(interaction) {
         const userInput = interaction.options.getString('role');
 
-        // --- MODIFIED LOGIC ---
         // Check if the user's input matches an alias. Default to the original input if no alias is found.
         const targetRoleName = roleAliases[userInput.toLowerCase()] || userInput;
 
