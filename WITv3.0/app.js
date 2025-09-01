@@ -111,7 +111,7 @@ client.updateIncursions = async function (isManualRefresh = false) {
 
         let embed;
         if (highSecIncursion) {
-            // Correctly look for "ConstellationID" to match your updated JSON file
+            // Find the matching constellation in our incursionsystem.json data using the correct key
             const spawnData = incursionSystems.find(constellation => constellation['ConstellationID'] === highSecIncursion.constellation_id);
 
             if (!spawnData) {
@@ -119,25 +119,35 @@ client.updateIncursions = async function (isManualRefresh = false) {
                 return;
             }
 
-            const currentHqId = spawnData['Dock Up System']; // Using the key from your snippet
+            const currentHqId = spawnData['Dock Up System ID'];
+            const currentHqName = spawnData['Headquarter System'].split(' ')[0]; // Get just the name, e.g., "Orduin"
             let lastHqRouteString = '';
 
+            // Calculate route from the previous HQ if a new spawn is detected
             if (lastHqSystemId && lastHqSystemId !== currentHqId) {
-                const lastHqNameData = incursionSystems.find(sys => sys['Dock Up System'] === lastHqSystemId);
+                const lastHqNameData = incursionSystems.find(sys => sys['Dock Up System ID'] === lastHqSystemId);
                 const lastHqName = lastHqNameData ? lastHqNameData['Headquarter System'].split(' ')[0] : 'Last HQ';
                 try {
-                    const secureUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=secure`;
-                    const shortestUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=shortest`;
+                    // Create Gatecheck URLs with names
+                    const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:secure`;
+                    const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:shortest`;
+
+                    // ESI URLs for fetching jump counts
+                    const secureEsiUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=secure`;
+                    const shortestEsiUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=shortest`;
+
                     const [secureResponse, shortestResponse] = await Promise.all([
-                        axios.get(secureUrl, { timeout: 5000 }),
-                        axios.get(shortestUrl, { timeout: 5000 })
+                        axios.get(secureEsiUrl, { timeout: 5000 }),
+                        axios.get(shortestEsiUrl, { timeout: 5000 })
                     ]);
+
                     const secureJumps = secureResponse.data.length - 1;
                     const shortestJumps = shortestResponse.data.length - 1;
+
                     if (secureJumps === shortestJumps) {
-                        lastHqRouteString = `**From ${lastHqName}**: [${shortestJumps} jumps](https://eve-gatecheck.space/eve/#${lastHqSystemId}:${currentHqId}:shortest)`;
+                        lastHqRouteString = `**From ${lastHqName}**: [${shortestJumps} jumps](${shortestGatecheckUrl})`;
                     } else {
-                        lastHqRouteString = `**From ${lastHqName}**: [${secureJumps}j (secure)](https://eve-gatecheck.space/eve/#${lastHqSystemId}:${currentHqId}:secure), [${shortestJumps}j (shortest)](https://eve-gatecheck.space/eve/#${lastHqSystemId}:${currentHqId}:shortest)`;
+                        lastHqRouteString = `**From ${lastHqName}**: [${secureJumps}j (secure)](${secureGatecheckUrl}), [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
                     }
                 } catch (e) {
                     console.error('Failed to calculate route from last HQ:', e.message);
@@ -146,22 +156,33 @@ client.updateIncursions = async function (isManualRefresh = false) {
             }
             lastHqSystemId = currentHqId;
 
+            // Calculate jumps to trade hubs
             const jumpPromises = Object.entries(config.tradeHubs).map(async ([name, id]) => {
                 const originId = currentHqId;
                 const destinationId = id;
+                const originName = currentHqName;
+                const destinationName = name;
+
                 try {
-                    const secureUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=secure`;
-                    const shortestUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=shortest`;
+                    // Create Gatecheck URLs with names
+                    const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${originName}:${destinationName}:secure`;
+                    const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${originName}:${destinationName}:shortest`;
+
+                    // ESI URLs for fetching jump counts
+                    const secureEsiUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=secure`;
+                    const shortestEsiUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=shortest`;
+
                     const [secureResponse, shortestResponse] = await Promise.all([
-                        axios.get(secureUrl, { timeout: 5000 }),
-                        axios.get(shortestUrl, { timeout: 5000 })
+                        axios.get(secureEsiUrl, { timeout: 5000 }),
+                        axios.get(shortestEsiUrl, { timeout: 5000 })
                     ]);
+
                     const secureJumps = secureResponse.data.length - 1;
                     const shortestJumps = shortestResponse.data.length - 1;
                     if (secureJumps === shortestJumps) {
-                        return `**${name}**: [${shortestJumps} jumps](https://eve-gatecheck.space/eve/#${originId}:${destinationId}:shortest)`;
+                        return `**${name}**: [${shortestJumps} jumps](${shortestGatecheckUrl})`;
                     } else {
-                        return `**${name}**: [${secureJumps}j (secure)](https://eve-gatecheck.space/eve/#${originId}:${destinationId}:secure), [${shortestJumps}j (shortest)](https://eve-gatecheck.space/eve/#${originId}:${destinationId}:shortest)`;
+                        return `**${name}**: [${secureJumps}j (secure)](${secureGatecheckUrl}), [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
                     }
                 } catch (e) {
                     return `**${name}**: N/A`;
