@@ -5,9 +5,14 @@ const { googleSheets } = require('../../config.js');
 
 // Helper function for Google Auth (no changes here)
 async function getAuth() {
+    const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS;
+    const serviceAccountCredentials = JSON.parse(credentials);
     const auth = new google.auth.GoogleAuth({
-        keyFile: 'credentials.json',
-        scopes: 'https://www.googleapis.com/auth/spreadsheets',
+        credentials: {
+            client_email: serviceAccountCredentials.client_email,
+            private_key: serviceAccountCredentials.private_key.replace(/\\n/g, '\n'),
+        },
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
     const client = await auth.getClient();
     return google.sheets({ version: 'v4', auth: client });

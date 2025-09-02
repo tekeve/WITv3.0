@@ -54,6 +54,7 @@ module.exports = {
     //Google Sheets/Docs Info
     googleSheets: {
         'todo': '1A-QWH2SYQlXH1uNl3KJS-NfvVTPWidAx0UlBtifdAH8',
+        'fleet': '1sTF1NxruAiUKOr52wKu33ka14mx3_xCH',
         //'inventory': 'YOUR_SECOND_SHEET_ID_HERE',
         //'finances': 'ANOTHER_SHEET_ID_HERE',
     },

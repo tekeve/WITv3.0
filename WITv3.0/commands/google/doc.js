@@ -3,11 +3,16 @@ const { google } = require('googleapis');
 // Import the entire docs object from our config
 const { googleDocs } = require('../../config.js');
 
-// Helper functions (no changes here)
+// Helper function for Google Auth (no changes here)
 async function getAuth() {
+    const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS;
+    const serviceAccountCredentials = JSON.parse(credentials);
     const auth = new google.auth.GoogleAuth({
-        keyFile: 'credentials.json',
-        scopes: 'https://www.googleapis.com/auth/documents',
+        credentials: {
+            client_email: serviceAccountCredentials.client_email,
+            private_key: serviceAccountCredentials.private_key.replace(/\\n/g, '\n'),
+        },
+        scopes: ['https://www.googleapis.com/auth/documents'],
     });
     const client = await auth.getClient();
     return google.docs({ version: 'v1', auth: client });
