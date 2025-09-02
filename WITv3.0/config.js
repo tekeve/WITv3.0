@@ -73,17 +73,107 @@ module.exports = {
     // Add the SRP mailing list ID for in-game mail notifications.
     srpMailingListId: '145241588',
 
-    // Onboarding configuration
-    addresident: {
-        // Define sets of roles. The key will be used in the command.
+    // Configuration for the /promote command
+    promotions: {
         roleSets: {
-            'newresident': ['Commander', 'Resident'], // Add the exact role names to give
-            // Add another set like this:
-            // 'another_set': ['Role A', 'Role B'],
+            'resident': {
+                add: ['Commander', 'Resident'],
+                // No roles are removed when becoming a resident
+            },
+            'line_commander': {
+                add: ['Line Commander'],
+                remove: ['Resident'] // Example: A Line Commander is no longer just a Resident
+            },
+            'training_fc': {
+                add: ['Training FC']
+            },
+            'fleet_commander': {
+                add: ['Fleet Commander'],
+                remove: ['Training FC']
+            },
+            'training_ct': {
+                add: ['Training CT']
+            },
+            'certified_trainer': {
+                add: ['Certified Trainer'],
+                remove: ['Training CT']
+            },
+            'officer': {
+                add: ['Officer']
+            },
+            'leadership': {
+                add: ['Leadership'],
+                remove: ['Officer']
+            },
         },
-        // Define channels to point new users to.
-        welcomeChannels: {
-            'resmasterlist': '1412388512149409792', // Replace with your #rules channel ID
+        // Define the channel and message for each promotion's DM
+        notificationInfo: {
+            'resident': {
+                channelId: '1412388512149409792',
+                message: 'Welcome! You have been promoted to Resident. Please review the resident-master-list channel for more information.'
+            },
+            'line_commander': {
+                channelId: '1412575503746990232',
+                message: 'Congratulations on your promotion to Line Commander! Please review the master-list channel for more information.'
+            },
+            'training_ct': {
+                channelId: '1412575547099189278',
+                message: 'Congratulations on your promotion to Training CT! Please review the ct-master-list channel for more information.'
+            },
+            'officer': {
+                channelId: '1412575584076431400',
+                message: 'Congratulations on your promotion to Officer! Please review the council-master-list channel for more information.'
+            },
+            'leadership': {
+                channelId: '1412575584076431400',
+                message: 'Congratulations on your promotion to Leadership!'
+            },
+        }
+    }
+    // NEW: Configuration for the /demote command
+    demotions: {
+        // A complete list of all roles managed by the promote/demote commands.
+        // This is used by the '/demote rank:all' option.
+        allManagedRoles: [
+            'Resident',
+            'Line Commander',
+            'Training FC',
+            'Fleet Commander',
+            'Training CT',
+            'Certified Trainer',
+            'Officer',
+            'Leadership'
+        ],
+        roleSets: {
+            'resident': {
+                remove: ['Commander','Resident'],
+                // No roles are added back when demoting from Resident
+            },
+            'line_commander': {
+                remove: ['Line Commander'],
+                add: ['Resident']
+            },
+            'training_fc': {
+                remove: ['Training FC'],
+                add: ['Line Commander']
+            },
+            'fleet_commander': {
+                remove: ['Fleet Commander']
+            },
+            'training_ct': {
+                remove: ['Training CT']
+            },
+            'certified_trainer': {
+                remove: ['Certified Trainer']
+            },
+            'officer': {
+                remove: ['Officer'],
+                add: ['Fleet Commander', 'Certified Trainer'] // Assumes
+            },
+            'leadership': {
+                remove: ['Leadership'],
+                add: ['Officer']
+            },
         }
     }
 };
