@@ -76,7 +76,7 @@ module.exports = {
             });
         }
         else if (subcommand === 'status') {
-            const authData = authManager.getUserAuthData(interaction.user.id);
+            const authData = await authManager.getUserAuthData(interaction.user.id);
             if (authData) {
                 const expiryDate = new Date(authData.token_expiry);
                 const embed = new EmbedBuilder()

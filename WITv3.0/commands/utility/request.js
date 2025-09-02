@@ -1,5 +1,5 @@
 ﻿const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
-const { requestChannelId } = require('../../config.js');
+require('dotenv').config();
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -14,7 +14,7 @@ module.exports = {
         const requestDetails = interaction.options.getString('details');
         const requester = interaction.user;
 
-        const requestChannel = await interaction.client.channels.fetch(requestChannelId);
+        const requestChannel = await interaction.client.channels.fetch(process.env.REQUEST_CHANNEL_ID);
         if (!requestChannel) {
             return interaction.reply({ content: 'Error: The request channel is not configured correctly.' });
         }

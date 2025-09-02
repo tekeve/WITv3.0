@@ -20,7 +20,8 @@ module.exports = {
     incursionRoles: [
         'Moderator',
         'Leadership',
-        'Officer'
+        'Officer',
+        'Big Cheese',
     ],
     // Add your role aliases here. The key is the alias, the value is the full role name.
     // Make sure the alias (the key) is lowercase.
@@ -40,11 +41,13 @@ module.exports = {
     adminRoles: [
         'Moderator',
         'Leadership',
-        'Officer'
+        'Officer',
+        'Big Cheese',
     ],
     // Add the roles that can use the /auth command
     authRoles: [
         'Moderator',
+        'Big Cheese',
     ],
 
     // You can get these IDs from the URL of your Google Sheet and Doc
@@ -70,9 +73,9 @@ module.exports = {
         secretKey: process.env.ESI_SECRET_KEY,
         // This MUST match the Callback URL in your ESI Application.
         // The port should be one that is open on your server/computer.
-        callbackUrl: 'http://localhost:3000/callback',
+        callbackUrl: process.env.ESI_CALLBACK_URL,
         // The scopes your bot needs. 'esi-mail.send_mail.v1' is required for sending mail. 'esi-mail.read_mail.v1' is required to identify mailing list ID's
-        scopes: 'esi-mail.send_mail.v1 esi-mail.read_mail.v1'
+        scopes: process.env.ESI_DEFAULT_SCOPES
 
     },
     // Add the SRP mailing list ID for in-game mail notifications.

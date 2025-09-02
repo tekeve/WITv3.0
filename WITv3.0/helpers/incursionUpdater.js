@@ -1,3 +1,4 @@
+require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
 const axios = require('axios');
@@ -61,7 +62,7 @@ async function updateIncursions(client, isManualRefresh = false) {
         const currentState = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
 
         if (currentState === lastIncursionState && !isManualRefresh) {
-            logger.warn('No change in high-sec incursion state.');
+            logger.info('No change in high-sec incursion state.');
             return;
         }
 
@@ -156,7 +157,7 @@ async function updateIncursions(client, isManualRefresh = false) {
 
         saveState();
 
-        const channel = await client.channels.fetch(config.incursionChannelId);
+        const channel = await client.channels.fetch(process.env.INCURSION_CHANNEL_ID);
         if (!channel) { return; }
         const messagePayload = { content: ' ', embeds: [embed] };
         if (incursionMessageId) {

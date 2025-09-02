@@ -1,42 +1,27 @@
-const fs = require('fs');
-const path = require('path');
 const axios = require('axios');
-const dotenv = require('dotenv');
+require('dotenv').config();
 const logger = require('@helpers/logger');
+const db = require('@helpers/dbService');
 
-dotenv.config();
-
-const tokensPath = path.join(__dirname, '..', 'authtokens.json');
 const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
 const ESI_SECRET_KEY = process.env.ESI_SECRET_KEY;
 
-// Helper to read the tokens file
-function readTokens() {
-    if (!fs.existsSync(tokensPath)) {
-        return {};
-    }
-    try {
-        const data = fs.readFileSync(tokensPath, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        logger.error('Error reading authtokens.json:', error);
-        return {};
-    }
-}
 
-// Helper to write to the tokens file
-function writeTokens(data) {
-    try {
-        fs.writeFileSync(tokensPath, JSON.stringify(data, null, 2));
-    } catch (error) {
-        logger.error('Error writing to authtokens.json:', error);
-    }
-}
-
-// The main function to get a valid access token, refreshing if necessary
+/**
+ * The main function to get a valid access token, refreshing if necessary.
+ * @param {string} discordId - The user's Discord ID.
+ * @returns {Promise<string|null>} The valid access token or null if unavailable.
+ */
 async function getAccessToken(discordId) {
-    const tokens = readTokens();
-    const userData = tokens[discordId];
+    let userData;
+    try {
+        const sql = 'SELECT discord_id, access_token, refresh_token, token_expiry, character_name FROM commander_list WHERE discord_id = ?';
+        const rows = await db.query(sql, [discordId]);
+        userData = rows[0];
+    } catch (error) {
+        logger.error('Error fetching user data from DB:', error);
+        return null;
+    }
 
     if (!userData) {
         return null; // User not authenticated
@@ -74,11 +59,10 @@ async function getAccessToken(discordId) {
         const expiresIn = response.data.expires_in;
 
         // Update the user's data with the new tokens and expiry time
-        tokens[discordId].access_token = newAccessToken;
-        tokens[discordId].refresh_token = newRefreshToken; // The refresh token might be rotated
-        tokens[discordId].token_expiry = new Date(Date.now() + expiresIn * 1000).toISOString();
+        const updateSql = 'UPDATE commander_list SET access_token = ?, refresh_token = ?, token_expiry = ? WHERE discord_id = ?';
+        const newExpiry = new Date(Date.now() + expiresIn * 1000).toISOString();
+        await db.query(updateSql, [newAccessToken, newRefreshToken, newExpiry, discordId]);
 
-        writeTokens(tokens);
         return newAccessToken;
 
     } catch (error) {
@@ -88,27 +72,50 @@ async function getAccessToken(discordId) {
 }
 
 module.exports = {
-    // Public function to save user authentication data
-    saveUserAuth: (discordId, authData) => {
-        const tokens = readTokens();
-        tokens[discordId] = authData;
-        writeTokens(tokens);
-    },
-
-    getUserAuthData: (discordId) => {
-        const tokens = readTokens();
-        return tokens[discordId] || null;
-    },
-
-    // Removes a user's authentication data
-    removeUser: (discordId) => {
-        const tokens = readTokens();
-        if (tokens[discordId]) {
-            delete tokens[discordId];
-            writeTokens(tokens);
-            return true; // Indicate success
+    /**
+     * Saves or updates a user's authentication data in the database.
+     * @param {string} discordId - The user's Discord ID.
+     * @param {object} authData - The authentication data object.
+     */
+    saveUserAuth: async (discordId, authData) => {
+        try {
+            const sql = 'INSERT INTO commander_list (discord_id, access_token, refresh_token, token_expiry) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE access_token = VALUES(access_token), refresh_token = VALUES(refresh_token), token_expiry = VALUES(token_expiry)';
+            await db.query(sql, [discordId, authData.access_token, authData.refresh_token, authData.token_expiry]);
+        } catch (error) {
+            logger.error('Error saving user auth data:', error);
         }
-        return false; // Indicate user not found
+    },
+
+    /**
+         * Fetches a user's authentication data from the database.
+         * @param {string} discordId - The user's Discord ID.
+         * @returns {Promise<object|null>} The user's auth data or null.
+         */
+    getUserAuthData: async (discordId) => {
+        try {
+            const sql = 'SELECT discord_id, character_name, access_token, refresh_token, token_expiry FROM commander_list WHERE discord_id = ?';
+            const rows = await db.query(sql, [discordId]);1
+            return rows[0] || null;
+        } catch (error) {
+            logger.error('Error fetching user auth data:', error);
+            return null;
+        }
+    },
+
+    /**
+     * Removes a user's authentication data from the database.
+     * @param {string} discordId - The user's Discord ID.
+     * @returns {Promise<boolean>} True if the user was removed, false otherwise.
+     */
+    removeUser: async (discordId) => {
+        try {
+            const sql = 'DELETE FROM commander_list WHERE discord_id = ?';
+            const result = await db.query(sql, [discordId]);
+            return result.affectedRows > 0;
+        } catch (error) {
+            logger.error('Error removing user:', error);
+            return false;
+        }
     },
 
     // Export the getAccessToken function
