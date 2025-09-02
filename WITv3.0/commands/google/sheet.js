@@ -1,8 +1,9 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 // Import the new centralized function instead of the googleapis library
-const { getSheetsService } = require('../../helpers/googleAuth.js');
+const { getSheetsService } = require('@helpers/googleAuth.js');
 // Import the entire sheets object from our config
 const { googleSheets } = require('../../config.js');
+const logger = require('@helpers/logger');
 
 // Dynamically create the choices for the command option
 const sheetChoices = Object.keys(googleSheets).map(key => ({ name: key, value: key }));
@@ -76,7 +77,7 @@ module.exports = {
                 await interaction.editReply(`Successfully wrote **${value}** to **${sheetName}** cell ${cell}.`);
             }
         } catch (error) {
-            console.error('Error with Google Sheets API:', error);
+            logger.error('Error with Google Sheets API:', error);
             await interaction.editReply('Something went wrong while connecting to Google Sheets.');
         }
     },

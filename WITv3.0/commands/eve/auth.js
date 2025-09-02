@@ -1,7 +1,8 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } = require('discord.js');
 const crypto = require('crypto');
-const authManager = require('../../helpers/authManager.js');
+const authManager = require('@helpers/authManager.js');
 const { esi, authRoles } = require('../../config.js');
+const logger = require('@helpers/logger');
 require('dotenv').config();
 
 // Load the ESI Client ID from environment variables
@@ -12,7 +13,7 @@ const hasAuthRole = (member) => member.roles.cache.some(role => authRoles.includ
 
 // Check to ensure the ESI Client ID is configured.
 if (!ESI_CLIENT_ID) {
-    console.error("FATAL: ESI_CLIENT_ID is not defined in the .env file. The /auth command will not work.");
+    logger.error("FATAL: ESI_CLIENT_ID is not defined in the .env file. The /auth command will not work.");
 }
 
 module.exports = {

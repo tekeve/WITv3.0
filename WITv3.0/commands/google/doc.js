@@ -1,8 +1,9 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 // Import the new centralized function instead of the googleapis library
-const { getDocsService } = require('../../helpers/googleAuth.js');
+const { getDocsService } = require('@helpers/googleAuth.js');
 // Import the entire docs object from our config
 const { googleDocs } = require('../../config.js');
+const logger = require('@helpers/logger');
 
 // The local getAuth() helper function is no longer needed here.
 
@@ -97,7 +98,7 @@ module.exports = {
                 await interaction.editReply(`Successfully appended text to the **${docName}** document.`);
             }
         } catch (error) {
-            console.error('Error with Google Docs API:', error);
+            logger.error('Error with Google Docs API:', error);
             await interaction.editReply('Something went wrong while connecting to Google Docs.');
         }
     },

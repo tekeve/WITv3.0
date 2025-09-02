@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const logger = require('@helpers/logger');
 
 const dataPath = path.join(__dirname, '..', 'commanderlist.json');
 
@@ -9,7 +10,7 @@ function readData() {
         const jsonData = fs.readFileSync(dataPath, 'utf8');
         return JSON.parse(jsonData);
     } catch (error) {
-        console.error('Error reading commanderlist.json:', error);
+        logger.error('Error reading commanderlist.json:', error);
         return {}; // Return empty object on error
     }
 }
@@ -20,7 +21,7 @@ function writeData(data) {
         const jsonString = JSON.stringify(data, null, 2);
         fs.writeFileSync(dataPath, jsonString);
     } catch (error) {
-        console.error('Error writing to commanderlist.json:', error);
+        logger.error('Error writing to commanderlist.json:', error);
     }
 }
 

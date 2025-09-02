@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const charManager = require('../../helpers/characterManager');
+const charManager = require('@helpers/characterManager');
 const { adminRoles } = require('../../config.js');
 
 // Helper function to check for admin roles

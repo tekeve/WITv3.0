@@ -1,5 +1,6 @@
 ﻿const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { adminRoles, addresident } = require('../../config.js');
+const logger = require('@helpers/logger');
 
 // Dynamically create the choices for the role_set option from config.js
 const roleSetChoices = Object.keys(addresident.roleSets).map(key => ({ name: key, value: key }));
@@ -54,7 +55,7 @@ module.exports = {
         }
 
         if (notFoundRoles.length > 0) {
-            console.warn(`Could not find the following roles to assign: ${notFoundRoles.join(', ')}`);
+            logger.warn(`Could not find the following roles to assign: ${notFoundRoles.join(', ')}`);
         }
 
         if (rolesToAssign.length === 0) {
@@ -82,7 +83,7 @@ module.exports = {
             } else {
                 // As a fallback, format the key from config (e.g., 'getting_started' -> 'Getting Started')
                 fieldName = key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-                console.warn(`Could not find channel with ID ${channelId} for addresident message.`);
+                logger.warn(`Could not find channel with ID ${channelId} for addresident message.`);
             }
 
             welcomeFields.push({ name: fieldName, value: `<#${channelId}>`, inline: true });
@@ -101,7 +102,7 @@ module.exports = {
         try {
             await targetUser.send({ embeds: [welcomeEmbed] });
         } catch (error) {
-            console.error(`Could not send a DM to ${targetUser.tag}. They may have DMs disabled.`);
+            logger.error(`Could not send a DM to ${targetUser.tag}. They may have DMs disabled.`);
             dmSent = false;
         }
 

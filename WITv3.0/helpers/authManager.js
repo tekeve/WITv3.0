@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const dotenv = require('dotenv');
+const logger = require('@helpers/logger');
 
 dotenv.config();
 
@@ -18,7 +19,7 @@ function readTokens() {
         const data = fs.readFileSync(tokensPath, 'utf8');
         return JSON.parse(data);
     } catch (error) {
-        console.error('Error reading authtokens.json:', error);
+        logger.error('Error reading authtokens.json:', error);
         return {};
     }
 }
@@ -28,7 +29,7 @@ function writeTokens(data) {
     try {
         fs.writeFileSync(tokensPath, JSON.stringify(data, null, 2));
     } catch (error) {
-        console.error('Error writing to authtokens.json:', error);
+        logger.error('Error writing to authtokens.json:', error);
     }
 }
 
@@ -50,7 +51,7 @@ async function getAccessToken(discordId) {
     }
 
     // Token is expired, let's refresh it
-    console.log(`Access token for ${userData.character_name} expired. Refreshing...`);
+    logger.log(`Access token for ${userData.character_name} expired. Refreshing...`);
     try {
         const base64Auth = Buffer.from(`${ESI_CLIENT_ID}:${ESI_SECRET_KEY}`).toString('base64');
         const response = await axios.post(
@@ -81,7 +82,7 @@ async function getAccessToken(discordId) {
         return newAccessToken;
 
     } catch (error) {
-        console.error('Error refreshing token:', error.response ? error.response.data : error.message);
+        logger.error('Error refreshing token:', error.response ? error.response.data : error.message);
         return null; // Return null on error
     }
 }

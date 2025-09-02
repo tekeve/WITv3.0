@@ -3,6 +3,8 @@
 // ================================================================= //
 const fs = require('node:fs');
 const path = require('node:path');
+require('module-alias/register');
+const logger = require('@helpers/logger');
 const { Client, Collection, Events, GatewayIntentBits, EmbedBuilder, REST, Routes, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const dotenv = require('dotenv');
 const axios = require('axios');
@@ -43,7 +45,7 @@ for (const folder of commandFolders) {
             client.commands.set(command.data.name, command);
             commandsToDeploy.push(command.data.toJSON());
         } else {
-            console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+            logger.warn(`The command at ${filePath} is missing a required "data" or "execute" property.`);
         }
     }
 }
@@ -58,7 +60,7 @@ client.updateIncursions = (isManualRefresh = false) => updateIncursions(client, 
 // ====================== EVENT LISTENERS ========================== //
 // ================================================================= //
 client.once(Events.ClientReady, c => {
-    console.log(`Ready! Logged in as ${c.user.tag}`);
+    logger.success(`Ready! Logged in as ${c.user.tag}`);
     client.updateIncursions();
     setInterval(() => client.updateIncursions(), 5 * 60 * 1000);
 });
@@ -70,7 +72,7 @@ client.on(Events.InteractionCreate, async interaction => {
         if (!command) return;
         try { await command.execute(interaction); }
         catch (error) {
-            console.error(error);
+            logger.error(error);
             if (interaction.replied || interaction.deferred) { await interaction.followUp({ content: 'There was an error while executing this command!', flags: [MessageFlags.Ephemeral] }); }
             else { await interaction.reply({ content: 'There was an error while executing this command!', flags: [MessageFlags.Ephemeral] }); }
         }
@@ -141,7 +143,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 await originalMessage.delete();
                 await interaction.reply({ content: 'The ticket has been successfully archived.', flags: [MessageFlags.Ephemeral] });
             } catch (error) {
-                console.error('Error processing ticket resolution:', error);
+                logger.error('Error processing ticket resolution:', error);
                 await interaction.reply({ content: 'There was an error resolving this ticket.', flags: [MessageFlags.Ephemeral] });
             }
         }
@@ -261,14 +263,14 @@ client.on(Events.InteractionCreate, async interaction => {
                         await srpChannel.send({ embeds: [srpEmbed] });
                     }
                 } catch (channelError) {
-                    console.error('Failed to send SRP notification to channel:', channelError);
+                    logger.error('Failed to send SRP notification to channel:', channelError);
                 }
 
                 await interaction.followUp({ content: 'Your SRP request has been submitted successfully!', flags: [MessageFlags.Ephemeral] });
 
             } catch (error) {
                 const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-                console.error('Failed to send EVE mail:', errorMessage);
+                logger.error('Failed to send EVE mail:', errorMessage);
                 await interaction.followUp({ content: `Failed to send SRP mail. ESI responded with: \`${errorMessage}\``, flags: [MessageFlags.Ephemeral] });
             } finally {
                 client.srpData.delete(interaction.user.id);
@@ -320,7 +322,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 await interaction.editReply({ content: 'EVE Mail has been sent successfully!' });
             } catch (error) {
                 const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-                console.error('Failed to send EVE mail:', errorMessage);
+                logger.error('Failed to send EVE mail:', errorMessage);
                 await interaction.editReply({ content: `Failed to send EVE mail. ESI responded with: \`${errorMessage}\`` });
             } finally {
                 client.mailSubjects.delete(mailId);
@@ -335,15 +337,15 @@ client.on(Events.InteractionCreate, async interaction => {
 // ================================================================= //
 (async () => {
     try {
-        console.log(`Started refreshing ${commandsToDeploy.length} application (/) commands.`);
+        logger.info(`Started refreshing ${commandsToDeploy.length} application (/) commands.`);
         const rest = new REST().setToken(process.env.DISCORD_TOKEN);
         const data = await rest.put(
             Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
             { body: commandsToDeploy },
         );
-        console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+        logger.success(`Successfully reloaded ${data.length} application (/) commands.`);
         client.login(process.env.DISCORD_TOKEN);
     } catch (error) {
-        console.error(error);
+        logger.error(error);
     }
 })();

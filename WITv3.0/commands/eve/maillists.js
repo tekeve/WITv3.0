@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const authManager = require('../../helpers/authManager.js');
+const authManager = require('@helpers/authManager.js');
 const axios = require('axios');
+const logger = require('@helpers/logger');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -56,7 +57,7 @@ module.exports = {
 
             } catch (error) {
                 const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-                console.error('Failed to fetch EVE mailing lists:', errorMessage);
+                logger.error('Failed to fetch EVE mailing lists:', errorMessage);
                 await interaction.editReply({ content: `Could not fetch your mailing lists. The ESI might be down or your token may be invalid. Please try re-authenticating with \`/auth login\`.` });
             }
         }

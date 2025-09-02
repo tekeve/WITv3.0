@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags } = require('discord.js');
-const authManager = require('../../helpers/authManager.js');
+const authManager = require('@helpers/authManager.js');
 const { adminRoles } = require('../../config.js');
 const crypto = require('crypto');
 

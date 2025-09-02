@@ -3,6 +3,7 @@ const path = require('node:path');
 const axios = require('axios');
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config.js');
+const logger = require('@helpers/logger');
 
 const STATE_FILE = path.join(__dirname, '..', 'state.json');
 
@@ -10,7 +11,7 @@ let stateData;
 try {
     stateData = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
 } catch (error) {
-    console.log('State file not found or invalid, creating a fresh state.');
+    logger.info('State file not found or invalid, creating a fresh state.');
     stateData = {};
 }
 
@@ -29,7 +30,7 @@ function saveState() {
     try {
         fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
     } catch (error) {
-        console.error('Failed to save state to file:', error);
+        logger.error('Failed to save state to file:', error);
     }
 }
 
@@ -37,7 +38,7 @@ async function updateIncursions(client, isManualRefresh = false) {
     if (isUpdating) { return; }
     isUpdating = true;
     try {
-        console.log('Checking for incursion updates...');
+        logger.info('Checking for incursion updates...');
         const response = await axios.get('https://esi.evetech.net/latest/incursions/', { timeout: 5000 });
         const allIncursions = response.data;
 
@@ -46,7 +47,7 @@ async function updateIncursions(client, isManualRefresh = false) {
                 const sysResponse = await axios.get(`https://esi.evetech.net/latest/universe/systems/${systemId}/`, { timeout: 5000 });
                 return sysResponse.data;
             } catch (e) {
-                console.error(`Could not resolve system ID ${systemId}:`, e.message);
+                logger.error(`Could not resolve system ID ${systemId}:`, e.message);
                 return null;
             }
         };
@@ -60,11 +61,11 @@ async function updateIncursions(client, isManualRefresh = false) {
         const currentState = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
 
         if (currentState === lastIncursionState && !isManualRefresh) {
-            console.log('No change in high-sec incursion state.');
+            logger.warn('No change in high-sec incursion state.');
             return;
         }
 
-        console.log('High-sec incursion state has changed or manual refresh triggered. Updating...');
+        logger.info('High-sec incursion state has changed or manual refresh triggered. Updating...');
         lastIncursionState = currentState;
 
         let embed;
@@ -72,7 +73,7 @@ async function updateIncursions(client, isManualRefresh = false) {
             const spawnData = incursionSystems.find(constellation => constellation['ConstellationID'] === highSecIncursion.constellation_id);
 
             if (!spawnData) {
-                console.log(`No matching spawn data found for Constellation ID: ${highSecIncursion.constellation_id}`);
+                logger.info(`No matching spawn data found for Constellation ID: ${highSecIncursion.constellation_id}`);
                 return;
             }
 
@@ -100,7 +101,7 @@ async function updateIncursions(client, isManualRefresh = false) {
                         lastHqRouteString = `**From ${lastHqName}**: [${secureJumps}j (secure)](${secureGatecheckUrl}), [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
                     }
                 } catch (e) {
-                    console.error('Failed to calculate route from last HQ:', e.message);
+                    logger.error('Failed to calculate route from last HQ:', e.message);
                     lastHqRouteString = `**From ${lastHqName}**: N/A`;
                 }
             }
@@ -164,7 +165,7 @@ async function updateIncursions(client, isManualRefresh = false) {
                 await message.edit(messagePayload);
             }
             catch (error) {
-                console.log('Previous message not found, posting a new one.');
+                logger.info('Previous message not found, posting a new one.');
                 const newMessage = await channel.send(messagePayload);
                 incursionMessageId = newMessage.id;
                 saveState();
@@ -179,23 +180,23 @@ async function updateIncursions(client, isManualRefresh = false) {
         if (axios.isAxiosError(error)) {
             // This is a network-level error (timeout, DNS, etc.)
             if (error.code === 'ECONNABORTED') {
-                console.log('ESI request timed out. Retrying on the next cycle.');
+                logger.warn('ESI request timed out. Retrying on the next cycle.');
             } else if (error.response) {
                 // The ESI server responded with an error status code (4xx, 5xx)
-                console.log(`ESI returned a non-2xx status: ${error.response.status}. Retrying on the next cycle.`);
+                logger.warn(`ESI returned a non-2xx status: ${error.response.status}. Retrying on the next cycle.`);
             } else {
                 // A different network error occurred
-                console.log('An error occurred while contacting ESI. Retrying on the next cycle.');
+                logger.warn('An error occurred while contacting ESI. Retrying on the next cycle.');
             }
         } else {
             // This is not an Axios error, so it's likely an issue with Discord or our own code.
             // We log the full error here for better debugging.
-            console.error('An unexpected error occurred during incursion update:', error);
+            logger.error('An unexpected error occurred during incursion update:', error);
         }
         // <<< END: NEW ERROR HANDLING LOGIC >>>
     } finally {
         isUpdating = false;
-        console.log('Update check finished.');
+        logger.info('Update check finished.');
     }
 }
 
