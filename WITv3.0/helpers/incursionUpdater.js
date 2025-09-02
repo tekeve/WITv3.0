@@ -4,10 +4,8 @@ const axios = require('axios');
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config.js');
 
-// Path to the state file
 const STATE_FILE = path.join(__dirname, '..', 'state.json');
 
-// In-memory state
 let stateData;
 try {
     stateData = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
@@ -26,7 +24,6 @@ let isUpdating = false;
 const factionMap = { 500019: 'Sansha\'s Nation', 500020: 'Triglavian Collective' };
 const incursionSystems = require('./incursionsystem.json');
 
-// Function to save the current state to the JSON file
 function saveState() {
     const state = { lastIncursionState, incursionMessageId, lastHqSystemId };
     try {
@@ -36,7 +33,6 @@ function saveState() {
     }
 }
 
-// The main function to fetch and update incursion data.
 async function updateIncursions(client, isManualRefresh = false) {
     if (isUpdating) { return; }
     isUpdating = true;
@@ -144,7 +140,7 @@ async function updateIncursions(client, isManualRefresh = false) {
                 .addFields(
                     { name: 'Region', value: spawnData.REGION, inline: true },
                     { name: 'Constellation', value: spawnData.Constellation, inline: true },
-                    { name: 'Security', value: highSecIncursion.systemData.security_status.toString(), inline: true },
+                    { name: 'Security', value: highSecIncursion.systemData.security_status.toFixed(1), inline: true },
                     { name: 'State', value: `\`${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}\``, inline: true },
                     { name: 'Headquarters', value: `[${spawnData['Headquarter System'].split(' ')[0]}](${`https://evemaps.dotlan.net/system/${spawnData['Headquarter System'].split(' ')[0]}`})`, inline: false },
                     { name: 'Vanguard Systems', value: spawnData['Vanguard Systems'] || 'None', inline: false },
@@ -179,7 +175,24 @@ async function updateIncursions(client, isManualRefresh = false) {
             saveState();
         }
     } catch (error) {
-        console.error('Failed to fetch or process incursion data. Full error:', error);
+        // <<< START: NEW ERROR HANDLING LOGIC >>>
+        if (axios.isAxiosError(error)) {
+            // This is a network-level error (timeout, DNS, etc.)
+            if (error.code === 'ECONNABORTED') {
+                console.log('ESI request timed out. Retrying on the next cycle.');
+            } else if (error.response) {
+                // The ESI server responded with an error status code (4xx, 5xx)
+                console.log(`ESI returned a non-2xx status: ${error.response.status}. Retrying on the next cycle.`);
+            } else {
+                // A different network error occurred
+                console.log('An error occurred while contacting ESI. Retrying on the next cycle.');
+            }
+        } else {
+            // This is not an Axios error, so it's likely an issue with Discord or our own code.
+            // We log the full error here for better debugging.
+            console.error('An unexpected error occurred during incursion update:', error);
+        }
+        // <<< END: NEW ERROR HANDLING LOGIC >>>
     } finally {
         isUpdating = false;
         console.log('Update check finished.');
