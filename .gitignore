@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /WITv3.0/.env
 /WITv3.0/credentials.json
+/WITv3.0/authtokens.json

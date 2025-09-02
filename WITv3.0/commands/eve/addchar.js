@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const charManager = require('../../helpers/characterManager');
 const { adminRoles } = require('../../config.js');
 

@@ -1,4 +1,4 @@
-﻿const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+﻿const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const { requestChannelId } = require('../../config.js');
 
 module.exports = {
@@ -49,6 +49,6 @@ module.exports = {
 
         await requestChannel.send({ embeds: [embed], components: [buttons] });
 
-        await interaction.reply({ content: 'Your request has been submitted successfully!', ephemeral: true });
+        await interaction.reply({ content: 'Your request has been submitted successfully!', flags: [MessageFlags.Ephemeral] });
     },
 };

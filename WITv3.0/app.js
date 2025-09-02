@@ -3,15 +3,26 @@
 // ================================================================= //
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, Events, GatewayIntentBits, EmbedBuilder, REST, Routes, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+const { Client, Collection, Events, GatewayIntentBits, EmbedBuilder, REST, Routes, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const dotenv = require('dotenv');
 const axios = require('axios');
 const config = require('./config.js');
 const charManager = require('./helpers/characterManager.js');
+const authManager = require('./helpers/authManager.js');
+const { startServer } = require('./server.js');
 
 dotenv.config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+// In-memory stores
+client.esiStateMap = new Map();
+client.srpData = new Map();
+client.mailSubjects = new Map(); // For storing mail subjects temporarily
+
+// Start the ESI authentication callback server
+startServer(client);
+
 
 // ================================================================= //
 // =================== COMMAND LOADING LOGIC ======================= //
@@ -104,7 +115,6 @@ client.updateIncursions = async function (isManualRefresh = false) {
 
         let embed;
         if (highSecIncursion) {
-            // --- CORRECTED KEY ---
             const spawnData = incursionSystems.find(constellation => constellation['ConstellationID'] === highSecIncursion.constellation_id);
 
             if (!spawnData) {
@@ -112,7 +122,6 @@ client.updateIncursions = async function (isManualRefresh = false) {
                 return;
             }
 
-            // --- CORRECTED KEY ---
             const currentHqId = spawnData['Dock Up System'];
             const currentHqName = spawnData['Headquarter System'].split(' ')[0];
             let lastHqRouteString = '';
@@ -177,9 +186,9 @@ client.updateIncursions = async function (isManualRefresh = false) {
                 .addFields(
                     { name: 'Region', value: spawnData.REGION, inline: true },
                     { name: 'Constellation', value: spawnData.Constellation, inline: true },
+                    { name: 'Security', value: highSecIncursion.systemData.security_status.toString(), inline: true },
                     { name: 'State', value: `\`${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}\``, inline: true },
-                    { name: 'Headquarters', value: spawnData['Headquarter System'], inline: false },
-                    // --- CORRECTED KEYS ---
+                    { name: 'Headquarters', value: `[${spawnData['Headquarter System'].split(' ')[0]}](${`https://evemaps.dotlan.net/system/${spawnData['Headquarter System'].split(' ')[0]}`})`, inline: false },
                     { name: 'Vanguard Systems', value: spawnData['Vanguard Systems'] || 'None', inline: false },
                     { name: 'Assault Systems', value: spawnData['Assault Systems'] || 'None', inline: false },
                     { name: 'Suggested Dockup', value: spawnData.Dockup, inline: false },
@@ -219,10 +228,6 @@ client.updateIncursions = async function (isManualRefresh = false) {
     }
 };
 
-
-
-
-
 // ================================================================= //
 // ====================== EVENT LISTENERS ========================== //
 // ================================================================= //
@@ -233,21 +238,23 @@ client.once(Events.ClientReady, c => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
+    // Command Handler
     if (interaction.isChatInputCommand()) {
         const command = client.commands.get(interaction.commandName);
         if (!command) return;
         try { await command.execute(interaction); }
         catch (error) {
             console.error(error);
-            if (interaction.replied || interaction.deferred) { await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true }); }
-            else { await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true }); }
+            if (interaction.replied || interaction.deferred) { await interaction.followUp({ content: 'There was an error while executing this command!', flags: [MessageFlags.Ephemeral] }); }
+            else { await interaction.reply({ content: 'There was an error while executing this command!', flags: [MessageFlags.Ephemeral] }); }
         }
     }
+    // Button Handler
     else if (interaction.isButton()) {
         const { customId, member } = interaction;
         if (customId === 'ticket_solve' || customId === 'ticket_deny') {
             if (!member.roles.cache.some(role => config.adminRoles.includes(role.name))) {
-                return interaction.reply({ content: 'You do not have permission to resolve tickets.', ephemeral: true });
+                return interaction.reply({ content: 'You do not have permission to resolve tickets.', flags: [MessageFlags.Ephemeral] });
             }
             const modal = new ModalBuilder().setTitle('Resolve Request Ticket');
             const action = customId === 'ticket_solve' ? 'Solved' : 'Denied';
@@ -257,7 +264,26 @@ client.on(Events.InteractionCreate, async interaction => {
             modal.addComponents(actionRow);
             await interaction.showModal(modal);
         }
+        if (customId === 'srp_continue') {
+            const modal = new ModalBuilder()
+                .setCustomId('srp_modal_part2')
+                .setTitle('SRP Request (Part 2/2)');
+
+            const srpableInput = new TextInputBuilder().setCustomId('srpable').setLabel('Was the cause of death SRPable?').setStyle(TextInputStyle.Short).setPlaceholder('Yes / No').setRequired(true);
+            const paidInput = new TextInputBuilder().setCustomId('paid').setLabel('Did the pilot pay SRP?').setStyle(TextInputStyle.Short).setPlaceholder('Yes / No / First Day / Commander').setRequired(true);
+            const lootInput = new TextInputBuilder().setCustomId('loot').setLabel('Loot Recovered?').setStyle(TextInputStyle.Short).setPlaceholder('Yes / No').setRequired(true);
+            const detailsInput = new TextInputBuilder().setCustomId('details').setLabel('Details').setStyle(TextInputStyle.Paragraph).setRequired(false);
+
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(srpableInput),
+                new ActionRowBuilder().addComponents(paidInput),
+                new ActionRowBuilder().addComponents(lootInput),
+                new ActionRowBuilder().addComponents(detailsInput)
+            );
+            await interaction.showModal(modal);
+        }
     }
+    // Modal Handler
     else if (interaction.isModalSubmit()) {
         const { customId } = interaction;
         if (customId.startsWith('resolve_modal_')) {
@@ -287,14 +313,156 @@ client.on(Events.InteractionCreate, async interaction => {
                 const archiveChannel = await client.channels.fetch(config.archiveChannelId);
                 await archiveChannel.send({ embeds: [archiveEmbed] });
                 await originalMessage.delete();
-                await interaction.reply({ content: 'The ticket has been successfully archived.', ephemeral: true });
+                await interaction.reply({ content: 'The ticket has been successfully archived.', flags: [MessageFlags.Ephemeral] });
             } catch (error) {
                 console.error('Error processing ticket resolution:', error);
-                await interaction.reply({ content: 'There was an error resolving this ticket.', ephemeral: true });
+                await interaction.reply({ content: 'There was an error resolving this ticket.', flags: [MessageFlags.Ephemeral] });
+            }
+        }
+        if (customId === 'srp_modal_part1') {
+            const part1Data = {
+                pilot: interaction.fields.getTextInputValue('srp_pilot_name'),
+                killmail: interaction.fields.getTextInputValue('srp_kill_report'),
+                value: interaction.fields.getTextInputValue('srp_kill_value'),
+                fc: interaction.fields.getTextInputValue('srp_fc_name'),
+                ship: interaction.fields.getTextInputValue('srp_ship_type'),
+            };
+            client.srpData.set(interaction.user.id, part1Data);
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('srp_continue').setLabel('Continue to Part 2').setStyle(ButtonStyle.Primary)
+            );
+
+            await interaction.reply({
+                content: 'Part 1 submitted. Please continue to the second part of the form.',
+                components: [row],
+                flags: [MessageFlags.Ephemeral]
+            });
+        }
+        if (customId === 'srp_modal_part2') {
+            await interaction.update({ content: 'Submitting your SRP request...', components: [] });
+
+            const part1Data = client.srpData.get(interaction.user.id);
+            if (!part1Data) {
+                return interaction.followUp({ content: 'Error: Could not find the first part of your SRP data. Please start again.', flags: [MessageFlags.Ephemeral] });
+            }
+
+            // NEW: Send the SRP request as an in-game mail
+            const authData = authManager.getUserAuthData(interaction.user.id);
+            if (!authData) {
+                return interaction.followUp({ content: 'You must authenticate a character with the ESI before submitting an SRP request via mail. Please use `/auth login`.', flags: [MessageFlags.Ephemeral] });
+            }
+
+            try {
+                const accessToken = await authManager.getAccessToken(interaction.user.id);
+                if (!accessToken) {
+                    return interaction.followUp({ content: 'Could not get an access token. Your authentication may have expired. Please try `/auth login` again.', flags: [MessageFlags.Ephemeral] });
+                }
+
+                const srpData = {
+                    ...part1Data,
+                    srpable: interaction.fields.getTextInputValue('srpable'),
+                    paid: interaction.fields.getTextInputValue('paid'),
+                    loot: interaction.fields.getTextInputValue('loot'),
+                    details: interaction.fields.getTextInputValue('details')
+                };
+
+                const subject = `SRP Request - ${srpData.pilot} - ${srpData.ship}`;
+                const body = `Pilot Name: ${srpData.pilot}\n`
+                    + `Kill Report: ${srpData.killmail}\n`
+                    + `Kill Value: ${srpData.value} ISK\n`
+                    + `FC: ${srpData.fc}\n`
+                    + `Backseat Info: ${srpData.backseat}\n`
+                    + `Ship Lost: ${srpData.ship}\n\n`
+                    + `SRPable: ${srpData.srpable}\n`
+                    + `Paid SRP: ${srpData.paid}\n`
+                    + `Loot Recovered: ${srpData.loot}\n\n`
+                    + `Additional Details:\n${srpData.details || 'None'}`;
+
+                await axios.post(
+                    `https://esi.evetech.net/latest/characters/${authData.character_id}/mail/`,
+                    {
+                        approved_cost: 0,
+                        body: body,
+                        recipients: [{ recipient_id: config.srpMailingListId, recipient_type: 'mailing_list' }],
+                        subject: subject,
+                    },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                await interaction.followUp({ content: 'Your SRP request has been submitted successfully!', flags: [MessageFlags.Ephemeral] });
+
+            } catch (error) {
+                const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
+                console.error('Failed to send EVE mail:', errorMessage);
+                await interaction.followUp({ content: `Failed to send SRP mail. ESI responded with: \`${errorMessage}\``, flags: [MessageFlags.Ephemeral] });
+            } finally {
+                client.srpData.delete(interaction.user.id);
+            }
+        }
+        // Handler for the sendmail modal
+        if (customId.startsWith('sendmail_modal_')) {
+            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+
+            const mailId = customId.substring('sendmail_modal_'.length);
+            const mailData = client.mailSubjects.get(mailId);
+            if (!mailData) {
+                return interaction.editReply({ content: 'Error: Could not retrieve mail data. It might have expired. Please try again.' });
+            }
+
+            const mailBody = interaction.fields.getTextInputValue('mail_body');
+            const authData = authManager.getUserAuthData(interaction.user.id);
+
+            if (!authData) {
+                return interaction.editReply({ content: 'Your authentication has expired. Please `/auth login` again.' });
+            }
+
+            try {
+                const accessToken = await authManager.getAccessToken(interaction.user.id);
+                // ESI expects recipient ID to be an integer
+                const recipientId = parseInt(mailData.mailingList, 10);
+                if (isNaN(recipientId)) {
+                    return interaction.editReply({ content: 'Error: The mailing list ID must be a number.' });
+                }
+
+                const recipient = {
+                    recipient_id: recipientId,
+                    recipient_type: 'mailing_list'
+                };
+
+                await axios.post(
+                    `https://esi.evetech.net/latest/characters/${authData.character_id}/mail/`,
+                    {
+                        approved_cost: 0,
+                        body: mailBody,
+                        recipients: [recipient],
+                        subject: mailData.subject,
+                    },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                await interaction.editReply({ content: 'EVE Mail has been sent successfully!' });
+            } catch (error) {
+                const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
+                console.error('Failed to send EVE mail:', errorMessage);
+                await interaction.editReply({ content: `Failed to send EVE mail. ESI responded with: \`${errorMessage}\`` });
+            } finally {
+                // Clean up the temporary storage
+                client.mailSubjects.delete(mailId);
             }
         }
     }
 });
+
 
 // ================================================================= //
 // ================= DEPLOY COMMANDS & BOT LOGIN =================== //
@@ -313,4 +481,3 @@ client.on(Events.InteractionCreate, async interaction => {
         console.error(error);
     }
 })();
-

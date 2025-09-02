@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const charManager = require('../../helpers/characterManager');
 // Import the new aliases from the config file
 const { roleAliases } = require('../../config');

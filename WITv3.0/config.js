@@ -11,6 +11,10 @@ module.exports = {
     // Channel IDs for the request system
     requestChannelId: '1411962383978725436',
     archiveChannelId: '1411962451439652904',
+    // NEW: Add the channel ID for SRP submissions
+    srpChannelId: '1412210083135225866',
+    // Add your channel ID for the spawn information here
+    incursionChannelId: '1364223029814759444',
 
     // Add the exact, case-sensitive names of roles that can use the /incursion command.
     incursionRoles: [
@@ -38,9 +42,10 @@ module.exports = {
         'Leadership',
         'Officer'
     ],
-
-    // Add your channel ID here
-    incursionChannelId: '1364223029814759444',
+    // Add the roles that can use the /auth command
+    authRoles: [
+        'Moderator',
+    ],
 
     // You can get these IDs from the URL of your Google Sheet and Doc
     // Example URL: https://docs.google.com/spreadsheets/d/THIS_IS_THE_ID/edit
@@ -55,5 +60,20 @@ module.exports = {
     googleDocs: {
         'test': '1bZxBnoDmcD0EpaPJx9-CjZbY0tTl98vGqkqKkyENyF8',
         //'guide': 'YOUR_SECOND_DOC_ID_HERE',
-    }
+    },
+    // ESI Application details for OAuth
+    // You MUST create an application at https://developers.eveonline.com/
+    esi: {
+        // These should be in your .env file
+        clientId: process.env.ESI_CLIENT_ID,
+        secretKey: process.env.ESI_SECRET_KEY,
+        // This MUST match the Callback URL in your ESI Application.
+        // The port should be one that is open on your server/computer.
+        callbackUrl: 'http://localhost:3000/callback',
+        // The scopes your bot needs. 'esi-mail.send_mail.v1' is required for sending mail. 'esi-mail.read_mail.v1' is required to identify mailing list ID's
+        scopes: 'esi-mail.send_mail.v1 esi-mail.read_mail.v1'
+
+    },
+    // Add the SRP mailing list ID for in-game mail notifications.
+    srpMailingListId: '145241588',
 };

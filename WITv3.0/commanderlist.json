@@ -1,35 +1,12 @@
 {
   "107396590653698048": {
     "mainChar": "Ezabella",
-    "alts": [
-      "Ezabella Ino",
-      "Mirror Saisima"
-    ],
+    "alts": [],
     "roles": [
       "Moderator",
       "Eve",
       "Unraid",
       "Wow",
-      "@everyone"
-    ]
-  },
-  "368778318415265792": {
-    "mainChar": "Bella Cadelanne",
-    "alts": [
-      "Blade Ravinger"
-    ],
-    "roles": [
-      "Eve",
-      "@everyone"
-    ]
-  },
-  "266657286355681280": {
-    "mainChar": "Skeltek",
-    "alts": [
-      "Kitsune Miyamoto"
-    ],
-    "roles": [
-      "Eve",
       "@everyone"
     ]
   }

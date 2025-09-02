@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { google } = require('googleapis');
 // Import the entire sheets object from our config
 const { googleSheets } = require('../../config.js');
@@ -46,7 +46,7 @@ module.exports = {
                     option.setName('value').setDescription('The value to write').setRequired(true))),
 
     async execute(interaction) {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
         try {
             const sheets = await getAuth();

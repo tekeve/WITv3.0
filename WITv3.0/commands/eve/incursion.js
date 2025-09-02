@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 // NEW: Import the allowed roles from your config file.
 const { incursionRoles } = require('../../config.js');
 
@@ -14,7 +14,7 @@ module.exports = {
         if (!hasPermission) {
             return interaction.reply({
                 content: 'You do not have permission to use this command.',
-                ephemeral: true
+                flags: [MessageFlags.Ephemeral]
             });
         }
 

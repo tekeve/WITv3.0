@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { google } = require('googleapis');
 // Import the entire docs object from our config
 const { googleDocs } = require('../../config.js');
@@ -57,7 +57,7 @@ module.exports = {
                     option.setName('text').setDescription('The text to append').setRequired(true))),
 
     async execute(interaction) {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
         try {
             const docs = await getAuth();
