@@ -8,14 +8,6 @@ module.exports = {
         'Rens': 30002510,
     },
 
-    // Channel IDs for the request system
-    requestChannelId: '1411962383978725436',
-    archiveChannelId: '1411962451439652904',
-    // NEW: Add the channel ID for SRP submissions
-    srpChannelId: '1412210083135225866',
-    // Add your channel ID for the spawn information here
-    incursionChannelId: '1364223029814759444',
-
     // Add the exact, case-sensitive names of roles that can use the /incursion command.
     incursionRoles: [
         'Moderator',
@@ -85,7 +77,7 @@ module.exports = {
     addresident: {
         // Define sets of roles. The key will be used in the command.
         roleSets: {
-            'newresident': ['Eve'], // Add the exact role names to give
+            'newresident': ['Commander', 'Resident'], // Add the exact role names to give
             // Add another set like this:
             // 'another_set': ['Role A', 'Role B'],
         },

@@ -30,7 +30,7 @@ async function ensureDatabaseExistsAndConnected() {
         logger.success('Database connection successful!');
         return true;
     } catch (error) {
-        logger.error('Database connection failed:', error);
+        logger.error('Database not found, run with --db-setup flag to initilize');
         return false;
     }
 }
