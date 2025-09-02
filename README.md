@@ -1,3 +1,5 @@
+This is already out of date - updates are planned
+
 Basic Setup
 
 Here's the plan:
