@@ -1,22 +1,12 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { google } = require('googleapis');
+// Import the new centralized function instead of the googleapis library
+const { getDocsService } = require('../../helpers/googleAuth.js');
 // Import the entire docs object from our config
 const { googleDocs } = require('../../config.js');
 
-// Helper function for Google Auth (no changes here)
-async function getAuth() {
-    const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS;
-    const serviceAccountCredentials = JSON.parse(credentials);
-    const auth = new google.auth.GoogleAuth({
-        credentials: {
-            client_email: serviceAccountCredentials.client_email,
-            private_key: serviceAccountCredentials.private_key.replace(/\\n/g, '\n'),
-        },
-        scopes: ['https://www.googleapis.com/auth/documents'],
-    });
-    const client = await auth.getClient();
-    return google.docs({ version: 'v1', auth: client });
-}
+// The local getAuth() helper function is no longer needed here.
+
+// Helper function to extract text from a Google Doc response
 function readDocContent(doc) {
     let text = '';
     if (doc.body && doc.body.content) {
@@ -65,7 +55,8 @@ module.exports = {
         await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
         try {
-            const docs = await getAuth();
+            // Call the new centralized function to get the authenticated docs service
+            const docs = await getDocsService();
             const subcommand = interaction.options.getSubcommand();
 
             // Get the chosen doc name and look up its ID
@@ -87,6 +78,7 @@ module.exports = {
             } else if (subcommand === 'append') {
                 const textToAppend = interaction.options.getString('text');
 
+                // To append, we need to find the end index of the document body
                 const docData = await docs.documents.get({ documentId: documentId, fields: 'body(content(endIndex))' });
                 const endIndex = docData.data.body.content[docData.data.body.content.length - 1].endIndex - 1;
 

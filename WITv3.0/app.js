@@ -10,6 +10,7 @@ const config = require('./config.js');
 const charManager = require('./helpers/characterManager.js');
 const authManager = require('./helpers/authManager.js');
 const { startServer } = require('./server.js');
+const { updateIncursions } = require('./helpers/incursionUpdater.js');
 
 dotenv.config();
 
@@ -18,7 +19,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 // In-memory stores
 client.esiStateMap = new Map();
 client.srpData = new Map();
-client.mailSubjects = new Map(); // For storing mail subjects temporarily
+client.mailSubjects = new Map();
 
 // Start the ESI authentication callback server
 startServer(client);
@@ -50,183 +51,8 @@ for (const folder of commandFolders) {
 // ================================================================= //
 // ============ STATE MANAGEMENT & HELPER FUNCTIONS ================ //
 // ================================================================= //
-const STATE_FILE = path.join(__dirname, 'state.json');
 
-let stateData;
-try {
-    stateData = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-} catch (error) {
-    console.log('State file not found or invalid, creating a fresh state.');
-    stateData = {};
-}
-
-let {
-    lastIncursionState = '',
-    incursionMessageId = null,
-    lastHqSystemId = null
-} = stateData;
-
-let isUpdating = false;
-const factionMap = { 500019: 'Sansha\'s Nation', 500020: 'Triglavian Collective' };
-const incursionSystems = require('./helpers/incursionsystem.json');
-
-function saveState() {
-    const state = { lastIncursionState, incursionMessageId, lastHqSystemId };
-    try {
-        fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
-    } catch (error) {
-        console.error('Failed to save state to file:', error);
-    }
-}
-
-client.updateIncursions = async function (isManualRefresh = false) {
-    if (isUpdating) { return; }
-    isUpdating = true;
-    try {
-        console.log('Checking for incursion updates...');
-        const response = await axios.get('https://esi.evetech.net/latest/incursions/', { timeout: 5000 });
-        const allIncursions = response.data;
-
-        const getSystemData = async (systemId) => {
-            try {
-                const sysResponse = await axios.get(`https://esi.evetech.net/latest/universe/systems/${systemId}/`, { timeout: 5000 });
-                return sysResponse.data;
-            } catch (e) {
-                console.error(`Could not resolve system ID ${systemId}:`, e.message);
-                return null;
-            }
-        };
-
-        const enrichedIncursions = await Promise.all(allIncursions.map(async (incursion) => {
-            const systemData = await getSystemData(incursion.staging_solar_system_id);
-            return { ...incursion, systemData };
-        }));
-
-        const highSecIncursion = enrichedIncursions.find(inc => inc.systemData && inc.systemData.security_status >= 0.5);
-        const currentState = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
-
-        if (currentState === lastIncursionState && !isManualRefresh) {
-            console.log('No change in high-sec incursion state.');
-            return;
-        }
-
-        console.log('High-sec incursion state has changed or manual refresh triggered. Updating...');
-        lastIncursionState = currentState;
-
-        let embed;
-        if (highSecIncursion) {
-            const spawnData = incursionSystems.find(constellation => constellation['ConstellationID'] === highSecIncursion.constellation_id);
-
-            if (!spawnData) {
-                console.log(`No matching spawn data found for Constellation ID: ${highSecIncursion.constellation_id}`);
-                return;
-            }
-
-            const currentHqId = spawnData['Dock Up System'];
-            const currentHqName = spawnData['Headquarter System'].split(' ')[0];
-            let lastHqRouteString = '';
-
-            if (lastHqSystemId && lastHqSystemId !== currentHqId) {
-                const lastHqNameData = incursionSystems.find(sys => sys['Dock Up System'] === lastHqSystemId);
-                const lastHqName = lastHqNameData ? lastHqNameData['Headquarter System'].split(' ')[0] : 'Last HQ';
-                try {
-                    const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:secure`;
-                    const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:shortest`;
-                    const secureEsiUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=secure`;
-                    const shortestEsiUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=shortest`;
-                    const [secureResponse, shortestResponse] = await Promise.all([
-                        axios.get(secureEsiUrl, { timeout: 5000 }),
-                        axios.get(shortestEsiUrl, { timeout: 5000 })
-                    ]);
-                    const secureJumps = secureResponse.data.length - 1;
-                    const shortestJumps = shortestResponse.data.length - 1;
-                    if (secureJumps === shortestJumps) {
-                        lastHqRouteString = `**From ${lastHqName}**: [${shortestJumps} jumps](${shortestGatecheckUrl})`;
-                    } else {
-                        lastHqRouteString = `**From ${lastHqName}**: [${secureJumps}j (secure)](${secureGatecheckUrl}), [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
-                    }
-                } catch (e) {
-                    console.error('Failed to calculate route from last HQ:', e.message);
-                    lastHqRouteString = `**From ${lastHqName}**: N/A`;
-                }
-            }
-            lastHqSystemId = currentHqId;
-
-            const jumpPromises = Object.entries(config.tradeHubs).map(async ([name, id]) => {
-                const originId = currentHqId;
-                const destinationId = id;
-                const originName = currentHqName;
-                const destinationName = name;
-                try {
-                    const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${originName}:${destinationName}:secure`;
-                    const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${originName}:${destinationName}:shortest`;
-                    const secureEsiUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=secure`;
-                    const shortestEsiUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=shortest`;
-                    const [secureResponse, shortestResponse] = await Promise.all([
-                        axios.get(secureEsiUrl, { timeout: 5000 }),
-                        axios.get(shortestEsiUrl, { timeout: 5000 })
-                    ]);
-                    const secureJumps = secureResponse.data.length - 1;
-                    const shortestJumps = shortestResponse.data.length - 1;
-                    if (secureJumps === shortestJumps) {
-                        return `**${name}**: [${shortestJumps} jumps](${shortestGatecheckUrl})`;
-                    } else {
-                        return `**${name}**: [${secureJumps}j (secure)](${secureGatecheckUrl}), [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
-                    }
-                } catch (e) {
-                    return `**${name}**: N/A`;
-                }
-            });
-            const jumpCounts = await Promise.all(jumpPromises);
-
-            embed = new EmbedBuilder()
-                .setColor(0xED4245)
-                .setTitle(`High-Sec Incursion Active: ${factionMap[highSecIncursion.faction_id] || 'Unknown Faction'}`)
-                .setThumbnail(`https://images.evetech.net/corporations/${highSecIncursion.faction_id === 500019 ? 1000179 : 1000182}/logo?size=64`)
-                .addFields(
-                    { name: 'Region', value: spawnData.REGION, inline: true },
-                    { name: 'Constellation', value: spawnData.Constellation, inline: true },
-                    { name: 'Security', value: highSecIncursion.systemData.security_status.toString(), inline: true },
-                    { name: 'State', value: `\`${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}\``, inline: true },
-                    { name: 'Headquarters', value: `[${spawnData['Headquarter System'].split(' ')[0]}](${`https://evemaps.dotlan.net/system/${spawnData['Headquarter System'].split(' ')[0]}`})`, inline: false },
-                    { name: 'Vanguard Systems', value: spawnData['Vanguard Systems'] || 'None', inline: false },
-                    { name: 'Assault Systems', value: spawnData['Assault Systems'] || 'None', inline: false },
-                    { name: 'Suggested Dockup', value: spawnData.Dockup, inline: false },
-                    ...(lastHqRouteString ? [{ name: 'Jumps from Last HQ', value: lastHqRouteString, inline: false }] : []),
-                    { name: 'Jumps from HQ', value: jumpCounts.join('\n'), inline: false }
-                ).setTimestamp();
-        } else {
-            embed = new EmbedBuilder().setColor(0x3BA55D).setTitle('No High-Sec Incursion Active').setDescription('The High-Security incursion is not currently active. Fly safe!').setTimestamp();
-        }
-
-        saveState();
-
-        const channel = await client.channels.fetch(config.incursionChannelId);
-        if (!channel) { return; }
-        const messagePayload = { content: ' ', embeds: [embed] };
-        if (incursionMessageId) {
-            try {
-                const message = await channel.messages.fetch(incursionMessageId);
-                await message.edit(messagePayload);
-            }
-            catch (error) {
-                console.log('Previous message not found, posting a new one.');
-                const newMessage = await channel.send(messagePayload);
-                incursionMessageId = newMessage.id;
-                saveState();
-            }
-        } else {
-            const newMessage = await channel.send(messagePayload);
-            incursionMessageId = newMessage.id;
-            saveState();
-        }
-    } catch (error) {
-        console.error('Failed to fetch or process incursion data. Full error:', error);
-    } finally {
-        isUpdating = false;
-        console.log('Update check finished.');
-    }
-};
+client.updateIncursions = (isManualRefresh = false) => updateIncursions(client, isManualRefresh);
 
 // ================================================================= //
 // ====================== EVENT LISTENERS ========================== //
@@ -347,7 +173,6 @@ client.on(Events.InteractionCreate, async interaction => {
                 return interaction.followUp({ content: 'Error: Could not find the first part of your SRP data. Please start again.', flags: [MessageFlags.Ephemeral] });
             }
 
-            // NEW: Send the SRP request as an in-game mail
             const authData = authManager.getUserAuthData(interaction.user.id);
             if (!authData) {
                 return interaction.followUp({ content: 'You must authenticate a character with the ESI before submitting an SRP request via mail. Please use `/auth login`.', flags: [MessageFlags.Ephemeral] });
@@ -372,7 +197,6 @@ client.on(Events.InteractionCreate, async interaction => {
                     + `Kill Report: ${srpData.killmail}\n`
                     + `Kill Value: ${srpData.value} ISK\n`
                     + `FC: ${srpData.fc}\n`
-                    + `Backseat Info: ${srpData.backseat}\n`
                     + `Ship Lost: ${srpData.ship}\n\n`
                     + `SRPable: ${srpData.srpable}\n`
                     + `Paid SRP: ${srpData.paid}\n`
@@ -395,6 +219,51 @@ client.on(Events.InteractionCreate, async interaction => {
                     }
                 );
 
+                try {
+                    const srpChannel = await client.channels.fetch(config.srpChannelId);
+                    if (srpChannel) {
+                        const submitterCharData = charManager.getChars(interaction.user.id);
+                        const submitterName = submitterCharData ? submitterCharData.mainChar : interaction.user.tag;
+
+                        let killReportValue = srpData.killmail;
+                        if (srpData.killmail && (srpData.killmail.startsWith('http://') || srpData.killmail.startsWith('https://'))) {
+                            killReportValue = `[Link](${srpData.killmail})`;
+                        }
+
+                        // <<< START: NEW TRUNCATION LOGIC >>>
+                        // Truncate the details field if it's too long for an embed
+                        let detailsValue = srpData.details || 'None';
+                        if (detailsValue.length > 1024) {
+                            detailsValue = detailsValue.substring(0, 1021) + '...';
+                        }
+                        // <<< END: NEW TRUNCATION LOGIC >>>
+
+                        const srpEmbed = new EmbedBuilder()
+                            .setColor(0x5865F2)
+                            .setAuthor({ name: `Submitted by: ${submitterName}`, iconURL: interaction.user.displayAvatarURL() })
+                            .setTitle('New SRP Request')
+                            .addFields(
+                                { name: 'Pilot Name', value: srpData.pilot, inline: true },
+                                { name: 'FC Name', value: srpData.fc, inline: true },
+                                { name: '\u200B', value: '\u200B', inline: true },
+                                { name: 'Ship Lost', value: srpData.ship, inline: true },
+                                { name: 'ISK Value', value: srpData.value, inline: true },
+                                { name: 'Kill Report', value: killReportValue, inline: true },
+                                { name: 'SRPable?', value: srpData.srpable, inline: true },
+                                { name: 'SRP Paid?', value: srpData.paid, inline: true },
+                                { name: 'Loot Recovered?', value: srpData.loot, inline: true },
+                                // Use the potentially truncated details value
+                                { name: 'Details', value: detailsValue, inline: false },
+                                { name: 'Submitted On', value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: false }
+                            )
+                            .setTimestamp();
+
+                        await srpChannel.send({ embeds: [srpEmbed] });
+                    }
+                } catch (channelError) {
+                    console.error('Failed to send SRP notification to channel:', channelError);
+                }
+
                 await interaction.followUp({ content: 'Your SRP request has been submitted successfully!', flags: [MessageFlags.Ephemeral] });
 
             } catch (error) {
@@ -405,7 +274,6 @@ client.on(Events.InteractionCreate, async interaction => {
                 client.srpData.delete(interaction.user.id);
             }
         }
-        // Handler for the sendmail modal
         if (customId.startsWith('sendmail_modal_')) {
             await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
@@ -424,7 +292,6 @@ client.on(Events.InteractionCreate, async interaction => {
 
             try {
                 const accessToken = await authManager.getAccessToken(interaction.user.id);
-                // ESI expects recipient ID to be an integer
                 const recipientId = parseInt(mailData.mailingList, 10);
                 if (isNaN(recipientId)) {
                     return interaction.editReply({ content: 'Error: The mailing list ID must be a number.' });
@@ -456,7 +323,6 @@ client.on(Events.InteractionCreate, async interaction => {
                 console.error('Failed to send EVE mail:', errorMessage);
                 await interaction.editReply({ content: `Failed to send EVE mail. ESI responded with: \`${errorMessage}\`` });
             } finally {
-                // Clean up the temporary storage
                 client.mailSubjects.delete(mailId);
             }
         }

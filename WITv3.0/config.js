@@ -77,4 +77,18 @@ module.exports = {
     },
     // Add the SRP mailing list ID for in-game mail notifications.
     srpMailingListId: '145241588',
+
+    // Onboarding configuration
+    addresident: {
+        // Define sets of roles. The key will be used in the command.
+        roleSets: {
+            'newresident': ['Eve'], // Add the exact role names to give
+            // Add another set like this:
+            // 'another_set': ['Role A', 'Role B'],
+        },
+        // Define channels to point new users to.
+        welcomeChannels: {
+            'resmasterlist': '1412388512149409792', // Replace with your #rules channel ID
+        }
+    }
 };

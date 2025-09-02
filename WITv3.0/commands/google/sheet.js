@@ -1,22 +1,8 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { google } = require('googleapis');
+// Import the new centralized function instead of the googleapis library
+const { getSheetsService } = require('../../helpers/googleAuth.js');
 // Import the entire sheets object from our config
 const { googleSheets } = require('../../config.js');
-
-// Helper function for Google Auth (no changes here)
-async function getAuth() {
-    const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS;
-    const serviceAccountCredentials = JSON.parse(credentials);
-    const auth = new google.auth.GoogleAuth({
-        credentials: {
-            client_email: serviceAccountCredentials.client_email,
-            private_key: serviceAccountCredentials.private_key.replace(/\\n/g, '\n'),
-        },
-        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
-    const client = await auth.getClient();
-    return google.sheets({ version: 'v4', auth: client });
-}
 
 // Dynamically create the choices for the command option
 const sheetChoices = Object.keys(googleSheets).map(key => ({ name: key, value: key }));
@@ -29,18 +15,19 @@ module.exports = {
             subcommand
                 .setName('read')
                 .setDescription('Read data from a cell in a specific sheet')
-                .addStringOption(option => // Add the new choice option
+                .addStringOption(option =>
                     option.setName('name')
                         .setDescription('The name of the sheet to access')
                         .setRequired(true)
-                        .addChoices(...sheetChoices)) // <-- Spread the choices here
+                        .addChoices(...sheetChoices))
                 .addStringOption(option =>
-                    option.setName('cell').setDescription('The cell to read (e.g., A1)').setRequired(true)))
+                    option.setName('cell').setDescription('The cell to read (e.g., A1)').setRequired(true))
+        )
         .addSubcommand(subcommand =>
             subcommand
                 .setName('write')
                 .setDescription('Write data to a cell in a specific sheet')
-                .addStringOption(option => // Add the new choice option here as well
+                .addStringOption(option =>
                     option.setName('name')
                         .setDescription('The name of the sheet to access')
                         .setRequired(true)
@@ -48,17 +35,17 @@ module.exports = {
                 .addStringOption(option =>
                     option.setName('cell').setDescription('The cell to write to (e.g., B2)').setRequired(true))
                 .addStringOption(option =>
-                    option.setName('value').setDescription('The value to write').setRequired(true))),
+                    option.setName('value').setDescription('The value to write').setRequired(true))
+        ),
 
     async execute(interaction) {
         await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
         try {
-            const sheets = await getAuth();
+            // Call the new centralized function to get the authenticated sheets service
+            const sheets = await getSheetsService();
             const subcommand = interaction.options.getSubcommand();
             const cell = interaction.options.getString('cell');
-
-            // Get the chosen sheet name and look up its ID
             const sheetName = interaction.options.getString('name');
             const spreadsheetId = googleSheets[sheetName];
 
@@ -69,17 +56,16 @@ module.exports = {
 
             if (subcommand === 'read') {
                 const response = await sheets.spreadsheets.values.get({
-                    spreadsheetId: spreadsheetId, // Use the dynamic ID
+                    spreadsheetId: spreadsheetId,
                     range: `Sheet1!${cell}`,
                 });
 
                 const value = response.data.values ? response.data.values[0][0] : 'empty';
                 await interaction.editReply(`Value in **${sheetName}** cell ${cell} is: **${value}**`);
-            }
-            else if (subcommand === 'write') {
+            } else if (subcommand === 'write') {
                 const value = interaction.options.getString('value');
                 await sheets.spreadsheets.values.update({
-                    spreadsheetId: spreadsheetId, // Use the dynamic ID
+                    spreadsheetId: spreadsheetId,
                     range: `Sheet1!${cell}`,
                     valueInputOption: 'USER_ENTERED',
                     resource: {
