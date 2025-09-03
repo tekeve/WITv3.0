@@ -72,4 +72,98 @@ module.exports = {
     },
     // Add the SRP mailing list ID for in-game mail notifications.
     srpMailingListId: '145241588',
+
+    // New Role Hierarchy for Promotions and Demotions
+    roleHierarchy: {
+        'Commander': {
+            promote: {
+                add: ['Commander'],
+                remove: []
+            },
+            demote: {
+                add: [],
+                remove: ['Commander']
+            }
+        },
+        'Resident': {
+            promote: {
+                add: ['Commander','Resident'],
+                remove: []
+            },
+            demote: {
+                add: [],
+                remove: ['Commander','Resident']
+            }
+        },
+        'Line Commander': {
+            promote: {
+                add: ['Line Commander'],
+                remove: ['Resident']
+            },
+            demote: {
+                add: ['Resident'],
+                remove: ['Line Commander']
+            }
+        },
+        'Training FC': {
+            promote: {
+                add: ['Training FC'],
+                remove: []
+            },
+            demote: {
+                add: [],
+                remove: ['Training FC']
+            }
+        },
+        'Fleet Commander': {
+            promote: {
+                add: ['Fleet Commander'],
+                remove: ['Training FC']
+            },
+            demote: {
+                add: ['Line Commander'],
+                remove: ['Fleet Commander']
+            }
+        },
+        'Training CT': {
+            promote: {
+                add: ['Training CT'],
+                remove: []
+            },
+            demote: {
+                add: [],
+                remove: ['Training CT']
+            }
+        },
+        'Certified Trainer': {
+            promote: {
+                add: ['Certified Trainer'],
+                remove: ['Training CT']
+            },
+            demote: {
+                add: [],
+                remove: ['Certified Trainer']
+            }
+        },
+        'Officer': {
+            promote: {
+                add: ['Officer'],
+                remove: []
+            },
+            demote: {
+                add: [],
+                remove: ['Officer']
+            }
+        },
+        'Leadership': {
+            promote: {
+                add: ['Leadership'],
+                remove: ['Officer']
+            },
+            demote: {
+                add: [],
+                remove: ['Leadership']
+            }
+        },
+    },
 };
