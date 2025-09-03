@@ -26,6 +26,15 @@ let isUpdating = false;
 const factionMap = { 500019: 'Sansha\'s Nation', 500020: 'Triglavian Collective' };
 const incursionSystems = require('./incursionsystem.json');
 
+// Color map for incursion states
+const stateColors = {
+    established: 0x3BA55D, // Green
+    mobilizing: 0xFFEA00,  // Yellow
+    withdrawing: 0xFFA500, // Orange
+    none: 0xED4245         // Red
+};
+
+
 function saveState() {
     const state = { lastIncursionState, incursionMessageId, lastHqSystemId };
     try {
@@ -79,15 +88,15 @@ async function updateIncursions(client, isManualRefresh = false) {
             }
 
             const currentHqId = spawnData['Dock Up System'];
-            const currentHqName = spawnData['Headquarter System'].split(' ')[0];
-            let lastHqRouteString = '';
+            const hqSystemName = spawnData['Headquarter System'].split(' (')[0];
 
+            let lastHqRouteString = '';
             if (lastHqSystemId && lastHqSystemId !== currentHqId) {
                 const lastHqNameData = incursionSystems.find(sys => sys['Dock Up System'] === lastHqSystemId);
                 const lastHqName = lastHqNameData ? lastHqNameData['Headquarter System'].split(' ')[0] : 'Last HQ';
                 try {
-                    const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:secure`;
-                    const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${currentHqName}:shortest`;
+                    const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${hqSystemName}:secure`;
+                    const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${hqSystemName}:shortest`;
                     const secureEsiUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=secure`;
                     const shortestEsiUrl = `https://esi.evetech.net/v1/route/${lastHqSystemId}/${currentHqId}/?flag=shortest`;
                     const [secureResponse, shortestResponse] = await Promise.all([
@@ -96,63 +105,67 @@ async function updateIncursions(client, isManualRefresh = false) {
                     ]);
                     const secureJumps = secureResponse.data.length - 1;
                     const shortestJumps = shortestResponse.data.length - 1;
-                    if (secureJumps === shortestJumps) {
-                        lastHqRouteString = `**From ${lastHqName}**: [${shortestJumps} jumps](${shortestGatecheckUrl})`;
-                    } else {
-                        lastHqRouteString = `**From ${lastHqName}**: [${secureJumps}j (secure)](${secureGatecheckUrl}), [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
-                    }
+                    lastHqRouteString = `From **${lastHqName}**: [${secureJumps}j (secure)](${secureGatecheckUrl}) / [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
                 } catch (e) {
                     logger.error('Failed to calculate route from last HQ:', e.message);
-                    lastHqRouteString = `**From ${lastHqName}**: N/A`;
+                    lastHqRouteString = `From **${lastHqName}**: N/A`;
                 }
             }
             lastHqSystemId = currentHqId;
 
             const jumpPromises = Object.entries(config.tradeHubs).map(async ([name, id]) => {
-                const originId = currentHqId;
-                const destinationId = id;
-                const originName = currentHqName;
-                const destinationName = name;
                 try {
-                    const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${originName}:${destinationName}:secure`;
-                    const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${originName}:${destinationName}:shortest`;
-                    const secureEsiUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=secure`;
-                    const shortestEsiUrl = `https://esi.evetech.net/v1/route/${originId}/${destinationId}/?flag=shortest`;
-                    const [secureResponse, shortestResponse] = await Promise.all([
-                        axios.get(secureEsiUrl, { timeout: 5000 }),
-                        axios.get(shortestEsiUrl, { timeout: 5000 })
-                    ]);
-                    const secureJumps = secureResponse.data.length - 1;
-                    const shortestJumps = shortestResponse.data.length - 1;
-                    if (secureJumps === shortestJumps) {
-                        return `**${name}**: [${shortestJumps} jumps](${shortestGatecheckUrl})`;
-                    } else {
-                        return `**${name}**: [${secureJumps}j (secure)](${secureGatecheckUrl}), [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
-                    }
+                    const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${hqSystemName}:${name}:secure`;
+                    const secureEsiUrl = `https://esi.evetech.net/v1/route/${currentHqId}/${id}/?flag=secure`;
+                    const response = await axios.get(secureEsiUrl, { timeout: 5000 });
+                    const jumpCount = response.data.length - 1;
+                    return { name: name, jumps: `[${jumpCount} Jumps](${secureGatecheckUrl})` };
                 } catch (e) {
-                    return `**${name}**: N/A`;
+                    return { name: name, jumps: 'N/A' };
                 }
             });
             const jumpCounts = await Promise.all(jumpPromises);
 
+            const formatSystemLinks = (systemString) => {
+                if (!systemString || systemString.trim() === '') return 'None';
+                return systemString.split(',')
+                    .map(name => name.trim())
+                    .map(name => `[${name}](https://evemaps.dotlan.net/system/${encodeURIComponent(name)})`)
+                    .join(', ');
+            };
+
+            const embedColor = stateColors[highSecIncursion.state] || stateColors.none;
+
             embed = new EmbedBuilder()
-                .setColor(0xED4245)
-                .setTitle(`High-Sec Incursion Active: ${factionMap[highSecIncursion.faction_id] || 'Unknown Faction'}`)
-                .setThumbnail(`https://images.evetech.net/corporations/${highSecIncursion.faction_id === 500019 ? 1000179 : 1000182}/logo?size=64`)
+                .setColor(embedColor)
+                .setTitle(`High-Sec Incursion: ${factionMap[highSecIncursion.faction_id] || 'Unknown Faction'}`)
+                .setDescription(`Sansha's Nation is targeting the **${spawnData.Constellation}** constellation in the **${spawnData.REGION}** region.`)
+                .setThumbnail(`https://images.evetech.net/corporations/${highSecIncursion.faction_id === 500019 ? 1000179 : 1000182}/logo?size=128`)
                 .addFields(
-                    { name: 'Region', value: spawnData.REGION, inline: true },
-                    { name: 'Constellation', value: spawnData.Constellation, inline: true },
-                    { name: 'Security', value: highSecIncursion.systemData.security_status.toFixed(1), inline: true },
-                    { name: 'State', value: `\`${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}\``, inline: true },
-                    { name: 'Headquarters', value: `[${spawnData['Headquarter System'].split(' ')[0]}](${`https://evemaps.dotlan.net/system/${spawnData['Headquarter System'].split(' ')[0]}`})`, inline: false },
-                    { name: 'Vanguard Systems', value: spawnData['Vanguard Systems'] || 'None', inline: false },
-                    { name: 'Assault Systems', value: spawnData['Assault Systems'] || 'None', inline: false },
-                    { name: 'Suggested Dockup', value: spawnData.Dockup, inline: false },
-                    ...(lastHqRouteString ? [{ name: 'Jumps from Last HQ', value: lastHqRouteString, inline: false }] : []),
-                    { name: 'Jumps from HQ', value: jumpCounts.join('\n'), inline: false }
-                ).setTimestamp();
+                    { name: 'Headquarters System', value: `[${spawnData['Headquarter System']}](https://evemaps.dotlan.net/system/${encodeURIComponent(hqSystemName)})`, inline: true },
+                    { name: 'Current State', value: `\`${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}\``, inline: true },
+                    { name: 'Island Constellation?', value: spawnData.ISLAND === 'ISLAND' ? '`Yes`' : '`No`', inline: true },
+                    { name: 'Vanguard Systems', value: formatSystemLinks(spawnData['Vanguard Systems']), inline: false },
+                    { name: 'Assault Systems', value: formatSystemLinks(spawnData['Assault Systems']), inline: false },
+                    { name: 'Suggested Dockup', value: `\`${spawnData.Dockup}\``, inline: false },
+                    { name: `Travel from ${jumpCounts[0].name}`, value: jumpCounts[0].jumps, inline: true },
+                    { name: `Travel from ${jumpCounts[1].name}`, value: jumpCounts[1].jumps, inline: true },
+                    { name: `Travel from ${jumpCounts[2].name}`, value: jumpCounts[2].jumps, inline: true },
+                )
+                .setFooter({ text: 'WTM-WIT Incursion Tracker | Data from ESI' })
+                .setTimestamp();
+
+            if (lastHqRouteString) {
+                embed.addFields({ name: 'Travel from Last HQ', value: lastHqRouteString, inline: false });
+            }
+
         } else {
-            embed = new EmbedBuilder().setColor(0x3BA55D).setTitle('No High-Sec Incursion Active').setDescription('The High-Security incursion is not currently active. Fly safe!').setTimestamp();
+            embed = new EmbedBuilder()
+                .setColor(stateColors.none)
+                .setTitle('No High-Sec Incursion Active')
+                .setDescription('The High-Security incursion is not currently active. Fly safe!')
+                .setFooter({ text: 'WTM-WIT Incursion Tracker | Data from ESI' })
+                .setTimestamp();
         }
 
         saveState();
@@ -177,24 +190,17 @@ async function updateIncursions(client, isManualRefresh = false) {
             saveState();
         }
     } catch (error) {
-        // <<< START: NEW ERROR HANDLING LOGIC >>>
         if (axios.isAxiosError(error)) {
-            // This is a network-level error (timeout, DNS, etc.)
             if (error.code === 'ECONNABORTED') {
                 logger.warn('ESI request timed out. Retrying on the next cycle.');
             } else if (error.response) {
-                // The ESI server responded with an error status code (4xx, 5xx)
                 logger.warn(`ESI returned a non-2xx status: ${error.response.status}. Retrying on the next cycle.`);
             } else {
-                // A different network error occurred
                 logger.warn('An error occurred while contacting ESI. Retrying on the next cycle.');
             }
         } else {
-            // This is not an Axios error, so it's likely an issue with Discord or our own code.
-            // We log the full error here for better debugging.
             logger.error('An unexpected error occurred during incursion update:', error);
         }
-        // <<< END: NEW ERROR HANDLING LOGIC >>>
     } finally {
         isUpdating = false;
         logger.info('Update check finished.');
@@ -202,3 +208,4 @@ async function updateIncursions(client, isManualRefresh = false) {
 }
 
 module.exports = { updateIncursions };
+
