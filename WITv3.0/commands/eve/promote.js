@@ -41,25 +41,28 @@ module.exports = {
 
         // 2. GET INPUTS
         const promotionName = interaction.options.getString('rank');
+        logger.info('promotionName: ', promoterName);
         const targetUser = interaction.options.getUser('user');
         const targetMember = await interaction.guild.members.fetch(targetUser.id);
         const formattedRoleName = promotionName.replace(/_/g, ' ');
-
+        logger.info('formattedRoleName: ', formattedRoleName);
         if (!targetMember) {
             return interaction.editReply({ content: 'Could not find that user in the server.' });
         }
 
         // 3. RESOLVE ROLE CHANGES & DELAY
         const promotionConfig = promotions.roleSets[promotionName];
+        logger.info('promotionConfig: ', promotionConfig);
         const roleNamesToAdd = promotionConfig.add || [];
+        logger.info('roleNamesToAdd: ', roleNamesToAdd);
         const roleNamesToRemove = promotionConfig.remove || [];
-        // Get delay from config, default to 2 seconds if not set
-        const promotionDelayMs = promotions.promotionDelay || 2000;
+        logger.info('roleNamesToRemove: ', roleNamesToRemove);
 
         const rolesToAdd = [];
         const rolesToRemove = [];
         let notFoundAdd = [];
         let notFoundRemove = [];
+        logger.info('rolesToAdd: ', rolesToAdd); logger.info('rolesToRemove: ', rolesToRemove);
 
         // Find role objects to add
         for (const roleName of roleNamesToAdd) {
