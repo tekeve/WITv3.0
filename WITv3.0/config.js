@@ -129,12 +129,13 @@ module.exports = {
                 message: 'Congratulations on your promotion to Leadership!'
             },
         }
-    }
-    // NEW: Configuration for the /demote command
+    },
+    // Configuration for the /demote command
     demotions: {
         // A complete list of all roles managed by the promote/demote commands.
         // This is used by the '/demote rank:all' option.
         allManagedRoles: [
+            'Commander',
             'Resident',
             'Line Commander',
             'Training FC',

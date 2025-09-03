@@ -1,7 +1,7 @@
 ﻿const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const charManager = require('@helpers/characterManager');
 const { adminRoles, promotions } = require('../../config.js');
 const logger = require('@helpers/logger');
-const charManager = require('@helpers/characterManager');
 
 // Dynamically create choices for the promotion option from the config
 const promotionChoices = Object.keys(promotions.roleSets).map(key => ({
@@ -12,7 +12,7 @@ const promotionChoices = Object.keys(promotions.roleSets).map(key => ({
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('promote')
-        .setDescription('Promotes a user to a new role set and sends a notification.')
+        .setDescription('Promotes a user to a specific rank.')
         .addUserOption(option =>
             option.setName('user')
                 .setDescription('The user to promote.')
@@ -37,7 +37,7 @@ module.exports = {
         await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
         // 2. GET INPUTS
-        const promotionName = interaction.options.getString('rank'); // Get the selected rank from the string option
+        const promotionName = interaction.options.getString('rank');
         const targetUser = interaction.options.getUser('user');
         const targetMember = await interaction.guild.members.fetch(targetUser.id);
         const formattedRoleName = promotionName.replace(/_/g, ' ');
@@ -46,11 +46,12 @@ module.exports = {
             return interaction.editReply({ content: 'Could not find that user in the server.' });
         }
 
-        // 3. FIND AND MANAGE ROLES
+        // 3. FIND AND PREPARE ROLES FOR CHANGE
         const promotionConfig = promotions.roleSets[promotionName];
         const rolesToAdd = [];
         const rolesToRemove = [];
-        let notFoundRoles = [];
+        let notFoundAdd = [];
+        let notFoundRemove = [];
 
         // Find roles to add
         const roleNamesToAdd = promotionConfig.add || [];
@@ -59,7 +60,7 @@ module.exports = {
             if (role) {
                 rolesToAdd.push(role);
             } else {
-                notFoundRoles.push(roleName);
+                notFoundAdd.push(roleName);
             }
         }
 
@@ -70,55 +71,63 @@ module.exports = {
             if (role) {
                 rolesToRemove.push(role);
             } else {
-                logger.warn(`Could not find role '${roleName}' to remove.`);
+                notFoundRemove.push(roleName);
             }
         }
 
-        if (notFoundRoles.length > 0) {
-            logger.warn(`Could not find the following roles to assign: ${notFoundRoles.join(', ')}`);
+        if (notFoundAdd.length > 0) {
+            logger.warn(`Could not find the following roles to add during promotion: ${notFoundAdd.join(', ')}`);
+        }
+        if (notFoundRemove.length > 0) {
+            logger.warn(`Could not find the following roles to remove during promotion: ${notFoundRemove.join(', ')}`);
         }
 
         if (rolesToAdd.length === 0) {
-            return interaction.editReply({ content: `Error: None of the roles for the '${formattedRoleName}' promotion could be found. Please check the config.` });
+            return interaction.editReply({ content: `Error: None of the roles to add for the '${formattedRoleName}' promotion could be found. Please check the config.` });
         }
 
-        // Perform the role updates
-        await targetMember.roles.add(rolesToAdd);
-        if (rolesToRemove.length > 0) {
-            await targetMember.roles.remove(rolesToRemove);
+        // <<< START: SAFER ROLE MANAGEMENT LOGIC >>>
+        // Perform role changes in separate, explicit steps
+        try {
+            if (rolesToRemove.length > 0) {
+                await targetMember.roles.remove(rolesToRemove);
+            }
+            if (rolesToAdd.length > 0) {
+                await targetMember.roles.add(rolesToAdd);
+            }
+        } catch (error) {
+            logger.error('Failed to update roles:', error);
+            return interaction.editReply({ content: 'An error occurred while updating roles. Please check my permissions and role hierarchy.' });
         }
+        // <<< END: SAFER ROLE MANAGEMENT LOGIC >>>
+
 
         // 4. PREPARE AND SEND THE DIRECT MESSAGE
-        const notificationInfo = promotions.notificationInfo[promotionName];
-        if (notificationInfo) {
-            const channel = interaction.guild.channels.cache.get(notificationInfo.channelId);
-            const channelLink = channel ? `<#${channel.id}>` : 'the relevant channels';
+        const notificationConfig = promotions.notificationInfo[promotionName];
+        const submitterCharData = charManager.getChars(interaction.user.id);
+        const promoterName = submitterCharData ? submitterCharData.mainChar : interaction.user.tag;
 
-            const promoterCharData = charManager.getChars(interaction.user.id);
-            const promoterName = promoterCharData ? promoterCharData.mainChar : interaction.user.tag;
+        const promotionEmbed = new EmbedBuilder()
+            .setColor(0x3BA55D)
+            .setTitle(`🎉 You have been promoted in ${interaction.guild.name}!`)
+            .setDescription(notificationConfig.message || `Congratulations on your promotion to ${formattedRoleName}!`)
+            .addFields({ name: 'More Information', value: `Please visit the <#${notificationConfig.channelId}> channel.` })
+            .setTimestamp()
+            .setFooter({ text: `Promoted by: ${promoterName}` });
 
-            const welcomeEmbed = new EmbedBuilder()
-                .setColor(0x3BA55D) // Green
-                .setTitle(`🎉 Congratulations! You've been promoted!`)
-                .setDescription(`You have been promoted to **${formattedRoleName}** in the ${interaction.guild.name} server.`)
-                .addFields({ name: 'Next Steps', value: `${notificationInfo.message} You can find more information in ${channelLink}.` })
-                .setTimestamp()
-                .setFooter({ text: `Promoted by: ${promoterName}` });
-
-            let dmSent = true;
-            try {
-                await targetUser.send({ embeds: [welcomeEmbed] });
-            } catch (error) {
-                logger.error(`Could not send a DM to ${targetUser.tag}. They may have DMs disabled.`);
-                dmSent = false;
-            }
-
-            const confirmationMessage = `Successfully promoted ${targetUser.tag} to **${formattedRoleName}**.`
-                + (dmSent ? ' A notification DM has been sent.' : ' **Warning:** Could not send a notification DM as their DMs are likely private.');
-            await interaction.editReply({ content: confirmationMessage });
-
-        } else {
-            await interaction.editReply({ content: `Successfully promoted ${targetUser.tag} to **${formattedRoleName}**, but no DM was sent as it is not configured.` });
+        let dmSent = true;
+        try {
+            await targetUser.send({ embeds: [promotionEmbed] });
+        } catch (error) {
+            logger.error(`Could not send a DM to ${targetUser.tag}. They may have DMs disabled.`);
+            dmSent = false;
         }
+
+        // 5. SEND CONFIRMATION
+        const confirmationMessage = `Successfully promoted ${targetUser.tag} to **${formattedRoleName}**. `
+            + (dmSent ? 'A notification DM has been sent.' : ' **Warning:** Could not send a notification DM as their DMs are likely private.');
+
+        await interaction.editReply({ content: confirmationMessage });
     },
 };
+
