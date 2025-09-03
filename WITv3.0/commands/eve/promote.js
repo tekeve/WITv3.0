@@ -9,6 +9,9 @@ const promotionChoices = Object.keys(promotions.roleSets).map(key => ({
     value: key
 }));
 
+// A helper function for creating a delay
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('promote')
@@ -46,63 +49,62 @@ module.exports = {
             return interaction.editReply({ content: 'Could not find that user in the server.' });
         }
 
-        // 3. FIND AND PREPARE ROLES FOR CHANGE
+        // 3. RESOLVE ROLE CHANGES & DELAY
         const promotionConfig = promotions.roleSets[promotionName];
+        const roleNamesToAdd = promotionConfig.add || [];
+        const roleNamesToRemove = promotionConfig.remove || [];
+        // Get delay from config, default to 2 seconds if not set
+        const promotionDelayMs = promotions.promotionDelay || 2000;
+
         const rolesToAdd = [];
         const rolesToRemove = [];
         let notFoundAdd = [];
         let notFoundRemove = [];
 
-        // Find roles to add
-        const roleNamesToAdd = promotionConfig.add || [];
+        // Find role objects to add
         for (const roleName of roleNamesToAdd) {
             const role = interaction.guild.roles.cache.find(r => r.name === roleName);
-            if (role) {
-                rolesToAdd.push(role);
-            } else {
-                notFoundAdd.push(roleName);
-            }
+            if (role) rolesToAdd.push(role);
+            else notFoundAdd.push(roleName);
         }
 
-        // Find roles to remove
-        const roleNamesToRemove = promotionConfig.remove || [];
+        // Find role objects to remove
         for (const roleName of roleNamesToRemove) {
             const role = interaction.guild.roles.cache.find(r => r.name === roleName);
-            if (role) {
-                rolesToRemove.push(role);
-            } else {
-                notFoundRemove.push(roleName);
-            }
+            if (role) rolesToRemove.push(role);
+            else notFoundRemove.push(roleName);
         }
 
-        if (notFoundAdd.length > 0) {
-            logger.warn(`Could not find the following roles to add during promotion: ${notFoundAdd.join(', ')}`);
-        }
-        if (notFoundRemove.length > 0) {
-            logger.warn(`Could not find the following roles to remove during promotion: ${notFoundRemove.join(', ')}`);
-        }
+        if (notFoundAdd.length > 0) logger.warn(`Could not find roles to add: ${notFoundAdd.join(', ')}`);
+        if (notFoundRemove.length > 0) logger.warn(`Could not find roles to remove: ${notFoundRemove.join(', ')}`);
 
         if (rolesToAdd.length === 0) {
-            return interaction.editReply({ content: `Error: None of the roles to add for the '${formattedRoleName}' promotion could be found. Please check the config.` });
+            return interaction.editReply({ content: `Error: Could not find any valid roles to add for the '${formattedRoleName}' promotion. Please check the config.` });
         }
 
-        // <<< START: SAFER ROLE MANAGEMENT LOGIC >>>
-        // Perform role changes in separate, explicit steps
+        // 4. APPLY ROLE CHANGES WITH DELAY
         try {
-            if (rolesToRemove.length > 0) {
-                await targetMember.roles.remove(rolesToRemove);
-            }
             if (rolesToAdd.length > 0) {
+                logger.info(`Adding roles: ${rolesToAdd.map(r => r.name).join(', ')}`);
                 await targetMember.roles.add(rolesToAdd);
+                logger.success('Successfully added new roles.');
             }
+
+            logger.info(`Waiting for ${promotionDelayMs}ms before removing old roles...`);
+            await delay(promotionDelayMs);
+
+            if (rolesToRemove.length > 0) {
+                logger.info(`Removing roles: ${rolesToRemove.map(r => r.name).join(', ')}`);
+                await targetMember.roles.remove(rolesToRemove);
+                logger.success('Successfully removed old roles.');
+            }
+
         } catch (error) {
             logger.error('Failed to update roles:', error);
             return interaction.editReply({ content: 'An error occurred while updating roles. Please check my permissions and role hierarchy.' });
         }
-        // <<< END: SAFER ROLE MANAGEMENT LOGIC >>>
 
-
-        // 4. PREPARE AND SEND THE DIRECT MESSAGE
+        // 5. PREPARE AND SEND THE DIRECT MESSAGE
         const notificationConfig = promotions.notificationInfo[promotionName];
         const submitterCharData = charManager.getChars(interaction.user.id);
         const promoterName = submitterCharData ? submitterCharData.mainChar : interaction.user.tag;
@@ -123,7 +125,7 @@ module.exports = {
             dmSent = false;
         }
 
-        // 5. SEND CONFIRMATION
+        // 6. SEND CONFIRMATION
         const confirmationMessage = `Successfully promoted ${targetUser.tag} to **${formattedRoleName}**. `
             + (dmSent ? 'A notification DM has been sent.' : ' **Warning:** Could not send a notification DM as their DMs are likely private.');
 

@@ -75,6 +75,9 @@ module.exports = {
 
     // Configuration for the /promote command
     promotions: {
+        // The delay in milliseconds between adding the new role and removing the old one.
+        // Useful for diagnosing issues with other bots or Discord's role persistence.
+        promotionDelay: 3000,
         roleSets: {
             'resident': {
                 add: ['Commander', 'Resident'],
@@ -148,15 +151,13 @@ module.exports = {
         roleSets: {
             'resident': {
                 remove: ['Commander','Resident'],
-                // No roles are added back when demoting from Resident
             },
             'line_commander': {
                 remove: ['Line Commander'],
                 add: ['Resident']
             },
             'training_fc': {
-                remove: ['Training FC'],
-                add: ['Line Commander']
+                remove: ['Training FC']
             },
             'fleet_commander': {
                 remove: ['Fleet Commander']
@@ -168,8 +169,7 @@ module.exports = {
                 remove: ['Certified Trainer']
             },
             'officer': {
-                remove: ['Officer'],
-                add: ['Fleet Commander', 'Certified Trainer'] // Assumes
+                remove: ['Officer']
             },
             'leadership': {
                 remove: ['Leadership'],
