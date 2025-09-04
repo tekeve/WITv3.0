@@ -60,7 +60,8 @@ async function getAccessToken(discordId) {
 
         // Update the user's data with the new tokens and expiry time
         const updateSql = 'UPDATE commander_list SET access_token = ?, refresh_token = ?, token_expiry = ? WHERE discord_id = ?';
-        const newExpiry = new Date(Date.now() + expiresIn * 1000).toISOString();
+        const expiryDate = new Date(Date.now() + expiresIn * 1000);
+        const newExpiry = expiryDate.toISOString().slice(0, 19).replace('T', ' '); // Format for MySQL
         await db.query(updateSql, [newAccessToken, newRefreshToken, newExpiry, discordId]);
 
         return newAccessToken;
@@ -79,8 +80,26 @@ module.exports = {
      */
     saveUserAuth: async (discordId, authData) => {
         try {
-            const sql = 'INSERT INTO commander_list (discord_id, access_token, refresh_token, token_expiry) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE access_token = VALUES(access_token), refresh_token = VALUES(refresh_token), token_expiry = VALUES(token_expiry)';
-            await db.query(sql, [discordId, authData.access_token, authData.refresh_token, authData.token_expiry]);
+            const sql = `
+                INSERT INTO commander_list (discord_id, main_character, character_id, character_name, access_token, refresh_token, token_expiry)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    main_character = VALUES(main_character),
+                    character_id = VALUES(character_id),
+                    character_name = VALUES(character_name),
+                    access_token = VALUES(access_token),
+                    refresh_token = VALUES(refresh_token),
+                    token_expiry = VALUES(token_expiry)
+            `;
+            await db.query(sql, [
+                discordId,
+                authData.character_name, // Use character_name for main_character
+                authData.character_id,
+                authData.character_name,
+                authData.access_token,
+                authData.refresh_token,
+                authData.token_expiry
+            ]);
         } catch (error) {
             logger.error('Error saving user auth data:', error);
         }
@@ -94,7 +113,7 @@ module.exports = {
     getUserAuthData: async (discordId) => {
         try {
             const sql = 'SELECT discord_id, character_name, access_token, refresh_token, token_expiry FROM commander_list WHERE discord_id = ?';
-            const rows = await db.query(sql, [discordId]);1
+            const rows = await db.query(sql, [discordId]); 1
             return rows[0] || null;
         } catch (error) {
             logger.error('Error fetching user auth data:', error);
@@ -121,3 +140,4 @@ module.exports = {
     // Export the getAccessToken function
     getAccessToken: getAccessToken
 };
+

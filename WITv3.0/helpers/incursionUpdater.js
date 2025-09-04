@@ -246,14 +246,14 @@ async function updateIncursions(client, options = {}) {
                 .setColor(stateColors[highSecIncursion.state] || stateColors.none)
                 .setTitle(`High-Sec Incursion: **${spawnData.Constellation}**`)
                 .setDescription(`Spawning in the [**${spawnData.REGION}**](https://evemaps.dotlan.net/region/${encodeURIComponent(spawnData.REGION)}) region.`)
-                .setThumbnail(`https://images.evetech.net/corporations/${highSecIncursion.faction_id}/logo?size=128`)
+                .setThumbnail(`https://images.evetech.net/corporations/${spawnData['FACTION ID']}/logo?size=128`)
                 .addFields(
                     { name: 'Suggested Dockup', value: `${spawnData.Dockup}`, inline: true },
                     { name: 'Current State', value: `${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}`, inline: true },
                     { name: 'Incursion Timeline', value: timelineString, inline: true },
                     { name: 'Headquarters', value: `[${spawnData['Headquarter System']}](https://evemaps.dotlan.net/system/${encodeURIComponent(hqSystemName)})`, inline: true },
-                    { name: 'Vanguards', value: formatSystemLinks(spawnData['Vanguard Systems']), inline: true },
                     { name: 'Assaults', value: formatSystemLinks(spawnData['Assault Systems']), inline: true },
+                    { name: 'Vanguards', value: formatSystemLinks(spawnData['Vanguard Systems']), inline: true },
                     { name: 'Routes from Trade Hubs', value: tradeHubJumpsString, inline: true },
                 )
                 .setFooter({ text: 'WIT v3.0 Incursion Tracker | Data from ESI' })
@@ -314,5 +314,3 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
-
-

@@ -1,4 +1,5 @@
 ﻿const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
+const charManager = require('@helpers/characterManager'); // Import the character manager
 require('dotenv').config();
 
 module.exports = {
@@ -14,6 +15,11 @@ module.exports = {
         const requestDetails = interaction.options.getString('details');
         const requester = interaction.user;
 
+        // Get the user's character data
+        const charData = charManager.getChars(requester.id);
+        // Use the main character name if it exists, otherwise fall back to the Discord tag
+        const requesterName = charData && charData.mainChar ? charData.mainChar : requester.tag;
+
         const requestChannel = await interaction.client.channels.fetch(process.env.REQUEST_CHANNEL_ID);
         if (!requestChannel) {
             return interaction.reply({ content: 'Error: The request channel is not configured correctly.' });
@@ -25,11 +31,11 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(0xFFA500) // Orange for 'Open'
             .setTitle('New Request Ticket')
-            .setAuthor({ name: requester.tag, iconURL: requester.displayAvatarURL() })
+            // Use the determined name for the author
+            .setAuthor({ name: requesterName, iconURL: requester.displayAvatarURL() })
             .setDescription(requestDetails)
             .addFields(
                 { name: 'Status', value: 'Open', inline: true },
-                // NEW: Add the dynamic timestamp field
                 { name: 'Created On', value: `<t:${timestamp}:f>`, inline: true }
             );
 

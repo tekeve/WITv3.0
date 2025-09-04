@@ -59,12 +59,15 @@ function startServer(client) {
             const { CharacterID, CharacterName } = verifyResponse.data;
 
             // 3. Store the tokens and character info by calling a method in authManager.js
+            const expiryDate = new Date(Date.now() + expires_in * 1000);
+            const formattedExpiry = expiryDate.toISOString().slice(0, 19).replace('T', ' '); // Format for MySQL
+
             authManager.saveUserAuth(discordId, {
                 character_id: CharacterID,
                 character_name: CharacterName,
                 access_token: access_token,
                 refresh_token: refresh_token,
-                token_expiry: new Date(Date.now() + expires_in * 1000).toISOString(),
+                token_expiry: formattedExpiry,
             });
 
             logger.success(`Successfully authenticated character ${CharacterName} for Discord user ${discordId}.`);
