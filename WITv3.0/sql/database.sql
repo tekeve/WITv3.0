@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `guild_id` bigint(200) NOT NULL,
   `auth_roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`auth_roles`)),
   `admin_roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`admin_roles`)),
-  `incursion_roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`incursion_roles`)),
+  `council_roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`council_roles`)),
   PRIMARY KEY (`guild_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 

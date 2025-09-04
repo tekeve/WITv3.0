@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
-const { adminRoles } = require('../../config.js');
+const { adminRoles, commanderRoles } = require('../../config.js');
 
 const hasAdminRole = (member) => member.roles.cache.some(role => adminRoles.includes(role.name));
 
@@ -11,6 +11,17 @@ module.exports = {
         .addUserOption(option => option.setName('user').setDescription('Admin only: The Discord user to get characters for.')),
 
     async execute(interaction) {
+        const hasPermission = interaction.member.roles.cache.some(role =>
+            adminRoles.includes(role.name) || commanderRoles.includes(role.name)
+        );
+
+        if (!hasPermission) {
+            return interaction.reply({
+                content: 'You do not have the required role to use this command.',
+                flags: [MessageFlags.Ephemeral]
+            });
+        }
+
         const targetUser = interaction.options.getUser('user');
 
         let discordUser = interaction.user;
@@ -23,24 +34,25 @@ module.exports = {
             return interaction.reply({ content: 'You do not have permission to view other users\' characters.', flags: [MessageFlags.Ephemeral] });
         }
 
+        // Update roles in the database every time the command is run.
+        const userRoles = discordMember.roles.cache.map(role => role.name);
+        await charManager.updateRoles(discordUser.id, userRoles);
+
         const charData = await charManager.getChars(discordUser.id);
 
         if (!charData) {
             return interaction.reply({ content: `No characters registered for ${discordUser.username}.`, flags: [MessageFlags.Ephemeral] });
         }
 
-        // Silently update roles in the background whenever this command is run
-        const userRoles = discordMember.roles.cache.map(role => role.name);
-        await charManager.updateUserRoles(discordUser.id, userRoles);
+        const alts = charData.alt_characters ? JSON.parse(charData.alt_characters) : [];
 
         const embed = new EmbedBuilder()
             .setColor(0x0099FF)
             .setTitle(`Registered Characters for ${discordUser.username}`)
             .addFields(
                 { name: 'Main Character', value: charData.main_character },
-                { name: 'Alts', value: charData.alt_characters.length > 0 ? charData.alt_characters.join('\n') : 'None' }
+                { name: 'Alts', value: alts.length > 0 ? alts.join('\n') : 'None' }
             )
-            .setFooter({ text: 'User roles were synced with the database.' })
             .setTimestamp();
 
         await interaction.reply({ embeds: [embed], flags: [MessageFlags.Ephemeral] });

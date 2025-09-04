@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
-const { adminRoles } = require('../../config.js');
+const { adminRoles, commanderRoles } = require('../../config.js');
 
 // Helper function to check for admin roles
 const hasAdminRole = (member) => member.roles.cache.some(role => adminRoles.includes(role.name));
@@ -23,6 +23,17 @@ module.exports = {
                 .addUserOption(option => option.setName('user').setDescription('Admin only: The Discord user to add the character for.'))),
 
     async execute(interaction) {
+        const hasPermission = interaction.member.roles.cache.some(role =>
+            adminRoles.includes(role.name) || commanderRoles.includes(role.name)
+        );
+
+        if (!hasPermission) {
+            return interaction.reply({
+                content: 'You do not have the required role to use this command.',
+                flags: [MessageFlags.Ephemeral]
+            });
+        }
+
         const subcommand = interaction.options.getSubcommand();
         const charName = interaction.options.getString('name');
         const targetUser = interaction.options.getUser('user');
@@ -39,22 +50,17 @@ module.exports = {
             return interaction.reply({ content: 'You do not have permission to modify other users\' characters.', flags: [MessageFlags.Ephemeral] });
         }
 
-        // Get the current roles to be saved or updated
-        const userRoles = discordMember.roles.cache.map(role => role.name);
-
         if (subcommand === 'main') {
-            const success = await charManager.addMain(discordUser.id, charName, userRoles);
-            if (success) {
-                await interaction.reply({ content: `Main character **${charName}** has been registered for ${discordUser.username}. Their roles have also been updated.`, flags: [MessageFlags.Ephemeral] });
-            } else {
-                await interaction.reply({ content: `There was a database error while registering **${charName}**.`, flags: [MessageFlags.Ephemeral] });
-            }
+            const userRoles = discordMember.roles.cache.map(role => role.name);
+            await charManager.addMain(discordUser.id, charName, userRoles);
+            await interaction.reply({ content: `Main character **${charName}** has been registered for ${discordUser.username}.`, flags: [MessageFlags.Ephemeral] });
         } else if (subcommand === 'alt') {
             const result = await charManager.addAlt(discordUser.id, charName);
             if (result.success) {
-                // Also update the roles when an alt is added successfully
-                await charManager.updateUserRoles(discordUser.id, userRoles);
-                await interaction.reply({ content: `Alt character **${charName}** has been added for ${discordUser.username}. Their roles have also been updated.`, flags: [MessageFlags.Ephemeral] });
+                // Sync roles on alt add
+                const userRoles = discordMember.roles.cache.map(role => role.name);
+                await charManager.updateRoles(discordUser.id, userRoles);
+                await interaction.reply({ content: `Alt character **${charName}** has been added for ${discordUser.username}.`, flags: [MessageFlags.Ephemeral] });
             } else {
                 await interaction.reply({ content: `Error: ${result.message}`, flags: [MessageFlags.Ephemeral] });
             }

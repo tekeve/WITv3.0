@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { incursionRoles } = require('../../config.js');
+const { adminRoles } = require('../../config.js');
 const incursionSystems = require('../../helpers/incursionsystem.json');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -90,7 +90,7 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        const hasPermission = interaction.member.roles.cache.some(role => incursionRoles.includes(role.name));
+        const hasPermission = interaction.member.roles.cache.some(role => adminRoles.includes(role.name));
 
         if (!hasPermission) {
             return interaction.reply({

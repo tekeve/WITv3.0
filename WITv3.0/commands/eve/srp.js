@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags } = require('discord.js');
+const { adminRoles, commanderRoles } = require('../../config.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -6,6 +7,17 @@ module.exports = {
         .setDescription('Submit a Ship Replacement Program (SRP) request.'),
 
     async execute(interaction) {
+        const hasPermission = interaction.member.roles.cache.some(role =>
+            adminRoles.includes(role.name) || commanderRoles.includes(role.name)
+        );
+
+        if (!hasPermission) {
+            return interaction.reply({
+                content: 'You do not have the required role to use this command.',
+                flags: [MessageFlags.Ephemeral]
+            });
+        }
+
         // Create the modal for the SRP request.
         const modal = new ModalBuilder()
             .setCustomId('srp_modal_part1')

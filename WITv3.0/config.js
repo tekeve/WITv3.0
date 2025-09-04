@@ -8,13 +8,6 @@ module.exports = {
         'Rens': 30002510,
     },
 
-    // Add the exact, case-sensitive names of roles that can use the /incursion command.
-    incursionRoles: [
-        'Moderator',
-        'Leadership',
-        'Officer',
-        'Big Cheese',
-    ],
     // Add your role aliases here. The key is the alias, the value is the full role name.
     // Make sure the alias (the key) is lowercase.
     roleAliases: {
@@ -35,6 +28,15 @@ module.exports = {
         'Leadership',
         'Officer',
         'Big Cheese',
+    ],
+    // Roles that can manage incursion commands
+    councilRoles: [
+        'Leadership',
+        'Officer',
+    ],
+    // Roles that can use the /inrole command
+    commanderRoles: [
+        'Commander'
     ],
     // Add the roles that can use the /auth command
     authRoles: [
@@ -87,12 +89,12 @@ module.exports = {
         },
         'Resident': {
             promote: {
-                add: ['Commander','Resident'],
+                add: ['Commander', 'Resident'],
                 remove: []
             },
             demote: {
                 add: [],
-                remove: ['Commander','Resident']
+                remove: ['Commander', 'Resident']
             }
         },
         'Line Commander': {
@@ -167,3 +169,4 @@ module.exports = {
         },
     },
 };
+

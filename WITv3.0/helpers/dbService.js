@@ -72,7 +72,7 @@ async function runSetup() {
     const guildId = await prompt('Enter the Discord Guild ID for this bot: ');
     const authRolesInput = await prompt('Enter authentication roles (comma-separated, e.g., role1, role2): ');
     const adminRolesInput = await prompt('Enter admin roles (comma-separated, e.g., role1, role2): ');
-    const incursionRolesInput = await prompt('Enter incursion roles (comma-separated, e.g., role1, role2): ');
+    const councilRolesInput = await prompt('Enter incursion roles (comma-separated, e.g., role1, role2): ');
 
     // Convert comma-separated strings to JSON format
     const formatRoles = (input) => {
@@ -82,18 +82,18 @@ async function runSetup() {
 
     const authRolesJSON = formatRoles(authRolesInput);
     const adminRolesJSON = formatRoles(adminRolesInput);
-    const incursionRolesJSON = formatRoles(incursionRolesInput);
+    const councilRolesJSON = formatRoles(councilRolesInput);
 
     // Insert data into the settings table
     const sql = `
-        INSERT INTO settings (guild_id, auth_roles, admin_roles, incursion_roles) 
+        INSERT INTO settings (guild_id, auth_roles, admin_roles, council_roles) 
         VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
             auth_roles = VALUES(auth_roles),
             admin_roles = VALUES(admin_roles),
-            incursion_roles = VALUES(incursion_roles)
+            council_roles = VALUES(council_roles)
     `;
-    await conn.execute(sql, [guildId, authRolesJSON, adminRolesJSON, incursionRolesJSON]);
+    await conn.execute(sql, [guildId, authRolesJSON, adminRolesJSON, councilRolesJSON]);
     logger.success('Settings have been saved to the database!');
 }
 
