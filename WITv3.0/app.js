@@ -80,7 +80,8 @@ async function initializeApp() {
     // ============ STATE MANAGEMENT & HELPER FUNCTIONS ================ //
     // ================================================================= //
 
-    client.updateIncursions = (isManualRefresh = false) => updateIncursions(client, isManualRefresh);
+    // Define a wrapper for updateIncursions to ensure options are passed correctly.
+    client.updateIncursions = (options) => updateIncursions(client, options);
 
     // ================================================================= //
     // ====================== EVENT LISTENERS ========================== //
@@ -377,3 +378,5 @@ async function initializeApp() {
     })();
 }
 initializeApp();
+
+

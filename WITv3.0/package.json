@@ -5,6 +5,7 @@
   "main": "app.js",
     "scripts": {
         "dev": "nodemon app.js --loud",
+        "verbose": "nodemon app.js --verbose",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
   "nodemonConfig": {
