@@ -1,10 +1,10 @@
 {
   "lastIncursionState": "20000504-mobilizing",
   "incursionMessageId": "1413021502659363006",
-  "lastHqSystemId": 30004130,
-  "spawnTimestamp": null,
-  "mobilizingTimestamp": 1756961693,
-  "withdrawingTimestamp": 1756961023,
-  "endedTimestamp": 1756961069,
+  "lastHqSystemId": 30003418,
+  "spawnTimestamp": 1756708080,
+  "mobilizingTimestamp": 1756863420,
+  "withdrawingTimestamp": null,
+  "endedTimestamp": null,
   "lastIncursionStats": null
 }

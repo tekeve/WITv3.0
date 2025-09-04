@@ -66,9 +66,22 @@ async function updateIncursions(client, options = {}) {
         let highSecIncursion;
         const { mockOverride } = state;
 
-        // Check for an active and valid mock override
-        if (mockOverride && mockOverride.expires > Date.now()) {
+        const isUsingMock = mockOverride && mockOverride.expires > Date.now();
+
+        // Determine which timestamps to use just for this update cycle's display
+        let spawnTimestampForDisplay = state.spawnTimestamp;
+        let mobilizingTimestampForDisplay = state.mobilizingTimestamp;
+        let withdrawingTimestampForDisplay = state.withdrawingTimestamp;
+
+        if (isUsingMock) {
             logger.info(`Using mock state override: ${JSON.stringify(mockOverride)}`);
+
+            // Use mock timestamps for display if they are provided in the override
+            if (mockOverride.spawnTimestamp) spawnTimestampForDisplay = mockOverride.spawnTimestamp;
+            if (mockOverride.mobilizingTimestamp) mobilizingTimestampForDisplay = mockOverride.mobilizingTimestamp;
+            if (mockOverride.withdrawingTimestamp) withdrawingTimestampForDisplay = mockOverride.withdrawingTimestamp;
+
+
             if (mockOverride.state === 'none') {
                 highSecIncursion = null;
             } else {
@@ -79,7 +92,7 @@ async function updateIncursions(client, options = {}) {
                         state: mockOverride.state,
                         staging_solar_system_id: spawnData['Dock Up System'],
                         faction_id: spawnData['FACTION ID'],
-                        systemData: { security_status: 0.8 }
+                        systemData: { security_status: 0.8 } // Assume highsec for mock
                     };
                 } else {
                     highSecIncursion = null; // Invalid constellation name in mock
@@ -115,7 +128,7 @@ async function updateIncursions(client, options = {}) {
         }
 
         const currentState = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
-        if (currentState === state.lastIncursionState && !isManualRefresh && !mockOverride) {
+        if (currentState === state.lastIncursionState && !isManualRefresh && !isUsingMock) {
             logger.info('No change in high-sec incursion state.');
             isUpdating = false;
             return;
@@ -126,8 +139,8 @@ async function updateIncursions(client, options = {}) {
         const currentSimpleState = highSecIncursion ? highSecIncursion.state : 'none';
         const lastSimpleState = state.lastIncursionState ? state.lastIncursionState.split('-')[1] : 'none';
 
-        // State change detection for timestamping
-        if (currentSimpleState !== lastSimpleState) {
+        // State change detection for timestamping - skip if using a mock
+        if (currentSimpleState !== lastSimpleState && !isUsingMock) {
             const now = Math.floor(Date.now() / 1000);
             if (lastSimpleState === 'none' && currentSimpleState === 'established') {
                 state.spawnTimestamp = now;
@@ -211,15 +224,23 @@ async function updateIncursions(client, options = {}) {
 
             const formatSystemLinks = (systemString) => !systemString ? 'None' : systemString.split(',').map(name => `[${name.trim()}](https://evemaps.dotlan.net/system/${encodeURIComponent(name.trim())})`).join(', ');
 
-            let timelineString = 'Calculating...';
-            if (state.spawnTimestamp) {
-                const momSpawnTime = state.spawnTimestamp + (3 * 24 * 3600);
-                timelineString = `Spawned: <t:${state.spawnTimestamp}:R>\nMothership: <t:${momSpawnTime}:R>`;
-                if (state.mobilizingTimestamp) {
-                    const despawnTime = state.mobilizingTimestamp + (3 * 24 * 3600);
-                    timelineString += `\nDespawns by: <t:${despawnTime}:R>`;
-                }
+            const timelineParts = [];
+            // Use the display-specific variables for the timeline
+            if (spawnTimestampForDisplay) {
+                const momSpawnTime = spawnTimestampForDisplay + (3 * 24 * 3600);
+                timelineParts.push(`Spawned: <t:${spawnTimestampForDisplay}:R>`);
+                timelineParts.push(`Mothership: <t:${momSpawnTime}:R>`);
             }
+            if (mobilizingTimestampForDisplay) {
+                const despawnTime = mobilizingTimestampForDisplay + (3 * 24 * 3600);
+                timelineParts.push(`Mobilizing: <t:${mobilizingTimestampForDisplay}:R>`);
+                timelineParts.push(`Despawns by: <t:${despawnTime}:R>`);
+            }
+            if (withdrawingTimestampForDisplay) {
+                timelineParts.push(`Withdrawing: <t:${withdrawingTimestampForDisplay}:R>`);
+            }
+
+            const timelineString = timelineParts.length > 0 ? timelineParts.join('\n') : 'Calculating...';
 
             embed = new EmbedBuilder()
                 .setColor(stateColors[highSecIncursion.state] || stateColors.none)
@@ -239,7 +260,10 @@ async function updateIncursions(client, options = {}) {
                 .setTimestamp();
 
             if (lastHqRouteString) {
-                embed.addFields({ name: 'Route from Last HQ', value: lastHqRouteString, inline: true });
+                embed.addFields(
+                    { name: '\u200b', value: '\u200b', inline: true },
+                    { name: 'Route from Last HQ', value: lastHqRouteString, inline: true }
+                );
             }
         } else {
             embed = new EmbedBuilder()
@@ -256,11 +280,11 @@ async function updateIncursions(client, options = {}) {
                 embed.addFields({ name: 'Next Spawn Window', value: `Opens: <t:${windowOpen}:R>\nCloses: <t:${windowClose}:R>` });
             }
             if (state.lastIncursionStats) {
-                const statsString = `**Total Duration**: ${state.lastIncursionStats.totalDuration}\n`
-                    + `**Established**: ${state.lastIncursionStats.establishedDuration} (${state.lastIncursionStats.establishedUsagePercentage})\n`
-                    + `**Mobilizing**: ${state.lastIncursionStats.mobilizingDuration}\n`
-                    + `**Withdrawing**: ${state.lastIncursionStats.withdrawingDuration}`;
-                embed.addFields({ name: 'Last Incursion Report', value: statsString });
+                embed.addFields({ name: 'Last Incursion Report', value: '\u200b' }); // Title field with a zero-width space
+                embed.addFields(
+                    { name: 'Total Duration', value: state.lastIncursionStats.totalDuration, inline: true },
+                    { name: 'Established Phase', value: `${state.lastIncursionStats.establishedDuration} (${state.lastIncursionStats.establishedUsagePercentage} used)`, inline: true },
+                );
             }
         }
 
@@ -290,4 +314,5 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
+
 

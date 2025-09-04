@@ -14,6 +14,38 @@ const constellationChoices = incursionSystems.map(sys => ({
 // Discord has a limit of 25 choices for slash command options
 const limitedConstellationChoices = constellationChoices.slice(0, 25);
 
+/**
+ * Parses a relative timestring (e.g., "1d 2h 30m ago") into a Unix timestamp.
+ * @param {string} timestring - The relative time string.
+ * @returns {number} The calculated Unix timestamp in seconds.
+ */
+function parseTimestring(timestring) {
+    const now = Date.now();
+    let totalSecondsAgo = 0;
+    const regex = /(\d+)\s*(d|h|m)/g;
+    let match;
+
+    // Ensure the string ends with "ago" for safety, then remove it
+    if (!timestring.trim().endsWith('ago')) return null;
+    const parsablePart = timestring.trim().slice(0, -3).trim();
+
+    while ((match = regex.exec(parsablePart)) !== null) {
+        const value = parseInt(match[1]);
+        const unit = match[2];
+        if (unit === 'd') {
+            totalSecondsAgo += value * 24 * 60 * 60;
+        } else if (unit === 'h') {
+            totalSecondsAgo += value * 60 * 60;
+        } else if (unit === 'm') {
+            totalSecondsAgo += value * 60;
+        }
+    }
+
+    if (totalSecondsAgo === 0) return null;
+
+    return Math.floor((now - totalSecondsAgo * 1000) / 1000);
+}
+
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -42,7 +74,20 @@ module.exports = {
                         .setDescription('The constellation name (required for active states).')
                         .setRequired(false)
                         .addChoices(...limitedConstellationChoices)
-                )),
+                )
+                .addStringOption(option =>
+                    option.setName('spawntimestamp')
+                        .setDescription('Mock spawn time (e.g., "2d 12h ago").')
+                        .setRequired(false))
+                .addStringOption(option =>
+                    option.setName('mobilizingtimestamp')
+                        .setDescription('Mock mobilizing time (e.g., "1d 3h ago").')
+                        .setRequired(false))
+                .addStringOption(option =>
+                    option.setName('withdrawingtimestamp')
+                        .setDescription('Mock withdrawing time (e.g., "1h 30m ago").')
+                        .setRequired(false))
+        ),
 
     async execute(interaction) {
         const hasPermission = interaction.member.roles.cache.some(role => incursionRoles.includes(role.name));
@@ -78,6 +123,9 @@ module.exports = {
         } else if (subcommand === 'setstate') {
             const state = interaction.options.getString('state');
             const constellationName = interaction.options.getString('constellation');
+            const spawnTimestampStr = interaction.options.getString('spawntimestamp');
+            const mobilizingTimestampStr = interaction.options.getString('mobilizingtimestamp');
+            const withdrawingTimestampStr = interaction.options.getString('withdrawingtimestamp');
 
             if (state !== 'none' && !constellationName) {
                 return interaction.editReply({ content: 'You must provide a constellation name when setting an active incursion state.' });
@@ -93,6 +141,13 @@ module.exports = {
                 constellationName: constellationName,
                 expires: Date.now() + (10 * 60 * 1000)
             };
+
+            // Parse and add any provided timestamps
+            if (spawnTimestampStr) stateData.mockOverride.spawnTimestamp = parseTimestring(spawnTimestampStr);
+            if (mobilizingTimestampStr) stateData.mockOverride.mobilizingTimestamp = parseTimestring(mobilizingTimestampStr);
+            if (withdrawingTimestampStr) stateData.mockOverride.withdrawingTimestamp = parseTimestring(withdrawingTimestampStr);
+
+
             fs.writeFileSync(STATE_FILE, JSON.stringify(stateData, null, 2));
 
             // Trigger an immediate update which will now use the override
