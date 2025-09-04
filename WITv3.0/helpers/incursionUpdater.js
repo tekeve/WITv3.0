@@ -16,14 +16,15 @@ try {
     stateData = {};
 }
 
+// NEW: Added lastStateChangeTimestamp to state tracking
 let {
     lastIncursionState = '',
     incursionMessageId = null,
-    lastHqSystemId = null
+    lastHqSystemId = null,
+    lastStateChangeTimestamp = null
 } = stateData;
 
 let isUpdating = false;
-const factionMap = { 500019: 'Sansha\'s Nation', 500020: 'Triglavian Collective' };
 const incursionSystems = require('./incursionsystem.json');
 
 // Color map for incursion states
@@ -36,7 +37,8 @@ const stateColors = {
 
 
 function saveState() {
-    const state = { lastIncursionState, incursionMessageId, lastHqSystemId };
+    // NEW: Save the timestamp to the state file
+    const state = { lastIncursionState, incursionMessageId, lastHqSystemId, lastStateChangeTimestamp };
     try {
         fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
     } catch (error) {
@@ -76,7 +78,13 @@ async function updateIncursions(client, isManualRefresh = false) {
         }
 
         logger.info('High-sec incursion state has changed or manual refresh triggered. Updating...');
+
+        // NEW: Update timestamp only when state actually changes
+        if (currentState !== lastIncursionState) {
+            lastStateChangeTimestamp = Math.floor(Date.now() / 1000);
+        }
         lastIncursionState = currentState;
+
 
         let embed;
         if (highSecIncursion) {
@@ -138,13 +146,15 @@ async function updateIncursions(client, isManualRefresh = false) {
 
             embed = new EmbedBuilder()
                 .setColor(embedColor)
-                .setTitle(`New High-Sec Incursion: **${spawnData.Constellation}** constellation in the **${spawnData.REGION}** region.`)
-                .setDescription(`Jumps from last HQ: `)
+                // NEW: More descriptive title with faction and clickable region
+                .setTitle(`High-Sec Incursion: **${spawnData.Constellation}**`)
+                .setDescription(`Spawning in the [**${spawnData.REGION}**](https://evemaps.dotlan.net/region/${encodeURIComponent(spawnData.REGION)}) region.`)
                 .setThumbnail(`https://images.evetech.net/corporations/${highSecIncursion.faction_id === 500019 ? 1000179 : 1000182}/logo?size=128`)
                 .addFields(
-                    { name: 'Suggested Dockup', value: `\`${spawnData.Dockup}\``, inline: true },
-                    { name: 'Current State', value: `\`${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}\``, inline: true },
-                    { name: 'Island Constellation?', value: spawnData.ISLAND === 'ISLAND' ? '`Yes`' : '`No`', inline: true },
+                    { name: 'Suggested Dockup', value: `${spawnData.Dockup}`, inline: true },
+                    { name: 'Current State', value: `${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}`, inline: true },
+                    // NEW: Dynamic timestamp for state change
+                    { name: 'State Since', value: lastStateChangeTimestamp ? `<t:${lastStateChangeTimestamp}:R>` : 'Unknown', inline: true },
                     { name: 'Headquarters System', value: `[${spawnData['Headquarter System']}](https://evemaps.dotlan.net/system/${encodeURIComponent(hqSystemName)})`, inline: true },
                     { name: 'Vanguard Systems', value: formatSystemLinks(spawnData['Vanguard Systems']), inline: true },
                     { name: 'Assault Systems', value: formatSystemLinks(spawnData['Assault Systems']), inline: true },
@@ -164,6 +174,12 @@ async function updateIncursions(client, isManualRefresh = false) {
                 .setColor(stateColors.none)
                 .setTitle('No High-Sec Incursion Active')
                 .setDescription('The High-Security incursion is not currently active. Fly safe!')
+                // NEW: Added an image for the "no incursion" state.
+                .setImage('https://i.imgur.com/k6uS2Gk.png')
+                .addFields(
+                    // NEW: Show when the last incursion ended
+                    { name: 'Stand Down Since', value: lastStateChangeTimestamp ? `<t:${lastStateChangeTimestamp}:R>` : 'Unknown', inline: true }
+                )
                 .setFooter({ text: 'WIT v3.0 Incursion Tracker | Data from ESI' })
                 .setTimestamp();
         }
@@ -208,4 +224,3 @@ async function updateIncursions(client, isManualRefresh = false) {
 }
 
 module.exports = { updateIncursions };
-
