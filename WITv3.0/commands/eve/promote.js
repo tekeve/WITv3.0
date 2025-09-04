@@ -11,7 +11,7 @@ const roleChoices = Object.keys(roleHierarchy).map(roleName => ({
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('promote')
-        .setDescription('Promotes a user to a specified role.')
+        .setDescription('Promotes a user to a specified role. (Admin Only)')
         .addUserOption(option =>
             option.setName('user')
                 .setDescription('The user to promote.')

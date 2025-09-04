@@ -30,7 +30,7 @@ const docChoices = Object.keys(googleDocs).map(key => ({ name: key, value: key }
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('doc')
-        .setDescription('Interact with Google Docs')
+        .setDescription('Interact with Google Docs (Admin Only)')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('read')

@@ -6,7 +6,7 @@ const logger = require('@helpers/logger');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('maillists')
-        .setDescription('Lists your character\'s EVE Online mailing lists and their IDs.')
+        .setDescription('Lists your character\'s EVE Online mailing lists and their IDs. (Admin Only)')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('list')

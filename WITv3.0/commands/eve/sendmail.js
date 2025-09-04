@@ -6,7 +6,7 @@ const crypto = require('crypto');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('sendmail')
-        .setDescription('Admin only: Send an in-game EVE Mail via an authenticated character.')
+        .setDescription('Send an in-game EVE Mail via an authenticated character. (Admin Only)')
         .addStringOption(option =>
             option.setName('mailing_list')
                 .setDescription('The ID of the EVE mailing list to send to.')

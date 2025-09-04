@@ -1,5 +1,5 @@
 ﻿const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
-const charManager = require('@helpers/characterManager'); // Import the character manager
+const charManager = require('@helpers/characterManager');
 require('dotenv').config();
 
 module.exports = {
@@ -15,14 +15,13 @@ module.exports = {
         const requestDetails = interaction.options.getString('details');
         const requester = interaction.user;
 
-        // Get the user's character data
-        const charData = charManager.getChars(requester.id);
-        // Use the main character name if it exists, otherwise fall back to the Discord tag
-        const requesterName = charData && charData.mainChar ? charData.mainChar : requester.tag;
+        // Fetch character data to use the main character name if available
+        const charData = await charManager.getChars(requester.id);
+        const authorName = charData && charData.main_character ? charData.main_character : requester.tag;
 
         const requestChannel = await interaction.client.channels.fetch(process.env.REQUEST_CHANNEL_ID);
         if (!requestChannel) {
-            return interaction.reply({ content: 'Error: The request channel is not configured correctly.' });
+            return interaction.reply({ content: 'Error: The request channel is not configured correctly.', flags: [MessageFlags.Ephemeral] });
         }
 
         // Get the current time as a Unix timestamp in seconds
@@ -31,11 +30,11 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setColor(0xFFA500) // Orange for 'Open'
             .setTitle('New Request Ticket')
-            // Use the determined name for the author
-            .setAuthor({ name: requesterName, iconURL: requester.displayAvatarURL() })
+            .setAuthor({ name: authorName, iconURL: requester.displayAvatarURL() })
             .setDescription(requestDetails)
             .addFields(
                 { name: 'Status', value: 'Open', inline: true },
+                // NEW: Add the dynamic timestamp field
                 { name: 'Created On', value: `<t:${timestamp}:f>`, inline: true }
             );
 
@@ -58,3 +57,4 @@ module.exports = {
         await interaction.reply({ content: 'Your request has been submitted successfully!', flags: [MessageFlags.Ephemeral] });
     },
 };
+

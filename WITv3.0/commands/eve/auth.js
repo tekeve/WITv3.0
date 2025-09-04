@@ -19,7 +19,7 @@ if (!ESI_CLIENT_ID) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('auth')
-        .setDescription('Authenticate your EVE Online character with the bot.')
+        .setDescription('Authenticate your EVE Online character with the bot. (Admin Only)')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('login')
@@ -77,7 +77,7 @@ module.exports = {
         }
         else if (subcommand === 'status') {
             const authData = await authManager.getUserAuthData(interaction.user.id);
-            if (authData) {
+            if (authData && authData.character_name) {
                 const expiryDate = new Date(authData.token_expiry);
                 const embed = new EmbedBuilder()
                     .setColor(0x3BA55D)
@@ -93,7 +93,7 @@ module.exports = {
             }
         }
         else if (subcommand === 'logout') {
-            const success = authManager.removeUser(interaction.user.id);
+            const success = await authManager.removeUser(interaction.user.id);
             if (success) {
                 await interaction.reply({ content: 'Your authentication token and character data have been successfully removed.', flags: [MessageFlags.Ephemeral] });
             } else {

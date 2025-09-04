@@ -11,7 +11,7 @@ const sheetChoices = Object.keys(googleSheets).map(key => ({ name: key, value: k
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('sheet')
-        .setDescription('Interact with Google Sheets')
+        .setDescription('Interact with Google Sheets (Admin Only)')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('read')

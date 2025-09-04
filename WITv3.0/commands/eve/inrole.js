@@ -15,13 +15,13 @@ module.exports = {
         // Check if the user's input matches an alias. Default to the original input if no alias is found.
         const targetRoleName = roleAliases[userInput.toLowerCase()] || userInput;
 
-        const users = charManager.findUsersInRole(targetRoleName);
+        const users = await charManager.findUsersInRole(targetRoleName);
 
         if (users.length === 0) {
-            return interaction.reply({ content: `No registered users found with the role **${targetRoleName}**.`});
+            return interaction.reply({ content: `No registered users found with the role **${targetRoleName}**.`, flags: [MessageFlags.Ephemeral] });
         }
 
-        const charList = users.map(user => `• ${user.mainChar}`).join('\n');
+        const charList = users.map(user => `• ${user.main_character}`).join('\n');
 
         const embed = new EmbedBuilder()
             .setColor(0x0099FF)

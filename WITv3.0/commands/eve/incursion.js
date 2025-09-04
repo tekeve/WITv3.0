@@ -50,7 +50,7 @@ function parseTimestring(timestring) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('incursion')
-        .setDescription('Manage and view EVE Online Incursion information.')
+        .setDescription('Manage and view EVE Online Incursion information. (Admin Only)')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('refresh')

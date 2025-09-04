@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
 const { adminRoles } = require('../../config.js');
 
@@ -36,21 +36,29 @@ module.exports = {
             discordUser = targetUser;
             discordMember = await interaction.guild.members.fetch(targetUser.id);
         } else if (targetUser) {
-            return interaction.reply({ content: 'You do not have permission to modify other users\' characters.'});
+            return interaction.reply({ content: 'You do not have permission to modify other users\' characters.', flags: [MessageFlags.Ephemeral] });
         }
 
+        // Get the current roles to be saved or updated
+        const userRoles = discordMember.roles.cache.map(role => role.name);
+
         if (subcommand === 'main') {
-            // Get all role names for the user
-            const userRoles = discordMember.roles.cache.map(role => role.name);
-            charManager.addMain(discordUser.id, charName, userRoles);
-            await interaction.reply({ content: `Main character **${charName}** has been registered for ${discordUser.username}.`});
-        } else if (subcommand === 'alt') {
-            const result = charManager.addAlt(discordUser.id, charName);
-            if (result.success) {
-                await interaction.reply({ content: `Alt character **${charName}** has been added for ${discordUser.username}.`});
+            const success = await charManager.addMain(discordUser.id, charName, userRoles);
+            if (success) {
+                await interaction.reply({ content: `Main character **${charName}** has been registered for ${discordUser.username}. Their roles have also been updated.`, flags: [MessageFlags.Ephemeral] });
             } else {
-                await interaction.reply({ content: `Error: ${result.message}`});
+                await interaction.reply({ content: `There was a database error while registering **${charName}**.`, flags: [MessageFlags.Ephemeral] });
+            }
+        } else if (subcommand === 'alt') {
+            const result = await charManager.addAlt(discordUser.id, charName);
+            if (result.success) {
+                // Also update the roles when an alt is added successfully
+                await charManager.updateUserRoles(discordUser.id, userRoles);
+                await interaction.reply({ content: `Alt character **${charName}** has been added for ${discordUser.username}. Their roles have also been updated.`, flags: [MessageFlags.Ephemeral] });
+            } else {
+                await interaction.reply({ content: `Error: ${result.message}`, flags: [MessageFlags.Ephemeral] });
             }
         }
     },
 };
+

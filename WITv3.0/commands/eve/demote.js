@@ -15,7 +15,7 @@ roleChoices.push({ name: 'All Roles', value: 'REMOVE_ALL' });
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('demote')
-        .setDescription('Demotes a user from a specified role.')
+        .setDescription('Demotes a user from a specified role. (Admin Only)')
         .addUserOption(option =>
             option.setName('user')
                 .setDescription('The user to demote.')

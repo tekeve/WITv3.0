@@ -145,8 +145,8 @@ async function initializeApp() {
                 const [, , messageId, action] = customId.split('_');
                 const closingComment = interaction.fields.getTextInputValue('resolve_comment');
                 try {
-                    const resolverCharData = charManager.getChars(interaction.user.id);
-                    const resolverName = resolverCharData ? resolverCharData.mainChar : interaction.user.tag;
+                    const resolverCharData = await charManager.getChars(interaction.user.id);
+                    const resolverName = resolverCharData ? resolverCharData.main_character : interaction.user.tag;
                     const requestChannel = await client.channels.fetch(process.env.REQUEST_CHANNEL_ID);
                     const originalMessage = await requestChannel.messages.fetch(messageId);
                     const originalEmbed = originalMessage.embeds[0];
@@ -202,7 +202,7 @@ async function initializeApp() {
                     return interaction.followUp({ content: 'Error: Could not find the first part of your SRP data. Please start again.', flags: [MessageFlags.Ephemeral] });
                 }
 
-                const authData = authManager.getUserAuthData(interaction.user.id);
+                const authData = await authManager.getUserAuthData(interaction.user.id);
                 if (!authData) {
                     return interaction.followUp({ content: 'You must authenticate a character with the ESI before submitting an SRP request via mail. Please use `/auth login`.', flags: [MessageFlags.Ephemeral] });
                 }
@@ -251,8 +251,8 @@ async function initializeApp() {
                     try {
                         const srpChannel = await client.channels.fetch(process.env.SRP_CHANNEL_ID);
                         if (srpChannel) {
-                            const submitterCharData = charManager.getChars(interaction.user.id);
-                            const submitterName = submitterCharData ? submitterCharData.mainChar : interaction.user.tag;
+                            const submitterCharData = await charManager.getChars(interaction.user.id);
+                            const submitterName = submitterCharData ? submitterCharData.main_character : interaction.user.tag;
 
                             let killReportValue = srpData.killmail;
                             if (srpData.killmail && (srpData.killmail.startsWith('http://') || srpData.killmail.startsWith('https://'))) {
@@ -313,7 +313,7 @@ async function initializeApp() {
                 }
 
                 const mailBody = interaction.fields.getTextInputValue('mail_body');
-                const authData = authManager.getUserAuthData(interaction.user.id);
+                const authData = await authManager.getUserAuthData(interaction.user.id);
 
                 if (!authData) {
                     return interaction.editReply({ content: 'Your authentication has expired. Please `/auth login` again.' });
@@ -378,5 +378,3 @@ async function initializeApp() {
     })();
 }
 initializeApp();
-
-

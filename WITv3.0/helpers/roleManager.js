@@ -1,6 +1,7 @@
 const { adminRoles } = require('../config');
 const logger = require('./logger');
 const { MessageFlags } = require('discord.js');
+const charManager = require('./characterManager'); // Import characterManager
 
 /**
  * Checks if a member has an admin role.
@@ -33,7 +34,7 @@ const findRole = (guild, roleName) => {
 async function manageRoles(interaction, action) {
     const targetUser = interaction.options.getUser('user');
     const targetRoleName = interaction.options.getString('role'); // This is the key in our hierarchy
-    const member = await interaction.guild.members.fetch(targetUser.id);
+    let member = await interaction.guild.members.fetch(targetUser.id);
     const { roleHierarchy } = require('../config');
 
     if (!hasAdminRole(interaction.member)) {
@@ -55,8 +56,14 @@ async function manageRoles(interaction, action) {
                 }
             }
 
+            // After all roles are removed, re-fetch the member, bypassing the cache
+            const updatedMember = await interaction.guild.members.fetch({ user: targetUser.id, force: true });
+            const finalRoles = updatedMember.roles.cache.map(r => r.name);
+            await charManager.updateUserRoles(targetUser.id, finalRoles);
+
+
             if (removedRoles.length > 0) {
-                await interaction.reply({ content: `Removed the following roles from ${targetUser.tag}: ${removedRoles.join(', ')}.`, flags: [MessageFlags.Ephemeral] });
+                await interaction.reply({ content: `Removed the following roles from ${targetUser.tag}: ${removedRoles.join(', ')}. Database has been updated.`, flags: [MessageFlags.Ephemeral] });
             } else {
                 await interaction.reply({ content: `${targetUser.tag} did not have any of the manageable roles to remove.`, flags: [MessageFlags.Ephemeral] });
             }
@@ -110,11 +117,18 @@ async function manageRoles(interaction, action) {
             }
         }
 
+        // After making changes, re-fetch the member object, bypassing the cache
+        const updatedMember = await interaction.guild.members.fetch({ user: targetUser.id, force: true });
+        const finalRoles = updatedMember.roles.cache.map(r => r.name);
+        await charManager.updateUserRoles(targetUser.id, finalRoles);
+
         let replyMessage = `Role changes for ${targetUser.tag} completed.\n`;
         if (addedRoles.length > 0) replyMessage += `> **Added:** ${addedRoles.join(', ')}\n`;
         if (removedRoles.length > 0) replyMessage += `> **Removed:** ${removedRoles.join(', ')}\n`;
         if (addedRoles.length === 0 && removedRoles.length === 0) {
             replyMessage = `No role changes were necessary for ${targetUser.tag}. They may already have the correct roles.`;
+        } else {
+            replyMessage += `> Database roles have been synced.`
         }
 
         await interaction.reply({ content: replyMessage, flags: [MessageFlags.Ephemeral] });

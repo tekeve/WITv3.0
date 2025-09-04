@@ -4,7 +4,7 @@ const { adminRoles } = require('../../config.js');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('setstatus')
-        .setDescription('Sets the bot\'s custom status (Admin only).')
+        .setDescription('Sets the bot\'s custom status (Admin Only).')
         .addStringOption(option =>
             option.setName('activity')
                 .setDescription('The type of activity.')
