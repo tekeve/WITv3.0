@@ -138,21 +138,21 @@ async function updateIncursions(client, isManualRefresh = false) {
 
             embed = new EmbedBuilder()
                 .setColor(embedColor)
-                .setTitle(`High-Sec Incursion: ${factionMap[highSecIncursion.faction_id] || 'Unknown Faction'}`)
-                .setDescription(`Sansha's Nation is targeting the **${spawnData.Constellation}** constellation in the **${spawnData.REGION}** region.`)
+                .setTitle(`New High-Sec Incursion: **${spawnData.Constellation}** constellation in the **${spawnData.REGION}** region.`)
+                .setDescription(`Jumps from last HQ: `)
                 .setThumbnail(`https://images.evetech.net/corporations/${highSecIncursion.faction_id === 500019 ? 1000179 : 1000182}/logo?size=128`)
                 .addFields(
-                    { name: 'Headquarters System', value: `[${spawnData['Headquarter System']}](https://evemaps.dotlan.net/system/${encodeURIComponent(hqSystemName)})`, inline: true },
+                    { name: 'Suggested Dockup', value: `\`${spawnData.Dockup}\``, inline: true },
                     { name: 'Current State', value: `\`${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}\``, inline: true },
                     { name: 'Island Constellation?', value: spawnData.ISLAND === 'ISLAND' ? '`Yes`' : '`No`', inline: true },
-                    { name: 'Vanguard Systems', value: formatSystemLinks(spawnData['Vanguard Systems']), inline: false },
-                    { name: 'Assault Systems', value: formatSystemLinks(spawnData['Assault Systems']), inline: false },
-                    { name: 'Suggested Dockup', value: `\`${spawnData.Dockup}\``, inline: false },
+                    { name: 'Headquarters System', value: `[${spawnData['Headquarter System']}](https://evemaps.dotlan.net/system/${encodeURIComponent(hqSystemName)})`, inline: true },
+                    { name: 'Vanguard Systems', value: formatSystemLinks(spawnData['Vanguard Systems']), inline: true },
+                    { name: 'Assault Systems', value: formatSystemLinks(spawnData['Assault Systems']), inline: true },
                     { name: `Travel from ${jumpCounts[0].name}`, value: jumpCounts[0].jumps, inline: true },
                     { name: `Travel from ${jumpCounts[1].name}`, value: jumpCounts[1].jumps, inline: true },
                     { name: `Travel from ${jumpCounts[2].name}`, value: jumpCounts[2].jumps, inline: true },
                 )
-                .setFooter({ text: 'WTM-WIT Incursion Tracker | Data from ESI' })
+                .setFooter({ text: 'WIT v3.0 Incursion Tracker | Data from ESI' })
                 .setTimestamp();
 
             if (lastHqRouteString) {
@@ -164,7 +164,7 @@ async function updateIncursions(client, isManualRefresh = false) {
                 .setColor(stateColors.none)
                 .setTitle('No High-Sec Incursion Active')
                 .setDescription('The High-Security incursion is not currently active. Fly safe!')
-                .setFooter({ text: 'WTM-WIT Incursion Tracker | Data from ESI' })
+                .setFooter({ text: 'WIT v3.0 Incursion Tracker | Data from ESI' })
                 .setTimestamp();
         }
 
