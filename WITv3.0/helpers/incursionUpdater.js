@@ -270,7 +270,7 @@ async function updateIncursions(client, options = {}) {
                 .setColor(stateColors.none)
                 .setTitle('No High-Sec Incursion Active')
                 .setDescription('The High-Security incursion is not currently active. Fly safe!')
-                .setImage('https://i.imgur.com/k6uS2Gk.png')
+                .setImage('https://cdn.discordapp.com/banners/295568584409743361/736f561f52f927ebe2d64604fea336d5.webp?size=480')
                 .setFooter({ text: 'WIT v3.0 Incursion Tracker | Data from ESI' })
                 .setTimestamp();
 
