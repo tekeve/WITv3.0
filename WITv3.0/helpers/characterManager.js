@@ -72,7 +72,7 @@ module.exports = {
         return rows;
     },
 
-    updateRoles: async (discordId, roles) => {
+    updateUserRoles: async (discordId, roles) => {
         const rolesJson = JSON.stringify(roles);
         const sql = 'UPDATE commander_list SET roles = ? WHERE discord_id = ?';
         await db.query(sql, [rolesJson, discordId]);

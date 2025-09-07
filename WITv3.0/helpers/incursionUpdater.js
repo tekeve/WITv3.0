@@ -1,13 +1,10 @@
 require('dotenv').config();
-const fs = require('node:fs');
-const path = require('node:path');
 const axios = require('axios');
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config.js');
+const db = require('@helpers/dbService');
 const logger = require('@helpers/logger');
 
-const STATE_FILE = path.join(__dirname, '..', 'state.json');
-let isUpdating = false;
 const incursionSystems = require('./incursionsystem.json');
 
 // Color map for incursion states
@@ -18,23 +15,66 @@ const stateColors = {
     none: 0xED4245         // Red
 };
 
-// Helper to read state from the file
-function readState() {
+// Helper to read state from the database
+async function readState() {
     try {
-        const rawData = fs.readFileSync(STATE_FILE, 'utf8');
-        return JSON.parse(rawData);
+        const rows = await db.query('SELECT * FROM incursion_state WHERE id = 1');
+        if (rows.length > 0) {
+            // The stats are stored as a JSON string, so we need to parse it.
+            const state = rows[0];
+            if (state.lastIncursionStats && typeof state.lastIncursionStats === 'string') {
+                try {
+                    state.lastIncursionStats = JSON.parse(state.lastIncursionStats);
+                } catch (e) {
+                    logger.error('Could not parse lastIncursionStats from database.', e);
+                    state.lastIncursionStats = null;
+                }
+            }
+            return state;
+        }
+        return {}; // Return empty object if no state row exists
     } catch (error) {
-        logger.info('State file not found or invalid, creating a fresh state.');
+        logger.error('Failed to read incursion state from database:', error);
         return {};
     }
 }
 
-// Helper to write state to the file
-function writeState(state) {
+// Helper to write state to the database
+async function writeState(state) {
     try {
-        fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+        // Ensure stats are stringified for storage
+        const statsToStore = state.lastIncursionStats ? JSON.stringify(state.lastIncursionStats) : null;
+
+        const sql = `
+            INSERT INTO incursion_state (
+                id, lastIncursionState, incursionMessageId, lastHqSystemId, 
+                spawnTimestamp, mobilizingTimestamp, withdrawingTimestamp, 
+                endedTimestamp, lastIncursionStats
+            ) VALUES (
+                1, ?, ?, ?, ?, ?, ?, ?, ?
+            ) ON DUPLICATE KEY UPDATE 
+                lastIncursionState = VALUES(lastIncursionState),
+                incursionMessageId = VALUES(incursionMessageId),
+                lastHqSystemId = VALUES(lastHqSystemId),
+                spawnTimestamp = VALUES(spawnTimestamp),
+                mobilizingTimestamp = VALUES(mobilizingTimestamp),
+                withdrawingTimestamp = VALUES(withdrawingTimestamp),
+                endedTimestamp = VALUES(endedTimestamp),
+                lastIncursionStats = VALUES(lastIncursionStats)
+        `;
+
+        await db.query(sql, [
+            state.lastIncursionState || null,
+            state.incursionMessageId || null,
+            state.lastHqSystemId || null,
+            state.spawnTimestamp || null,
+            state.mobilizingTimestamp || null,
+            state.withdrawingTimestamp || null,
+            state.endedTimestamp || null,
+            statsToStore
+        ]);
     } catch (error) {
-        logger.error('Failed to save state to file:', error);
+        logger.error('Failed to save incursion state to database:', error);
     }
 }
 
@@ -59,29 +99,18 @@ async function updateIncursions(client, options = {}) {
     isUpdating = true;
 
     // Load state at the beginning of each run
-    let state = readState();
+    const state = await readState();
+    logger.info('Current state from database:', state);
     const { isManualRefresh = false } = options;
 
     try {
         let highSecIncursion;
-        const { mockOverride } = state;
+        const mockOverride = client.mockOverride; // Use in-memory mock
 
         const isUsingMock = mockOverride && mockOverride.expires > Date.now();
 
-        // Determine which timestamps to use just for this update cycle's display
-        let spawnTimestampForDisplay = state.spawnTimestamp;
-        let mobilizingTimestampForDisplay = state.mobilizingTimestamp;
-        let withdrawingTimestampForDisplay = state.withdrawingTimestamp;
-
         if (isUsingMock) {
             logger.info(`Using mock state override: ${JSON.stringify(mockOverride)}`);
-
-            // Use mock timestamps for display if they are provided in the override
-            if (mockOverride.spawnTimestamp) spawnTimestampForDisplay = mockOverride.spawnTimestamp;
-            if (mockOverride.mobilizingTimestamp) mobilizingTimestampForDisplay = mockOverride.mobilizingTimestamp;
-            if (mockOverride.withdrawingTimestamp) withdrawingTimestampForDisplay = mockOverride.withdrawingTimestamp;
-
-
             if (mockOverride.state === 'none') {
                 highSecIncursion = null;
             } else {
@@ -92,17 +121,16 @@ async function updateIncursions(client, options = {}) {
                         state: mockOverride.state,
                         staging_solar_system_id: spawnData['Dock Up System'],
                         faction_id: spawnData['FACTION ID'],
-                        systemData: { security_status: 0.8 } // Assume highsec for mock
+                        systemData: { security_status: 0.8 } // Assume highsec
                     };
                 } else {
-                    highSecIncursion = null; // Invalid constellation name in mock
+                    highSecIncursion = null;
                 }
             }
         } else {
-            // If override is expired or doesn't exist, clear it and proceed with ESI
             if (mockOverride) {
                 logger.info('Mock override has expired. Deleting it and resuming ESI updates.');
-                delete state.mockOverride;
+                client.mockOverride = null;
             }
 
             logger.info('Checking for incursion updates from ESI...');
@@ -117,6 +145,8 @@ async function updateIncursions(client, options = {}) {
             const enrichedIncursions = await Promise.all(allIncursions.map(async (incursion) => {
                 try {
                     const systemData = await getSystemData(incursion.staging_solar_system_id);
+                    // Add detailed logging for each system fetched
+                    logger.info(`Enriching constellation ${incursion.constellation_id}: Staging system ${systemData.name} (${incursion.staging_solar_system_id}), Security: ${systemData.security_status}`);
                     return { ...incursion, systemData };
                 } catch (e) {
                     logger.error(`Could not resolve system ID ${incursion.staging_solar_system_id}:`, e.message);
@@ -124,11 +154,16 @@ async function updateIncursions(client, options = {}) {
                 }
             }));
 
-            highSecIncursion = enrichedIncursions.find(inc => inc.systemData && inc.systemData.security_status >= 0.5);
+            // Correct the security status check to be more inclusive of high-sec systems
+            highSecIncursion = enrichedIncursions.find(inc => inc.systemData && inc.systemData.security_status > 0.45);
+            logger.info(`Final high-sec incursion object after filtering: ${JSON.stringify(highSecIncursion || 'None')}`);
         }
 
-        const currentState = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
-        if (currentState === state.lastIncursionState && !isManualRefresh && !isUsingMock) {
+        const currentStateKey = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
+
+        logger.info(`Comparing current key '${currentStateKey}' with last known state key '${state.lastIncursionState}'`);
+
+        if (currentStateKey === state.lastIncursionState && !isManualRefresh && !isUsingMock) {
             logger.info('No change in high-sec incursion state.');
             isUpdating = false;
             return;
@@ -137,42 +172,55 @@ async function updateIncursions(client, options = {}) {
         logger.info('High-sec incursion state has changed or manual/mock update triggered. Updating...');
 
         const currentSimpleState = highSecIncursion ? highSecIncursion.state : 'none';
-        const lastSimpleState = state.lastIncursionState ? state.lastIncursionState.split('-')[1] : 'none';
+        const currentConstellationId = highSecIncursion ? highSecIncursion.constellation_id : null;
 
-        // State change detection for timestamping - skip if using a mock
-        if (currentSimpleState !== lastSimpleState && !isUsingMock) {
+        // Safely parse the last known state from the database
+        let lastSimpleState = 'none';
+        let lastConstellationId = null;
+        if (state.lastIncursionState && state.lastIncursionState !== 'none') {
+            const parts = state.lastIncursionState.split('-');
+            lastConstellationId = parseInt(parts[0], 10);
+            lastSimpleState = parts[1];
+        }
+
+        if (!isUsingMock) {
             const now = Math.floor(Date.now() / 1000);
-            if (lastSimpleState === 'none' && currentSimpleState === 'established') {
+
+            // A new constellation has spawned
+            if (currentConstellationId && currentConstellationId !== lastConstellationId) {
                 state.spawnTimestamp = now;
                 state.mobilizingTimestamp = null;
                 state.withdrawingTimestamp = null;
                 state.endedTimestamp = null;
                 state.lastIncursionStats = null;
-            } else if (lastSimpleState === 'established' && currentSimpleState === 'mobilizing') {
-                state.mobilizingTimestamp = now;
-            } else if (lastSimpleState === 'mobilizing' && currentSimpleState === 'withdrawing') {
-                state.withdrawingTimestamp = now;
-            } else if (currentSimpleState === 'none' && lastSimpleState !== 'none') {
+            }
+            // State transition within the same constellation
+            else if (currentConstellationId && currentConstellationId === lastConstellationId && currentSimpleState !== lastSimpleState) {
+                if (currentSimpleState === 'mobilizing') state.mobilizingTimestamp = now;
+                if (currentSimpleState === 'withdrawing') state.withdrawingTimestamp = now;
+            }
+            // Incursion has ended
+            else if (currentSimpleState === 'none' && lastSimpleState !== 'none') {
                 state.endedTimestamp = now;
-                const lastConstellationId = parseInt(state.lastIncursionState.split('-')[0], 10);
                 const lastSpawnData = incursionSystems.find(c => c['ConstellationID'] === lastConstellationId);
                 if (lastSpawnData) state.lastHqSystemId = lastSpawnData['Dock Up System'];
 
                 if (state.spawnTimestamp) {
-                    const establishedDur = (state.mobilizingTimestamp || state.endedTimestamp) - state.spawnTimestamp;
+                    const establishedDur = (state.mobilizingTimestamp || now) - state.spawnTimestamp;
+                    const mobilizingDur = state.mobilizingTimestamp ? (state.withdrawingTimestamp || now) - state.mobilizingTimestamp : null;
                     const establishedUsage = Math.round((establishedDur / (5 * 24 * 3600)) * 100);
+
                     state.lastIncursionStats = {
-                        totalDuration: formatDuration(state.endedTimestamp - state.spawnTimestamp),
+                        totalDuration: formatDuration(now - state.spawnTimestamp),
                         establishedDuration: formatDuration(establishedDur),
-                        mobilizingDuration: formatDuration(state.mobilizingTimestamp && state.withdrawingTimestamp ? state.withdrawingTimestamp - state.mobilizingTimestamp : null),
-                        withdrawingDuration: formatDuration(state.withdrawingTimestamp ? state.endedTimestamp - state.withdrawingTimestamp : null),
+                        mobilizingDuration: formatDuration(mobilizingDur),
+                        withdrawingDuration: formatDuration(state.withdrawingTimestamp ? now - state.withdrawingTimestamp : null),
                         establishedUsagePercentage: `${establishedUsage}%`
                     };
                 }
             }
         }
-        state.lastIncursionState = currentState;
-
+        state.lastIncursionState = currentStateKey;
 
         let embed;
         if (highSecIncursion) {
@@ -225,19 +273,22 @@ async function updateIncursions(client, options = {}) {
             const formatSystemLinks = (systemString) => !systemString ? 'None' : systemString.split(',').map(name => `[${name.trim()}](https://evemaps.dotlan.net/system/${encodeURIComponent(name.trim())})`).join(', ');
 
             const timelineParts = [];
-            // Use the display-specific variables for the timeline
-            if (spawnTimestampForDisplay) {
-                const momSpawnTime = spawnTimestampForDisplay + (3 * 24 * 3600);
-                timelineParts.push(`Spawned: <t:${spawnTimestampForDisplay}:R>`);
+            const spawnTimestamp = isUsingMock && mockOverride.spawnTimestamp ? mockOverride.spawnTimestamp : state.spawnTimestamp;
+            const mobilizingTimestamp = isUsingMock && mockOverride.mobilizingTimestamp ? mockOverride.mobilizingTimestamp : state.mobilizingTimestamp;
+            const withdrawingTimestamp = isUsingMock && mockOverride.withdrawingTimestamp ? mockOverride.withdrawingTimestamp : state.withdrawingTimestamp;
+
+            if (spawnTimestamp) {
+                const momSpawnTime = spawnTimestamp + (3 * 24 * 3600);
+                timelineParts.push(`Spawned: <t:${spawnTimestamp}:R>`);
                 timelineParts.push(`Mothership: <t:${momSpawnTime}:R>`);
             }
-            if (mobilizingTimestampForDisplay) {
-                const despawnTime = mobilizingTimestampForDisplay + (3 * 24 * 3600);
-                timelineParts.push(`Mobilizing: <t:${mobilizingTimestampForDisplay}:R>`);
+            if (mobilizingTimestamp) {
+                const despawnTime = mobilizingTimestamp + (3 * 24 * 3600);
+                timelineParts.push(`Mobilizing: <t:${mobilizingTimestamp}:R>`);
                 timelineParts.push(`Despawns by: <t:${despawnTime}:R>`);
             }
-            if (withdrawingTimestampForDisplay) {
-                timelineParts.push(`Withdrawing: <t:${withdrawingTimestampForDisplay}:R>`);
+            if (withdrawingTimestamp) {
+                timelineParts.push(`Withdrawing: <t:${withdrawingTimestamp}:R>`);
             }
 
             const timelineString = timelineParts.length > 0 ? timelineParts.join('\n') : 'Calculating...';
@@ -280,7 +331,7 @@ async function updateIncursions(client, options = {}) {
                 embed.addFields({ name: 'Next Spawn Window', value: `Opens: <t:${windowOpen}:R>\nCloses: <t:${windowClose}:R>` });
             }
             if (state.lastIncursionStats) {
-                embed.addFields({ name: 'Last Incursion Report', value: '\u200b' }); // Title field with a zero-width space
+                embed.addFields({ name: 'Last Incursion Report', value: '\u200b' });
                 embed.addFields(
                     { name: 'Total Duration', value: state.lastIncursionStats.totalDuration, inline: true },
                     { name: 'Established Phase', value: `${state.lastIncursionStats.establishedDuration} (${state.lastIncursionStats.establishedUsagePercentage} used)`, inline: true },
@@ -303,7 +354,7 @@ async function updateIncursions(client, options = {}) {
             state.incursionMessageId = newMessage.id;
         }
 
-        writeState(state);
+        await writeState(state);
 
     } catch (error) {
         logger.error('An unexpected error occurred during incursion update:', error);
@@ -313,4 +364,7 @@ async function updateIncursions(client, options = {}) {
     }
 }
 
+let isUpdating = false;
+
 module.exports = { updateIncursions };
+

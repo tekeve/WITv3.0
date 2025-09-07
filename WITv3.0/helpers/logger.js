@@ -15,13 +15,19 @@ if (!fs.existsSync(errorDir)) fs.mkdirSync(errorDir);
 const args = process.argv.slice(2);
 let isQuiet = false;
 let isVerbose = false;
+let isAudit = false;
+
 if (args.includes('--quiet') | (args.includes('-q'))) {
     isQuiet = true;
     console.log(chalk.blue('[INFO] logging quiet, only errors will be shown, log|error files will still be updated'));
-} else if (args.includes('--verbose') | (args.includes('-v')) | (args.includes('--loud')) | (args.includes('-l')) ) {
+} else if (args.includes('--verbose') | (args.includes('-v')) | (args.includes('--loud')) | (args.includes('-l'))) {
     isVerbose = true;
     console.log(chalk.blue('[INFO] logging loud, all debugging messages will be shown'));
-} else {
+} else if (args.includes('--audit')) {
+    isAudit = true;
+    console.log(chalk.blue('[INFO] logging audit, all audit messages will be shown'));
+}
+else {
     console.log(chalk.blue('[INFO] logging default, only errors and warning will be shown, log|error files will still be updated'));
 }
 
@@ -73,6 +79,14 @@ function error(err, context = '') {
     logToFile(errorPath, line);
 }
 
+function audit(...args) {
+    const line = `[AUDIT] ${args.map(formatValue).join(' ')}`;
+    logToFile(logPath, line);
+    if (isAudit || isVerbose) {
+        console.log(chalk.magenta(line));
+    }
+}
+
 function table(label, data) {
     if (isVerbose) {
         console.log(chalk.cyan(`📊 ${label}`));
@@ -86,4 +100,5 @@ module.exports = {
     warn,
     error,
     table,
+    audit,
 };

@@ -5,21 +5,6 @@
 -- HeidiSQL Version:             12.6.0.6765
 -- --------------------------------------------------------
 
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET NAMES utf8 */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
-
--- Dumping database structure for wtm-wit
-DROP DATABASE IF EXISTS `wit-db`;
-CREATE DATABASE IF NOT EXISTS `wit-db` /*!40100 DEFAULT CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci */;
-USE `wit-db`;
-
 -- Dumping structure for table wtm-wit.commander_list
 DROP TABLE IF EXISTS `commander_list`;
 CREATE TABLE IF NOT EXISTS `commander_list` (
@@ -39,8 +24,6 @@ CREATE TABLE IF NOT EXISTS `commander_list` (
   UNIQUE KEY `character_id` (`character_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
--- Dumping data for table wtm-wit.commander_list: ~2 rows (approximately)
-
 -- Dumping structure for table wtm-wit.google_docs
 DROP TABLE IF EXISTS `google_docs`;
 CREATE TABLE IF NOT EXISTS `google_docs` (
@@ -50,8 +33,6 @@ CREATE TABLE IF NOT EXISTS `google_docs` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
--- Dumping data for table wtm-wit.google_docs: ~1 rows (approximately)
-
 -- Dumping structure for table wtm-wit.google_sheets
 DROP TABLE IF EXISTS `google_sheets`;
 CREATE TABLE IF NOT EXISTS `google_sheets` (
@@ -60,8 +41,6 @@ CREATE TABLE IF NOT EXISTS `google_sheets` (
   `sheet_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
-
--- Dumping data for table wtm-wit.google_sheets: ~2 rows (approximately)
 
 -- Dumping structure for table wtm-wit.incursion_systems
 DROP TABLE IF EXISTS `incursion_systems`;
@@ -196,6 +175,14 @@ CREATE TABLE IF NOT EXISTS `mailing_lists` (
 
 -- Dumping data for table wtm-wit.mailing_lists: ~1 rows (approximately)
 
+-- Dumping structure for table wtm-wit.incursion_state
+DROP TABLE IF EXISTS `incursion_state`;
+CREATE TABLE IF NOT EXISTS `incursion_state` (
+  `key_name` varchar(50) NOT NULL,
+  `value` longtext DEFAULT NULL,
+  PRIMARY KEY (`key_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
 -- Dumping structure for table wtm-wit.settings
 DROP TABLE IF EXISTS `settings`;
 CREATE TABLE IF NOT EXISTS `settings` (
@@ -206,10 +193,23 @@ CREATE TABLE IF NOT EXISTS `settings` (
   PRIMARY KEY (`guild_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
--- Dumping data for table wtm-wit.settings: ~1 rows (approximately)
+-- Dumping structure for table wtm-wit.incursion_state
+DROP TABLE IF EXISTS `incursion_state`;
+CREATE TABLE IF NOT EXISTS `incursion_state` (
+  `id` int(11) NOT NULL DEFAULT 1,
+  `lastIncursionState` varchar(50) DEFAULT NULL,
+  `incursionMessageId` varchar(50) DEFAULT NULL,
+  `lastHqSystemId` int(11) DEFAULT NULL,
+  `spawnTimestamp` bigint(20) DEFAULT NULL,
+  `mobilizingTimestamp` bigint(20) DEFAULT NULL,
+  `withdrawingTimestamp` bigint(20) DEFAULT NULL,
+  `endedTimestamp` bigint(20) DEFAULT NULL,
+  `lastIncursionStats` json DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
-/*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
-/*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
-/*!40014 SET FOREIGN_KEY_CHECKS=IFNULL(@OLD_FOREIGN_KEY_CHECKS, 1) */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40111 SET SQL_NOTES=IFNULL(@OLD_SQL_NOTES, 1) */;
+-- Dumping data for table wtm-wit.incursion_state: ~0 rows (approximately)
+DELETE FROM `incursion_state`;
+INSERT IGNORE INTO `incursion_state` (`id`, `lastIncursionState`, `incursionMessageId`, `lastHqSystemId`, `spawnTimestamp`, `mobilizingTimestamp`, `withdrawingTimestamp`, `endedTimestamp`, `lastIncursionStats`) VALUES
+	(1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+

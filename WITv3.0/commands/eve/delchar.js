@@ -60,7 +60,7 @@ module.exports = {
             // Sync roles after successfully deleting an alt. No sync needed if the whole profile is gone.
             if (subcommand === 'alt') {
                 const userRoles = discordMember.roles.cache.map(role => role.name);
-                await charManager.updateRoles(discordUser.id, userRoles);
+                await charManager.updateUserRoles(discordUser.id, userRoles);
             }
             await interaction.reply({ content: result.message, flags: [MessageFlags.Ephemeral] });
         } else {

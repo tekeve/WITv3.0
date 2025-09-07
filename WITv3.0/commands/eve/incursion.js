@@ -1,10 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { adminRoles } = require('../../config.js');
 const incursionSystems = require('../../helpers/incursionsystem.json');
-const fs = require('node:fs');
-const path = require('node:path');
-
-const STATE_FILE = path.join(__dirname, '..', '..', 'state.json');
 
 // Create choices for the constellation option dynamically from the JSON file
 const constellationChoices = incursionSystems.map(sys => ({
@@ -102,20 +98,12 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
         await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
-        // Read current state file
-        let stateData;
-        try {
-            stateData = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-        } catch (e) {
-            stateData = {}; // create if doesn't exist
-        }
+        // State file logic is removed, handled by client.mockOverride now
 
         if (subcommand === 'refresh') {
             // Clear any mock override when manually refreshing
-            if (stateData.mockOverride) {
-                delete stateData.mockOverride;
-                fs.writeFileSync(STATE_FILE, JSON.stringify(stateData, null, 2));
-            }
+            interaction.client.mockOverride = null;
+
             // Trigger an update, which will now use ESI data
             await interaction.client.updateIncursions({ isManualRefresh: true });
             await interaction.editReply({ content: 'Mock state cleared. Incursion data has been manually refreshed from ESI!' });
@@ -135,20 +123,17 @@ module.exports = {
                 return interaction.editReply({ content: `Error: The constellation "${constellationName}" was not found.` });
             }
 
-            // Set the mock override in the state file, expiring in 10 minutes
-            stateData.mockOverride = {
+            // Set the mock override in the client object, expiring in 10 minutes
+            interaction.client.mockOverride = {
                 state: state,
                 constellationName: constellationName,
                 expires: Date.now() + (10 * 60 * 1000)
             };
 
             // Parse and add any provided timestamps
-            if (spawnTimestampStr) stateData.mockOverride.spawnTimestamp = parseTimestring(spawnTimestampStr);
-            if (mobilizingTimestampStr) stateData.mockOverride.mobilizingTimestamp = parseTimestring(mobilizingTimestampStr);
-            if (withdrawingTimestampStr) stateData.mockOverride.withdrawingTimestamp = parseTimestring(withdrawingTimestampStr);
-
-
-            fs.writeFileSync(STATE_FILE, JSON.stringify(stateData, null, 2));
+            if (spawnTimestampStr) interaction.client.mockOverride.spawnTimestamp = parseTimestring(spawnTimestampStr);
+            if (mobilizingTimestampStr) interaction.client.mockOverride.mobilizingTimestamp = parseTimestring(mobilizingTimestampStr);
+            if (withdrawingTimestampStr) interaction.client.mockOverride.withdrawingTimestamp = parseTimestring(withdrawingTimestampStr);
 
             // Trigger an immediate update which will now use the override
             await interaction.client.updateIncursions({ isManualRefresh: true });

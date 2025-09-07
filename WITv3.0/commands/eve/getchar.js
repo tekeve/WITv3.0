@@ -36,7 +36,7 @@ module.exports = {
 
         // Update roles in the database every time the command is run.
         const userRoles = discordMember.roles.cache.map(role => role.name);
-        await charManager.updateRoles(discordUser.id, userRoles);
+        await charManager.updateUserRoles(discordUser.id, userRoles);
 
         const charData = await charManager.getChars(discordUser.id);
 

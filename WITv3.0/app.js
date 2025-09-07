@@ -22,6 +22,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 client.esiStateMap = new Map();
 client.srpData = new Map();
 client.mailSubjects = new Map();
+client.mockOverride = null; // For mock incursion state
 
 // Function to ensure the database is ready
 async function ensureDatabaseExistsAndConnected() {

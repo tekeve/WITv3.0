@@ -63,6 +63,7 @@ async function manageRoles(interaction, action) {
 
 
             if (removedRoles.length > 0) {
+                logger.audit(`Admin "${interaction.user.tag}" removed all manageable roles from "${targetUser.tag}": ${removedRoles.join(', ')}.`);
                 await interaction.reply({ content: `Removed the following roles from ${targetUser.tag}: ${removedRoles.join(', ')}. Database has been updated.`, flags: [MessageFlags.Ephemeral] });
             } else {
                 await interaction.reply({ content: `${targetUser.tag} did not have any of the manageable roles to remove.`, flags: [MessageFlags.Ephemeral] });
@@ -123,8 +124,14 @@ async function manageRoles(interaction, action) {
         await charManager.updateUserRoles(targetUser.id, finalRoles);
 
         let replyMessage = `Role changes for ${targetUser.tag} completed.\n`;
-        if (addedRoles.length > 0) replyMessage += `> **Added:** ${addedRoles.join(', ')}\n`;
-        if (removedRoles.length > 0) replyMessage += `> **Removed:** ${removedRoles.join(', ')}\n`;
+        if (addedRoles.length > 0) {
+            replyMessage += `> **Added:** ${addedRoles.join(', ')}\n`;
+            logger.audit(`Admin "${interaction.user.tag}" ${action}d "${targetUser.tag}" with role "${targetRoleName}", adding roles: ${addedRoles.join(', ')}.`);
+        }
+        if (removedRoles.length > 0) {
+            replyMessage += `> **Removed:** ${removedRoles.join(', ')}\n`;
+            logger.audit(`Admin "${interaction.user.tag}" ${action}d "${targetUser.tag}" with role "${targetRoleName}", removing roles: ${removedRoles.join(', ')}.`);
+        }
         if (addedRoles.length === 0 && removedRoles.length === 0) {
             replyMessage = `No role changes were necessary for ${targetUser.tag}. They may already have the correct roles.`;
         } else {

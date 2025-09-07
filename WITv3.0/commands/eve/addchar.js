@@ -59,7 +59,7 @@ module.exports = {
             if (result.success) {
                 // Sync roles on alt add
                 const userRoles = discordMember.roles.cache.map(role => role.name);
-                await charManager.updateRoles(discordUser.id, userRoles);
+                await charManager.updateUserRoles(discordUser.id, userRoles);
                 await interaction.reply({ content: `Alt character **${charName}** has been added for ${discordUser.username}.`, flags: [MessageFlags.Ephemeral] });
             } else {
                 await interaction.reply({ content: `Error: ${result.message}`, flags: [MessageFlags.Ephemeral] });

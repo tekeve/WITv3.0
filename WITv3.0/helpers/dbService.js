@@ -10,7 +10,10 @@ const dbConfig = {
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
-    multipleStatements: true // This is crucial for executing the SQL file
+    multipleStatements: true, // Keep this for setup
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 };
 
 // A function to read user input from the command line
@@ -27,44 +30,45 @@ function prompt(question) {
     });
 }
 
-let connection;
+// Create a connection pool instead of a single connection
+const pool = mysql.createPool(dbConfig);
 
-async function getConnection() {
-    if (!connection || connection.state === 'disconnected') {
-        try {
-            connection = await mysql.createConnection(dbConfig);
-            logger.success('Connected to MySQL database!');
-        } catch (error) {
-            logger.error('Failed to connect to MySQL database:', error);
-            throw error;
-        }
-    }
-    return connection;
-}
-
-// Public function to execute a query
+// Public function to execute a query from the pool
 async function query(sql, args) {
-    const conn = await getConnection();
-    const [rows] = await conn.execute(sql, args);
-    return rows;
+    try {
+        const [rows] = await pool.execute(sql, args);
+        return rows;
+    } catch (error) {
+        logger.error(`Database query failed: ${error.message}`);
+        throw error; // Re-throw the error to be caught by the caller
+    }
 }
 
 // New function to handle database setup from an SQL file
 async function runSetup() {
     logger.info('Starting database setup...');
-    const conn = await getConnection();
 
     try {
         // Read the SQL file from the root directory
         const sqlFilePath = path.join(process.cwd(), './sql/database.sql');
         const sqlScript = fs.readFileSync(sqlFilePath, 'utf8');
 
-        // Execute the entire SQL script
-        logger.info('Executing database setup script...');
-        await conn.execute(sqlScript);
+        // Split the script into individual statements and filter out empty ones
+        const statements = sqlScript.split(';').filter(statement => statement.trim() !== '');
+
+        logger.info(`Found ${statements.length} SQL statements to execute.`);
+
+        // Execute each statement sequentially using the pool
+        for (const [index, statement] of statements.entries()) {
+            if (statement) { // Ensure it's not an empty string
+                logger.info(`Executing statement ${index + 1}/${statements.length}...`);
+                await pool.query(statement);
+            }
+        }
         logger.success('Database tables are ready based on setup.sql!');
     } catch (error) {
         logger.error('Failed to run database setup script:', error);
+        // We will let the process exit, but this gives a clear message
         throw error;
     }
 
@@ -85,7 +89,7 @@ async function runSetup() {
     const councilRolesJSON = formatRoles(councilRolesInput);
 
     // Insert data into the settings table
-    const sql = `
+    const insertSql = `
         INSERT INTO settings (guild_id, auth_roles, admin_roles, council_roles) 
         VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
@@ -93,7 +97,7 @@ async function runSetup() {
             admin_roles = VALUES(admin_roles),
             council_roles = VALUES(council_roles)
     `;
-    await conn.execute(sql, [guildId, authRolesJSON, adminRolesJSON, councilRolesJSON]);
+    await query(insertSql, [guildId, authRolesJSON, adminRolesJSON, councilRolesJSON]);
     logger.success('Settings have been saved to the database!');
 }
 
@@ -101,3 +105,4 @@ module.exports = {
     query,
     runSetup
 };
+
