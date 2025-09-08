@@ -2,14 +2,13 @@
 // =================== IMPORTS AND CLIENT SETUP ==================== //
 // ================================================================= //
 const fs = require('node:fs');
-const { readdirSync } = require('fs');
 const path = require('node:path');
 require('module-alias/register');
 const logger = require('@helpers/logger');
 const { Client, Collection, Events, GatewayIntentBits, EmbedBuilder, REST, Routes, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 require('dotenv').config();
 const axios = require('axios');
-const config = require('./config.js');
+const configManager = require('@helpers/configManager'); // <-- Use the new config manager
 const charManager = require('@helpers/characterManager.js');
 const authManager = require('@helpers/authManager.js');
 const { startServer } = require('./server.js');
@@ -35,6 +34,7 @@ async function ensureDatabaseExistsAndConnected() {
         return false;
     }
 }
+
 // Function to run initial setup if a command-line argument is provided
 async function initializeApp() {
     if (process.argv.includes('--db-setup')) {
@@ -49,6 +49,9 @@ async function initializeApp() {
         logger.error('Cannot start the application without a database connection. Please check your configuration.');
         return;
     }
+
+    // Load config from the database right after connection is confirmed
+    await configManager.loadConfig();
 
     // Start the ESI authentication callback server
     startServer(client);
@@ -94,6 +97,7 @@ async function initializeApp() {
     });
 
     client.on(Events.InteractionCreate, async interaction => {
+        const config = configManager.get(); // Get latest config for every interaction
         // Command Handler
         if (interaction.isChatInputCommand()) {
             const command = client.commands.get(interaction.commandName);
@@ -260,13 +264,11 @@ async function initializeApp() {
                                 killReportValue = `[Link](${srpData.killmail})`;
                             }
 
-                            // <<< START: NEW TRUNCATION LOGIC >>>
                             // Truncate the details field if it's too long for an embed
                             let detailsValue = srpData.details || 'None';
                             if (detailsValue.length > 1024) {
                                 detailsValue = detailsValue.substring(0, 1021) + '...';
                             }
-                            // <<< END: NEW TRUNCATION LOGIC >>>
 
                             const srpEmbed = new EmbedBuilder()
                                 .setColor(0x5865F2)
@@ -282,7 +284,6 @@ async function initializeApp() {
                                     { name: 'SRPable?', value: srpData.srpable, inline: true },
                                     { name: 'SRP Paid?', value: srpData.paid, inline: true },
                                     { name: 'Loot Recovered?', value: srpData.loot, inline: true },
-                                    // Use the potentially truncated details value
                                     { name: 'Details', value: detailsValue, inline: false },
                                     { name: 'Submitted On', value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: false }
                                 )

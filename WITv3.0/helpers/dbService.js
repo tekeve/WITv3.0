@@ -16,6 +16,9 @@ const dbConfig = {
     queueLimit: 0
 };
 
+// Create a connection pool instead of a single connection
+const pool = mysql.createPool(dbConfig);
+
 // A function to read user input from the command line
 function prompt(question) {
     const rl = readline.createInterface({
@@ -29,9 +32,6 @@ function prompt(question) {
         });
     });
 }
-
-// Create a connection pool instead of a single connection
-const pool = mysql.createPool(dbConfig);
 
 // Public function to execute a query from the pool
 async function query(sql, args) {
