@@ -8,9 +8,6 @@
         "verbose": "nodemon app.js --verbose",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
-  "nodemonConfig": {
-    "ignore": "state.json"
-  },
   "_moduleAliases": {
     "@root": ".",
     "@helpers": "./helpers",
