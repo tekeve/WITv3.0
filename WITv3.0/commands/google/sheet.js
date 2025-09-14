@@ -1,12 +1,9 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-// Import the new centralized function instead of the googleapis library
+const { SlashCommandBuilder } = require('discord.js');
 const { getSheetsService } = require('@helpers/googleAuth.js');
-// Import the entire sheets object from our config
-const { googleSheets } = require('../../config.js');
+const configManager = require('@helpers/configManager');
 const logger = require('@helpers/logger');
-
-// Dynamically create the choices for the command option
-const sheetChoices = Object.keys(googleSheets).map(key => ({ name: key, value: key }));
+const roleManager = require('@helpers/roleManager');
+const databaseManager = require('@helpers/databaseManager'); // Import the new manager
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,9 +15,10 @@ module.exports = {
                 .setDescription('Read data from a cell in a specific sheet')
                 .addStringOption(option =>
                     option.setName('name')
-                        .setDescription('The name of the sheet to access')
+                        .setDescription('The name of the sheet to access (start typing to see options)')
                         .setRequired(true)
-                        .addChoices(...sheetChoices))
+                        .setAutocomplete(true) // Enable autocomplete
+                )
                 .addStringOption(option =>
                     option.setName('cell').setDescription('The cell to read (e.g., A1)').setRequired(true))
         )
@@ -30,50 +28,60 @@ module.exports = {
                 .setDescription('Write data to a cell in a specific sheet')
                 .addStringOption(option =>
                     option.setName('name')
-                        .setDescription('The name of the sheet to access')
+                        .setDescription('The name of the sheet to access (start typing to see options)')
                         .setRequired(true)
-                        .addChoices(...sheetChoices))
+                        .setAutocomplete(true) // Enable autocomplete
+                )
                 .addStringOption(option =>
                     option.setName('cell').setDescription('The cell to write to (e.g., B2)').setRequired(true))
                 .addStringOption(option =>
                     option.setName('value').setDescription('The value to write').setRequired(true))
         ),
 
+    async autocomplete(interaction) {
+        const focusedValue = interaction.options.getFocused();
+        // Use our database manager to get suggestions from the 'google_sheets' table
+        const choices = await databaseManager.getKeys('google_sheets', focusedValue);
+        await interaction.respond(choices.slice(0, 25));
+    },
+
     async execute(interaction) {
-        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+        if (!roleManager.isAdmin(interaction.member)) {
+            return interaction.reply({ content: 'You do not have permission to use this command.' });
+        }
+
+        await interaction.deferReply();
 
         try {
-            // Call the new centralized function to get the authenticated sheets service
             const sheets = await getSheetsService();
             const subcommand = interaction.options.getSubcommand();
             const cell = interaction.options.getString('cell');
             const sheetName = interaction.options.getString('name');
-            const spreadsheetId = googleSheets[sheetName];
+
+            // Get the full, up-to-date config inside the command
+            const config = configManager.get();
+            const spreadsheetId = config.googleSheets[sheetName];
 
             if (!spreadsheetId) {
-                await interaction.editReply('Could not find a sheet with that name in the configuration.');
-                return;
+                return interaction.editReply(`Could not find a sheet with the name "${sheetName}". Please select one from the list.`);
             }
 
             if (subcommand === 'read') {
                 const response = await sheets.spreadsheets.values.get({
-                    spreadsheetId: spreadsheetId,
+                    spreadsheetId,
                     range: `Sheet1!${cell}`,
                 });
-
                 const value = response.data.values ? response.data.values[0][0] : 'empty';
                 await interaction.editReply(`Value in **${sheetName}** cell ${cell} is: **${value}**`);
+
             } else if (subcommand === 'write') {
                 const value = interaction.options.getString('value');
                 await sheets.spreadsheets.values.update({
-                    spreadsheetId: spreadsheetId,
+                    spreadsheetId,
                     range: `Sheet1!${cell}`,
                     valueInputOption: 'USER_ENTERED',
-                    resource: {
-                        values: [[value]],
-                    },
+                    resource: { values: [[value]] },
                 });
-
                 await interaction.editReply(`Successfully wrote **${value}** to **${sheetName}** cell ${cell}.`);
             }
         } catch (error) {

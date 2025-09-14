@@ -1,6 +1,6 @@
 ﻿const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
-const { adminRoles, commanderRoles } = require('../../config.js');
+const roleManager = require('@helpers/roleManager');
 require('dotenv').config();
 
 module.exports = {
@@ -13,11 +13,8 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        const hasPermission = interaction.member.roles.cache.some(role =>
-            adminRoles.includes(role.name) || commanderRoles.includes(role.name)
-        );
-
-        if (!hasPermission) {
+        // Use the centralized permission check
+        if (!roleManager.isCommanderOrAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
                 flags: [MessageFlags.Ephemeral]
@@ -33,7 +30,7 @@ module.exports = {
 
         const requestChannel = await interaction.client.channels.fetch(process.env.REQUEST_CHANNEL_ID);
         if (!requestChannel) {
-            return interaction.reply({ content: 'Error: The request channel is not configured correctly.', flags: [MessageFlags.Ephemeral] });
+            return interaction.reply({ content: 'Error: The request channel is not configured correctly.'});
         }
 
         const timestamp = Math.floor(Date.now() / 1000);
@@ -64,7 +61,7 @@ module.exports = {
 
         await requestChannel.send({ embeds: [embed], components: [buttons] });
 
-        await interaction.reply({ content: 'Your request has been submitted successfully!', flags: [MessageFlags.Ephemeral] });
+        await interaction.reply({ content: 'Your request has been submitted successfully!'});
     },
 };
 

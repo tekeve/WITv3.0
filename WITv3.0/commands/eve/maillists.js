@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const authManager = require('@helpers/authManager.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const authManager = require('@helpers/authManager');
 const axios = require('axios');
 const logger = require('@helpers/logger');
 
@@ -13,13 +13,14 @@ module.exports = {
                 .setDescription('Show all mailing lists your authenticated character can access.')),
 
     async execute(interaction) {
-        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+        await interaction.deferReply();
 
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'list') {
-            const authData = authManager.getUserAuthData(interaction.user.id);
-            if (!authData) {
+            // FIX: Added 'await' to ensure we get the user data before proceeding.
+            const authData = await authManager.getUserAuthData(interaction.user.id);
+            if (!authData || !authData.character_id) {
                 return interaction.editReply({
                     content: 'You must authenticate a character first. Please use `/auth login`.',
                 });
@@ -42,7 +43,6 @@ module.exports = {
                     return interaction.editReply({ content: 'Your character is not subscribed to any mailing lists.' });
                 }
 
-                // Format the lists for the embed description
                 const listString = mailingLists
                     .map(list => `**${list.name}**: \`${list.mailing_list_id}\``)
                     .join('\n');
@@ -57,7 +57,7 @@ module.exports = {
 
             } catch (error) {
                 const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-                logger.error('Failed to fetch EVE mailing lists:', errorMessage);
+                logger.error(`Failed to fetch EVE mailing lists: ${errorMessage}`);
                 await interaction.editReply({ content: `Could not fetch your mailing lists. The ESI might be down or your token may be invalid. Please try re-authenticating with \`/auth login\`.` });
             }
         }

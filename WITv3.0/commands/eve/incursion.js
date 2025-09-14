@@ -1,16 +1,12 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const configManager = require('@helpers/configManager');
-const incursionManager = require('@helpers/incursionManager'); // Use the manager
-const logger = require('@helpers/logger');
+const { SlashCommandBuilder } = require('discord.js');
+const roleManager = require('@helpers/roleManager');
+const incursionManager = require('@helpers/incursionManager');
 
-// Dynamically create choices from the cached incursion data
-const incursionSystems = incursionManager.get();
-const constellationChoices = incursionSystems.map(sys => ({
-    name: sys.Constellation,
-    value: sys.Constellation,
-}));
-const limitedConstellationChoices = constellationChoices.slice(0, 25);
-
+/**
+ * Parses a relative timestring (e.g., "1d 2h 30m ago") into a Unix timestamp.
+ * @param {string} timestring - The relative time string.
+ * @returns {number|null} The calculated Unix timestamp in seconds or null if invalid.
+ */
 function parseTimestring(timestring) {
     const now = Date.now();
     let totalSecondsAgo = 0;
@@ -23,12 +19,17 @@ function parseTimestring(timestring) {
     while ((match = regex.exec(parsablePart)) !== null) {
         const value = parseInt(match[1]);
         const unit = match[2];
-        if (unit === 'd') totalSecondsAgo += value * 24 * 60 * 60;
-        else if (unit === 'h') totalSecondsAgo += value * 60 * 60;
-        else if (unit === 'm') totalSecondsAgo += value * 60;
+        if (unit === 'd') {
+            totalSecondsAgo += value * 24 * 60 * 60;
+        } else if (unit === 'h') {
+            totalSecondsAgo += value * 60 * 60;
+        } else if (unit === 'm') {
+            totalSecondsAgo += value * 60;
+        }
     }
 
     if (totalSecondsAgo === 0) return null;
+
     return Math.floor((now - totalSecondsAgo * 1000) / 1000);
 }
 
@@ -59,8 +60,7 @@ module.exports = {
                     option.setName('constellation')
                         .setDescription('The constellation name (required for active states).')
                         .setRequired(false)
-                        .addChoices(...limitedConstellationChoices)
-                )
+                        .setAutocomplete(true)) // Enable autocomplete
                 .addStringOption(option =>
                     option.setName('spawntimestamp')
                         .setDescription('Mock spawn time (e.g., "2d 12h ago").')
@@ -75,21 +75,33 @@ module.exports = {
                         .setRequired(false))
         ),
 
-    async execute(interaction) {
-        const config = configManager.get();
-        const hasPermission = interaction.member.roles.cache.some(role =>
-            config.adminRoles.includes(role.name) || config.councilRoles.includes(role.name)
-        );
+    async autocomplete(interaction) {
+        const focusedOption = interaction.options.getFocused(true);
+        if (focusedOption.name === 'constellation') {
+            const incursionSystems = incursionManager.get();
+            if (!incursionSystems) {
+                await interaction.respond([]);
+                return;
+            }
+            const choices = incursionSystems
+                .map(sys => sys.Constellation)
+                .filter(name => name.toLowerCase().startsWith(focusedOption.value.toLowerCase()))
+                .slice(0, 25)
+                .map(name => ({ name: name, value: name }));
 
-        if (!hasPermission) {
+            await interaction.respond(choices);
+        }
+    },
+
+    async execute(interaction) {
+        if (!roleManager.isAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have permission to use this command.',
-                flags: [MessageFlags.Ephemeral]
             });
         }
 
         const subcommand = interaction.options.getSubcommand();
-        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+        await interaction.deferReply();
 
         if (subcommand === 'refresh') {
             interaction.client.mockOverride = null;
@@ -107,8 +119,8 @@ module.exports = {
                 return interaction.editReply({ content: 'You must provide a constellation name when setting an active incursion state.' });
             }
 
-            const allIncursionSystems = incursionManager.get();
-            if (constellationName && !allIncursionSystems.some(c => c.Constellation === constellationName)) {
+            const incursionSystems = incursionManager.get();
+            if (constellationName && !incursionSystems.some(c => c.Constellation === constellationName)) {
                 return interaction.editReply({ content: `Error: The constellation "${constellationName}" was not found.` });
             }
 
@@ -129,3 +141,4 @@ module.exports = {
         }
     },
 };
+

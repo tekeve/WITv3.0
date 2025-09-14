@@ -46,7 +46,7 @@ module.exports = {
             discordUser = targetUser;
             discordMember = await interaction.guild.members.fetch(targetUser.id);
         } else if (targetUser) {
-            return interaction.reply({ content: 'You do not have permission to modify other users\' characters.', flags: [MessageFlags.Ephemeral] });
+            return interaction.reply({ content: 'You do not have permission to modify other users\' characters.'});
         }
 
         let result;
@@ -62,9 +62,9 @@ module.exports = {
                 const userRoles = discordMember.roles.cache.map(role => role.name);
                 await charManager.updateUserRoles(discordUser.id, userRoles);
             }
-            await interaction.reply({ content: result.message, flags: [MessageFlags.Ephemeral] });
+            await interaction.reply({ content: result.message});
         } else {
-            await interaction.reply({ content: `Error: ${result.message}`, flags: [MessageFlags.Ephemeral] });
+            await interaction.reply({ content: `Error: ${result.message}`});
         }
     },
 };

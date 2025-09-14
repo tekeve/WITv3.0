@@ -1,15 +1,22 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { manageRoles } = require('../../helpers/roleManager');
-const { roleHierarchy } = require('../../config');
+const { manageRoles } = require('@helpers/roleManager');
+const configManager = require('@helpers/configManager');
 
-// Dynamically create the role choices from the config file
-const roleChoices = Object.keys(roleHierarchy).map(roleName => ({
-    name: roleName,
-    value: roleName,
-}));
+// Get the configuration once.
+const config = configManager.get();
+
+// Defensively create the role choices from the config file.
+const roleChoices = (config && config.roleHierarchy)
+    ? Object.keys(config.roleHierarchy).map(roleName => ({
+        name: roleName,
+        value: roleName,
+    }))
+    : [];
 
 // Add the special option to remove all manageable roles
-roleChoices.push({ name: 'All Roles', value: 'REMOVE_ALL' });
+if (roleChoices.length > 0) {
+    roleChoices.push({ name: 'All Roles', value: 'REMOVE_ALL' });
+}
 
 
 module.exports = {
@@ -29,4 +36,3 @@ module.exports = {
         await manageRoles(interaction, 'demote');
     },
 };
-

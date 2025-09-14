@@ -33,6 +33,22 @@ function prompt(question) {
     });
 }
 
+/**
+ * Checks if the database connection is valid by running a simple query.
+ * @returns {Promise<boolean>} - True if the connection is successful, false otherwise.
+ */
+async function ensureDatabaseExistsAndConnected() {
+    try {
+        await pool.query('SELECT 1 + 1 AS solution');
+        logger.success('Database connection successful!');
+        return true;
+    } catch (error) {
+        // We don't need to log the full error here, as a simple failure message is enough.
+        // The setup instructions will guide the user.
+        return false;
+    }
+}
+
 // Public function to execute a query from the pool
 async function query(sql, args) {
     try {
@@ -49,60 +65,47 @@ async function runSetup() {
     logger.info('Starting database setup...');
 
     try {
-        // Read the SQL file from the root directory
         const sqlFilePath = path.join(process.cwd(), './sql/database.sql');
         const sqlScript = fs.readFileSync(sqlFilePath, 'utf8');
-
-        // Split the script into individual statements and filter out empty ones
         const statements = sqlScript.split(';').filter(statement => statement.trim() !== '');
-
         logger.info(`Found ${statements.length} SQL statements to execute.`);
 
-        // Execute each statement sequentially using the pool
         for (const [index, statement] of statements.entries()) {
-            if (statement) { // Ensure it's not an empty string
+            if (statement) {
                 logger.info(`Executing statement ${index + 1}/${statements.length}...`);
                 await pool.query(statement);
             }
         }
-        logger.success('Database tables are ready based on setup.sql!');
+        logger.success('Database tables created/verified successfully!');
     } catch (error) {
         logger.error('Failed to run database setup script:', error);
-        // We will let the process exit, but this gives a clear message
         throw error;
     }
 
-    // Get user input for settings table after the tables are created
-    const guildId = await prompt('Enter the Discord Guild ID for this bot: ');
-    const authRolesInput = await prompt('Enter authentication roles (comma-separated, e.g., role1, role2): ');
-    const adminRolesInput = await prompt('Enter admin roles (comma-separated, e.g., role1, role2): ');
-    const councilRolesInput = await prompt('Enter incursion roles (comma-separated, e.g., role1, role2): ');
-
-    // Convert comma-separated strings to JSON format
-    const formatRoles = (input) => {
-        const rolesArray = input.split(',').map(role => role.trim()).filter(role => role.length > 0);
-        return JSON.stringify({ roles: rolesArray });
-    };
-
-    const authRolesJSON = formatRoles(authRolesInput);
-    const adminRolesJSON = formatRoles(adminRolesInput);
-    const councilRolesJSON = formatRoles(councilRolesInput);
-
-    // Insert data into the settings table
-    const insertSql = `
-        INSERT INTO settings (guild_id, auth_roles, admin_roles, council_roles) 
-        VALUES (?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            auth_roles = VALUES(auth_roles),
-            admin_roles = VALUES(admin_roles),
-            council_roles = VALUES(council_roles)
-    `;
-    await query(insertSql, [guildId, authRolesJSON, adminRolesJSON, councilRolesJSON]);
-    logger.success('Settings have been saved to the database!');
+    // Check if the old config.js file exists for migration
+    const oldConfigPath = path.join(__dirname, '../config.js');
+    if (fs.existsSync(oldConfigPath)) {
+        logger.info('Found old config.js file, migrating settings to database...');
+        try {
+            const initialConfig = require(oldConfigPath);
+            for (const [key, value] of Object.entries(initialConfig)) {
+                const valueJson = JSON.stringify(value);
+                const insertSql = 'INSERT INTO config (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)';
+                await query(insertSql, [key, valueJson]);
+            }
+            logger.success('Successfully migrated settings from config.js to the database.');
+        } catch (error) {
+            logger.error('Failed during config.js migration:', error);
+        }
+    } else {
+        logger.info('No old config.js file found, skipping migration. Please configure settings via the /config command.');
+    }
 }
+
 
 module.exports = {
     query,
-    runSetup
+    runSetup,
+    ensureDatabaseExistsAndConnected,
 };
 

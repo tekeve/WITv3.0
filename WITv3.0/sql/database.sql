@@ -29,9 +29,13 @@ CREATE TABLE IF NOT EXISTS `commander_list` (
   UNIQUE KEY `character_id` (`character_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
--- Dumping data for table wit-db.commander_list: ~1 rows (approximately)
-REPLACE INTO `commander_list` (`id`, `discord_id`, `main_character`, `alt_characters`, `roles`, `character_id`, `character_name`, `access_token`, `refresh_token`, `token_expiry`) VALUES
-	(4, '266657286355681280', 'Skeltek', '[]', '["Eve","@everyone"]', NULL, NULL, NULL, NULL, NULL);
+-- Dumping structure for table wtm-wit.config
+DROP TABLE IF EXISTS `config`;
+CREATE TABLE IF NOT EXISTS `config` (
+  `key_name` varchar(255) NOT NULL,
+  `value` longtext DEFAULT NULL,
+  PRIMARY KEY (`key_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
 -- Dumping structure for table wit-db.google_docs
 DROP TABLE IF EXISTS `google_docs`;
@@ -42,8 +46,6 @@ CREATE TABLE IF NOT EXISTS `google_docs` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
--- Dumping data for table wit-db.google_docs: ~0 rows (approximately)
-
 -- Dumping structure for table wit-db.google_sheets
 DROP TABLE IF EXISTS `google_sheets`;
 CREATE TABLE IF NOT EXISTS `google_sheets` (
@@ -52,8 +54,6 @@ CREATE TABLE IF NOT EXISTS `google_sheets` (
   `sheet_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
-
--- Dumping data for table wit-db.google_sheets: ~0 rows (approximately)
 
 -- Dumping structure for table wit-db.incursion_state
 DROP TABLE IF EXISTS `incursion_state`;
@@ -69,10 +69,6 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
   `lastIncursionStats` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`lastIncursionStats`)),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
-
--- Dumping data for table wit-db.incursion_state: ~1 rows (approximately)
-REPLACE INTO `incursion_state` (`id`, `lastIncursionState`, `incursionMessageId`, `lastHqSystemId`, `spawnTimestamp`, `mobilizingTimestamp`, `withdrawingTimestamp`, `endedTimestamp`, `lastIncursionStats`) VALUES
-	(1, '20000325-established', '1414200649213808690', 30003453, 1757280348, NULL, NULL, NULL, NULL);
 
 -- Dumping structure for table wit-db.incursion_systems
 DROP TABLE IF EXISTS `incursion_systems`;
@@ -206,8 +202,6 @@ CREATE TABLE IF NOT EXISTS `mailing_lists` (
   `list_name` varchar(50) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
--- Dumping data for table wit-db.mailing_lists: ~0 rows (approximately)
-
 -- Dumping structure for table wit-db.settings
 DROP TABLE IF EXISTS `settings`;
 CREATE TABLE IF NOT EXISTS `settings` (
@@ -217,8 +211,3 @@ CREATE TABLE IF NOT EXISTS `settings` (
   `council_roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`council_roles`)),
   PRIMARY KEY (`guild_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
-
--- Dumping data for table wit-db.settings: ~1 rows (approximately)
-REPLACE INTO `settings` (`guild_id`, `auth_roles`, `admin_roles`, `council_roles`) VALUES
-	(366076789438808064, '{"roles":["Moderator","Leadership","Officer","Big Cheese"]}', '{"roles":["Moderator","Leadership","Officer","Big Cheese"]}', '{"roles":["Moderator","Leadership","Officer","Big Cheese"]}');
-

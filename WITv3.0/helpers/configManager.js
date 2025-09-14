@@ -1,52 +1,53 @@
-const db = require('./dbService');
+const db = require('@helpers/dbService');
 const logger = require('./logger');
 
-let config = null;
+let config = null; // In-memory cache for the config
 
 /**
- * Internal function to fetch config from the DB and cache it.
+ * Fetches the configuration from the database and populates the in-memory cache.
+ * Now includes robust error handling for JSON parsing.
  */
-async function loadConfigInternal() {
+async function loadConfig() {
     try {
-        const rows = await db.query('SELECT `key`, `value` FROM `config`');
-        const loadedConfig = {};
+        const newConfig = {};
+        const rows = await db.query('SELECT key_name, value FROM config');
+
         for (const row of rows) {
             try {
-                loadedConfig[row.key] = JSON.parse(row.value);
+                // Attempt to parse the value as JSON.
+                newConfig[row.key_name] = JSON.parse(row.value);
             } catch (e) {
-                logger.warn(`Could not parse config value for key "${row.key}". Using raw value.`);
-                loadedConfig[row.key] = row.value;
+                // If parsing fails, log a warning and use the raw value.
+                // This prevents a crash if a single config value is not valid JSON.
+                logger.warn(`Could not parse JSON for config key "${row.key_name}". Using raw value. Error: ${e.message}`);
+                newConfig[row.key_name] = row.value;
             }
         }
-        config = loadedConfig;
-        logger.success('Configuration loaded successfully from database.');
+
+        config = newConfig; // Atomically update the config cache
+        logger.success('Configuration loaded/reloaded from the database.');
+
     } catch (error) {
-        logger.error('Failed to load configuration from database:', error);
-        config = {}; // Fallback to prevent crashes
+        logger.error('Failed to load configuration from the database:', error);
+        // In case of a DB failure, we keep the last known valid config (if any)
+        // to prevent the bot from becoming completely non-functional.
     }
 }
 
+
 module.exports = {
     /**
-     * Loads or reloads the entire configuration from the database.
-     * Should be called once on startup and after any config change.
+     * Gets the current in-memory configuration object.
+     * @returns {object | null} The configuration object or null if not loaded.
      */
-    loadConfig: async () => {
-        await loadConfigInternal();
-    },
+    get: () => config,
 
     /**
-     * Synchronously retrieves the cached configuration object.
-     * Throws an error if the configuration hasn't been loaded yet.
-     * @returns {object} The configuration object.
+     * Public method to trigger a reload of the configuration from the database.
+     * Renamed for clarity.
      */
-    get: () => {
-        if (config === null) {
-            // This case should ideally not be hit if loadConfig is called on startup.
-            logger.error("FATAL: configManager.get() was called before config was loaded.");
-            throw new Error('Configuration has not been loaded yet. Call loadConfig() on application startup.');
-        }
-        return config;
+    reloadConfig: async () => {
+        await loadConfig();
     },
 };
 

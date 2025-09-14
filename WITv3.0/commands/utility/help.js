@@ -51,6 +51,6 @@ module.exports = {
             .setDescription(commandList || 'You do not have permission to use any commands.')
             .setTimestamp();
 
-        await interaction.reply({ embeds: [embed], flags: [MessageFlags.Ephemeral] });
+        await interaction.reply({ embeds: [embed]});
     },
 };

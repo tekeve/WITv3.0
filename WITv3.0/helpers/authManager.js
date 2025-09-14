@@ -25,15 +25,12 @@ const formatMySqlDateTime = (date) => {
  * @returns {Promise<{success: boolean, message: string}>}
  */
 async function saveUserAuth(discordId, authData) {
-    // Check if the user has a main character registered
     const existingUser = await charManager.getChars(discordId);
     if (!existingUser || !existingUser.main_character) {
         return { success: false, message: 'No main character registered. Please use `/addchar main` first.' };
     }
 
-    // User has a main, now check if the authenticated character matches
     if (existingUser.main_character.toLowerCase() === authData.character_name.toLowerCase()) {
-        // It's the main character, update their ESI details
         try {
             const sql = 'UPDATE commander_list SET character_id = ?, character_name = ?, access_token = ?, refresh_token = ?, token_expiry = ? WHERE discord_id = ?';
             await db.query(sql, [authData.character_id, authData.character_name, authData.access_token, authData.refresh_token, authData.token_expiry, discordId]);
@@ -43,15 +40,10 @@ async function saveUserAuth(discordId, authData) {
             return { success: false, message: 'A database error occurred while updating your main character.' };
         }
     } else {
-        // It's a different character, add it as an alt and update ESI details
         try {
-            // First, add as an alt (this function handles checking for duplicates)
             await charManager.addAlt(discordId, authData.character_name);
-
-            // Now, update the ESI details for the user. This will overwrite any previous auth.
             const sql = 'UPDATE commander_list SET character_id = ?, character_name = ?, access_token = ?, refresh_token = ?, token_expiry = ? WHERE discord_id = ?';
             await db.query(sql, [authData.character_id, authData.character_name, authData.access_token, authData.refresh_token, authData.token_expiry, discordId]);
-
             return { success: true, message: `Successfully authenticated alt character ${authData.character_name}. It has been added to your profile.` };
         } catch (error) {
             logger.error(`Error authenticating alt character for ${discordId}:`, error);
@@ -69,7 +61,8 @@ async function saveUserAuth(discordId, authData) {
 async function getAccessToken(discordId) {
     let userData;
     try {
-        const sql = 'SELECT discord_id, access_token, refresh_token, token_expiry, character_name FROM commander_list WHERE discord_id = ?';
+        // Ensure character_id is also selected here for consistency
+        const sql = 'SELECT discord_id, access_token, refresh_token, token_expiry, character_name, character_id FROM commander_list WHERE discord_id = ?';
         const rows = await db.query(sql, [discordId]);
         userData = rows[0];
     } catch (error) {
@@ -81,15 +74,13 @@ async function getAccessToken(discordId) {
         return null; // User not authenticated
     }
 
-    // Check if the token is expired (or close to it)
     const tokenExpires = new Date(userData.token_expiry).getTime();
-    const isExpired = Date.now() >= tokenExpires - (60 * 1000); // 60-second buffer
+    const isExpired = Date.now() >= tokenExpires - (60 * 1000);
 
     if (!isExpired) {
         return userData.access_token;
     }
 
-    // Token is expired, let's refresh it
     logger.info(`Access token for ${userData.character_name} expired. Refreshing...`);
     try {
         const base64Auth = Buffer.from(`${ESI_CLIENT_ID}:${ESI_SECRET_KEY}`).toString('base64');
@@ -112,7 +103,6 @@ async function getAccessToken(discordId) {
         const newRefreshToken = response.data.refresh_token;
         const expiresIn = response.data.expires_in;
 
-        // Update the user's data with the new tokens and expiry time
         const updateSql = 'UPDATE commander_list SET access_token = ?, refresh_token = ?, token_expiry = ? WHERE discord_id = ?';
         const newExpiry = formatMySqlDateTime(new Date(Date.now() + expiresIn * 1000));
         await db.query(updateSql, [newAccessToken, newRefreshToken, newExpiry, discordId]);
@@ -121,7 +111,7 @@ async function getAccessToken(discordId) {
 
     } catch (error) {
         logger.error('Error refreshing token:', error.response ? error.response.data : error.message);
-        return null; // Return null on error
+        return null;
     }
 }
 
@@ -133,7 +123,8 @@ module.exports = {
      */
     getUserAuthData: async (discordId) => {
         try {
-            const sql = 'SELECT discord_id, character_name, access_token, refresh_token, token_expiry FROM commander_list WHERE discord_id = ?';
+            // FIX: Added 'character_id' to the SELECT statement.
+            const sql = 'SELECT discord_id, character_name, character_id, access_token, refresh_token, token_expiry FROM commander_list WHERE discord_id = ?';
             const rows = await db.query(sql, [discordId]);
             return rows[0] || null;
         } catch (error) {
@@ -158,8 +149,6 @@ module.exports = {
         }
     },
 
-    // Export the primary functions
     saveUserAuth,
     getAccessToken,
 };
-

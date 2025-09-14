@@ -1,15 +1,13 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } = require('discord.js');
 const crypto = require('crypto');
 const authManager = require('@helpers/authManager.js');
-const { esi, authRoles } = require('../../config.js');
+const roleManager = require('@helpers/roleManager');
+const { esi } = require('../../config.js');
 const logger = require('@helpers/logger');
 require('dotenv').config();
 
 // Load the ESI Client ID from environment variables
 const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
-
-// Helper function to check for required roles
-const hasAuthRole = (member) => member.roles.cache.some(role => authRoles.includes(role.name));
 
 // Check to ensure the ESI Client ID is configured.
 if (!ESI_CLIENT_ID) {
@@ -34,8 +32,8 @@ module.exports = {
                 .setDescription('De-authorize your character and remove your token.')),
 
     async execute(interaction) {
-        // Check if the user has permission to use this command
-        if (!hasAuthRole(interaction.member)) {
+        // Use the centralized permission check
+        if (!roleManager.canAuth(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
                 flags: [MessageFlags.Ephemeral]
@@ -87,18 +85,19 @@ module.exports = {
                         { name: 'Token Expires', value: `<t:${Math.floor(expiryDate.getTime() / 1000)}:R>`, inline: true }
                     )
                     .setFooter({ text: 'Your token will be refreshed automatically.' });
-                await interaction.reply({ embeds: [embed], flags: [MessageFlags.Ephemeral] });
+                await interaction.reply({ embeds: [embed]});
             } else {
-                await interaction.reply({ content: 'You do not have a character authenticated with this bot.', flags: [MessageFlags.Ephemeral] });
+                await interaction.reply({ content: 'You do not have a character authenticated with this bot.'});
             }
         }
         else if (subcommand === 'logout') {
             const success = await authManager.removeUser(interaction.user.id);
             if (success) {
-                await interaction.reply({ content: 'Your authentication token and character data have been successfully removed.', flags: [MessageFlags.Ephemeral] });
+                await interaction.reply({ content: 'Your authentication token and character data have been successfully removed.'});
             } else {
-                await interaction.reply({ content: 'You do not have a character authenticated with this bot.', flags: [MessageFlags.Ephemeral] });
+                await interaction.reply({ content: 'You do not have a character authenticated with this bot.'});
             }
         }
     },
 };
+
