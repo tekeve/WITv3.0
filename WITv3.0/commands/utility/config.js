@@ -89,14 +89,17 @@ module.exports = {
                 .setTimestamp();
 
             const fields = [];
+            const MAX_FIELD_VALUE_LENGTH = 1024;
+            const CODE_BLOCK_MARKDOWN_LENGTH = '```json\n'.length + '```'.length;
+
             for (const [key, value] of Object.entries(config)) {
-                // Truncate long values to prevent embed errors
                 let valueString = JSON.stringify(value, null, 2);
-                if (valueString.length > 1024) {
-                    valueString = valueString.substring(0, 1021) + '...';
+
+                if (valueString.length + CODE_BLOCK_MARKDOWN_LENGTH > MAX_FIELD_VALUE_LENGTH) {
+                    const truncateLength = MAX_FIELD_VALUE_LENGTH - CODE_BLOCK_MARKDOWN_LENGTH - '...'.length;
+                    valueString = valueString.substring(0, truncateLength) + '...';
                 }
 
-                // Add to fields array, respecting the 25-field limit
                 if (fields.length < 25) {
                     fields.push({ name: key, value: `\`\`\`json\n${valueString}\`\`\`` });
                 } else {
@@ -150,4 +153,3 @@ module.exports = {
         }
     },
 };
-
