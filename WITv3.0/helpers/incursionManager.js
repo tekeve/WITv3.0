@@ -4,38 +4,30 @@ const logger = require('./logger');
 let incursionSystems = null;
 
 /**
- * Internal function to fetch incursion system data from the DB and cache it.
+ * Fetches the latest incursion system data from the database and updates the in-memory cache.
  */
-async function loadIncursionSystemsInternal() {
+async function loadIncursionSystems() {
     try {
-        const rows = await db.query('SELECT * FROM `incursion_systems`');
+        logger.info('Loading incursion systems data from the database...');
+        const rows = await db.query('SELECT * FROM incursion_systems');
         incursionSystems = rows;
-        logger.success(`${rows.length} incursion system constellations loaded from database.`);
+        logger.success(`Successfully loaded ${rows.length} incursion systems.`);
     } catch (error) {
         logger.error('Failed to load incursion systems from database:', error);
-        incursionSystems = []; // Fallback to an empty array to prevent crashes
+        incursionSystems = []; // Ensure it's an empty array on failure
     }
 }
 
-module.exports = {
-    /**
-     * Loads or reloads all incursion system data from the database.
-     * This should be called once on application startup.
-     */
-    load: async () => {
-        await loadIncursionSystemsInternal();
-    },
+/**
+ * Returns the cached incursion systems array.
+ * @returns {Array} The array of incursion system objects.
+ */
+function get() {
+    return incursionSystems;
+}
 
-    /**
-     * Synchronously retrieves the cached incursion system data.
-     * Throws an error if the data hasn't been loaded yet.
-     * @returns {Array} An array of incursion system objects.
-     */
-    get: () => {
-        if (incursionSystems === null) {
-            logger.error("FATAL: incursionManager.get() was called before data was loaded.");
-            throw new Error('Incursion systems data has not been loaded yet. Call load() on application startup.');
-        }
-        return incursionSystems;
-    },
+module.exports = {
+    loadIncursionSystems,
+    get
 };
+

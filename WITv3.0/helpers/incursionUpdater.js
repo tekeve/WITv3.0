@@ -209,7 +209,7 @@ async function updateIncursions(client, options = {}) {
             });
 
             const jumpCounts = await Promise.all(jumpPromises);
-            const tradeHubJumpsString = jumpCounts.map(hub => `**${hub.name}**: ${hub.jumps}`).join('\n');
+            const tradeHubJumpsString = jumpCounts.map(hub => `**${hub.name}**:\n${hub.jumps}`).join('\n');
             const formatSystemLinks = (systemString) => !systemString ? 'None' : systemString.split(',').map(name => `[${name.trim()}](https://evemaps.dotlan.net/system/${encodeURIComponent(name.trim())})`).join(', ');
 
             const timelineParts = [];

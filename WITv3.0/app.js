@@ -1,66 +1,26 @@
-﻿// ================================================================= //
-// =================== IMPORTS AND CLIENT SETUP ==================== //
-// ================================================================= //
-const fs = require('node:fs');
-const path = require('node:path');
+﻿const fs = require('fs');
+const path = require('path');
+const chalk = require('chalk');
 require('module-alias/register');
 const logger = require('@helpers/logger');
-const { Client, Collection, Events, GatewayIntentBits, REST, Routes, MessageFlags } = require('discord.js');
+const { Client, Collection, Events, GatewayIntentBits, REST, Routes } = require('discord.js');
 require('dotenv').config();
-const configManager = require('@helpers/configManager.js');
-const incursionManager = require('@helpers/incursionManager.js');
-const requestManager = require('@helpers/requestManager.js');
-const srpManager = require('@helpers/srpManager.js'); // Import the new SRP manager
-const { startServer } = require('./server.js');
-const { updateIncursions } = require('@helpers/incursionUpdater.js');
+
+const configManager = require('@helpers/configManager');
+const incursionManager = require('@helpers/incursionManager');
 const db = require('@helpers/dbService');
+const { startServer } = require('./server.js');
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const requestManager = require('@helpers/requestManager');
+const srpManager = require('@helpers/srpManager');
+const mailManager = require('@helpers/mailManager');
 
-// In-memory stores
-client.esiStateMap = new Map();
-client.srpData = new Map();
-client.mailSubjects = new Map();
-client.mockOverride = null;
-
-// Function to ensure the database is ready
-async function ensureDatabaseExistsAndConnected() {
-    try {
-        await db.query('SELECT 1 + 1 AS solution');
-        logger.success('Database connection successful!');
-        return true;
-    } catch (error) {
-        logger.error('Database connection failed. Run with --db-setup flag to initialize.');
-        return false;
-    }
-}
-
-// Main application initialization function
-async function initializeApp() {
-    if (process.argv.includes('--db-setup')) {
-        logger.info('Running database setup...');
-        await db.runSetup();
-        logger.success('Database setup complete. You can now start the application normally.');
-        process.exit(0);
-    }
-
-    const dbConnected = await ensureDatabaseExistsAndConnected();
-    if (!dbConnected) {
-        logger.error('Cannot start application without a database connection.');
-        return;
-    }
-
-    // Load critical data from the database on startup
-    await configManager.loadConfig();
-    await incursionManager.load();
-
-    startServer(client);
-
-    // ================================================================= //
-    // =================== COMMAND LOADING LOGIC ======================= //
-    // ================================================================= //
-    client.commands = new Collection();
+// ================================================================= //
+// ==================== DEPLOY COMMANDS SCRIPT ===================== //
+// ================================================================= //
+async function deployCommands() {
     const commandsToDeploy = [];
+    const client = { commands: new Collection() }; // Mock client for command loading
     const foldersPath = path.join(__dirname, 'commands');
     const commandFolders = fs.readdirSync(foldersPath);
 
@@ -70,11 +30,84 @@ async function initializeApp() {
         for (const file of commandFiles) {
             const filePath = path.join(commandsPath, file);
             const command = require(filePath);
-            if ('data' in command && 'execute' in command) {
+            if ('data' in command && ('execute' in command || 'autocomplete' in command)) {
                 client.commands.set(command.data.name, command);
                 commandsToDeploy.push(command.data.toJSON());
             } else {
-                logger.warn(`The command at ${filePath} is missing a required "data" or "execute" property.`);
+                logger.warn(`The command at ${filePath} is missing a required "data", "execute", or "autocomplete" property.`);
+            }
+        }
+    }
+
+    try {
+        logger.info(`Started refreshing ${commandsToDeploy.length} application (/) commands.`);
+        const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+        const data = await rest.put(
+            Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
+            { body: commandsToDeploy },
+        );
+        logger.success(`Successfully reloaded ${data.length} application (/) commands.`);
+        console.log(chalk.greenBright('\n✅ Command deployment successful! You can now start the bot normally.'));
+    } catch (error) {
+        logger.error(error);
+    }
+}
+
+
+// ================================================================= //
+// =================== MAIN APPLICATION LOGIC ====================== //
+// ================================================================= //
+async function initializeApp() {
+    // Handle command-line flags
+    if (process.argv.includes('--db-setup')) {
+        logger.info('Running database setup...');
+        await db.runSetup();
+        process.exit(0);
+    }
+    if (process.argv.includes('--deploy')) {
+        await deployCommands();
+        process.exit(0);
+    }
+
+    // Ensure database is connected before proceeding
+    const dbConnected = await db.ensureDatabaseExistsAndConnected();
+    if (!dbConnected) {
+        logger.error('Cannot start the application without a database connection. Please check your configuration.');
+        return;
+    }
+
+    // Load dynamic configurations from the database
+    await configManager.reloadConfig();
+    await incursionManager.loadIncursionSystems();
+
+    const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+
+    // In-memory stores
+    client.esiStateMap = new Map();
+    client.srpData = new Map();
+    client.mailSubjects = new Map();
+    client.mockOverride = null; // For mock incursion state
+
+    // Start the ESI authentication callback server
+    startServer(client);
+
+    // ================================================================= //
+    // =================== COMMAND LOADING LOGIC ======================= //
+    // ================================================================= //
+    client.commands = new Collection();
+    const foldersPath = path.join(__dirname, 'commands');
+    const commandFolders = fs.readdirSync(foldersPath);
+
+    for (const folder of commandFolders) {
+        const commandsPath = path.join(foldersPath, folder);
+        const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+        for (const file of commandFiles) {
+            const filePath = path.join(commandsPath, file);
+            const command = require(filePath);
+            if ('data' in command && ('execute' in command || 'autocomplete' in command)) {
+                client.commands.set(command.data.name, command);
+            } else {
+                logger.warn(`The command at ${filePath} is missing a required property.`);
             }
         }
     }
@@ -82,6 +115,7 @@ async function initializeApp() {
     // ================================================================= //
     // ============ STATE MANAGEMENT & HELPER FUNCTIONS ================ //
     // ================================================================= //
+    const { updateIncursions } = require('@helpers/incursionUpdater.js');
     client.updateIncursions = (options) => updateIncursions(client, options);
 
     // ================================================================= //
@@ -94,65 +128,47 @@ async function initializeApp() {
     });
 
     client.on(Events.InteractionCreate, async interaction => {
-        // Command Handler
-        if (interaction.isChatInputCommand()) {
-            const command = client.commands.get(interaction.commandName);
-            if (!command) return;
-            try {
+        try {
+            if (interaction.isChatInputCommand()) {
+                const command = client.commands.get(interaction.commandName);
+                if (!command) return;
                 await command.execute(interaction);
-            } catch (error) {
-                logger.error(error);
-                if (interaction.replied || interaction.deferred) {
-                    await interaction.followUp({ content: 'There was an error while executing this command!', flags: [MessageFlags.Ephemeral] });
-                } else {
-                    await interaction.reply({ content: 'There was an error while executing this command!', flags: [MessageFlags.Ephemeral] });
+            }
+            else if (interaction.isAutocomplete()) {
+                const command = client.commands.get(interaction.commandName);
+                if (!command || !command.autocomplete) return;
+                await command.autocomplete(interaction);
+            }
+            else if (interaction.isButton()) {
+                const { customId } = interaction;
+                if (customId.startsWith('ticket_')) {
+                    await requestManager.handleInteraction(interaction);
+                } else if (customId.startsWith('srp_')) {
+                    await srpManager.handleInteraction(interaction);
                 }
             }
-        }
-        // Button Handler
-        else if (interaction.isButton()) {
-            const { customId } = interaction;
-            if (customId === 'ticket_solve' || customId === 'ticket_deny') {
-                await requestManager.handleRequestButton(interaction);
+            else if (interaction.isModalSubmit()) {
+                const { customId } = interaction;
+                if (customId.startsWith('resolve_modal_')) {
+                    await requestManager.handleInteraction(interaction);
+                } else if (customId.startsWith('srp_modal_')) {
+                    await srpManager.handleInteraction(interaction);
+                } else if (customId.startsWith('sendmail_modal_')) {
+                    await mailManager.handleModal(interaction);
+                }
             }
-            if (customId === 'srp_continue') {
-                await srpManager.handleSrpContinueButton(interaction); // Use the SRP manager
+        } catch (error) {
+            logger.error(`Error during interaction for command ${interaction.commandName}:`, error);
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({ content: 'There was an error while processing this interaction!' });
+            } else {
+                await interaction.reply({ content: 'There was an error while processing this interaction!' });
             }
-        }
-        // Modal Handler
-        else if (interaction.isModalSubmit()) {
-            const { customId } = interaction;
-
-            if (customId.startsWith('resolve_modal_')) {
-                await requestManager.handleRequestModal(interaction);
-            }
-            if (customId === 'srp_modal_part1') {
-                await srpManager.handleSrpModalPart1(interaction); // Use the SRP manager
-            }
-            if (customId === 'srp_modal_part2') {
-                await srpManager.handleSrpModalPart2(interaction); // Use the SRP manager
-            }
-            // ... handler for sendmail_modal will be moved next
         }
     });
 
-    // ================================================================= //
-    // ================= DEPLOY COMMANDS & BOT LOGIN =================== //
-    // ================================================================= //
-    (async () => {
-        try {
-            logger.info(`Started refreshing ${commandsToDeploy.length} application (/) commands.`);
-            const rest = new REST().setToken(process.env.DISCORD_TOKEN);
-            const data = await rest.put(
-                Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-                { body: commandsToDeploy },
-            );
-            logger.success(`Successfully reloaded ${data.length} application (/) commands.`);
-            client.login(process.env.DISCORD_TOKEN);
-        } catch (error) {
-            logger.error(error);
-        }
-    })();
+    client.login(process.env.DISCORD_TOKEN);
 }
+
 initializeApp();
 

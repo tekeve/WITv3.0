@@ -12,7 +12,7 @@ module.exports = {
 
     async execute(interaction) {
         if (!hasAdminRole(interaction.member)) {
-            return interaction.reply({ content: 'You do not have permission to use this command.', flags: [MessageFlags.Ephemeral] });
+            return interaction.reply({ content: 'You do not have permission to use this command.'});
         }
 
         await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });

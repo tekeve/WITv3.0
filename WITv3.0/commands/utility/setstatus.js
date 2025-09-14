@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags, ActivityType } = require('discord.js');
-const { adminRoles } = require('../../config.js');
+const roleManager = require('@helpers/roleManager');
+const logger = require('@helpers/logger');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -24,8 +25,8 @@ module.exports = {
                 .setDescription('The URL for the streaming status (e.g., Twitch/YouTube).')),
 
     async execute(interaction) {
-        // Permission Check
-        if (!interaction.member.roles.cache.some(role => adminRoles.includes(role.name))) {
+        // Permission Check using the centralized roleManager
+        if (!roleManager.isAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
                 flags: [MessageFlags.Ephemeral]
@@ -86,3 +87,4 @@ module.exports = {
         }
     },
 };
+

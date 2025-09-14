@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags } = require('discord.js');
-const { adminRoles, commanderRoles } = require('../../config.js');
+const roleManager = require('@helpers/roleManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -7,11 +7,8 @@ module.exports = {
         .setDescription('Submit a Ship Replacement Program (SRP) request.'),
 
     async execute(interaction) {
-        const hasPermission = interaction.member.roles.cache.some(role =>
-            adminRoles.includes(role.name) || commanderRoles.includes(role.name)
-        );
-
-        if (!hasPermission) {
+        // Use the centralized permission check
+        if (!roleManager.isCommanderOrAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
                 flags: [MessageFlags.Ephemeral]
@@ -72,3 +69,4 @@ module.exports = {
         await interaction.showModal(modal);
     },
 };
+

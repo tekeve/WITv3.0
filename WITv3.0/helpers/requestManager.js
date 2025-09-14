@@ -1,24 +1,16 @@
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const charManager = require('@helpers/characterManager');
+const { EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const logger = require('@helpers/logger');
-const configManager = require('@helpers/configManager');
+const charManager = require('@helpers/characterManager');
+const roleManager = require('@helpers/roleManager');
 
-/**
- * Handles button clicks for solving or denying a request ticket by showing a modal.
- * @param {import('discord.js').ButtonInteraction} interaction - The button interaction object.
- */
-async function handleRequestButton(interaction) {
-    const config = configManager.get();
-    const { customId, member } = interaction;
-
+async function handleTicketButton(interaction) {
     // Permission check
-    if (!member.roles.cache.some(role => config.adminRoles.includes(role.name))) {
-        return interaction.reply({ content: 'You do not have permission to resolve tickets.', flags: [MessageFlags.Ephemeral] });
+    if (!roleManager.isAdmin(interaction.member)) {
+        return interaction.reply({ content: 'You do not have permission to resolve tickets.' });
     }
 
-    // Create and configure the modal
     const modal = new ModalBuilder().setTitle('Resolve Request Ticket');
-    const action = customId === 'ticket_solve' ? 'Solved' : 'Denied';
+    const action = interaction.customId === 'ticket_solve' ? 'Solved' : 'Denied';
     modal.setCustomId(`resolve_modal_${interaction.message.id}_${action}`);
 
     const commentInput = new TextInputBuilder()
@@ -30,31 +22,22 @@ async function handleRequestButton(interaction) {
 
     const actionRow = new ActionRowBuilder().addComponents(commentInput);
     modal.addComponents(actionRow);
-
-    // Show the modal to the user
     await interaction.showModal(modal);
 }
 
-/**
- * Handles the submission of the ticket resolution modal.
- * @param {import('discord.js').ModalSubmitInteraction} interaction - The modal submission interaction object.
- */
-async function handleRequestModal(interaction) {
+async function handleResolveModal(interaction) {
     const { customId, client } = interaction;
     const [, , messageId, action] = customId.split('_');
     const closingComment = interaction.fields.getTextInputValue('resolve_comment');
 
     try {
-        // Fetch the resolver's main character name for the log
         const resolverCharData = await charManager.getChars(interaction.user.id);
         const resolverName = resolverCharData ? resolverCharData.main_character : interaction.user.tag;
 
-        // Fetch the original request message
         const requestChannel = await client.channels.fetch(process.env.REQUEST_CHANNEL_ID);
         const originalMessage = await requestChannel.messages.fetch(messageId);
         const originalEmbed = originalMessage.embeds[0];
 
-        // Prepare the archive embed
         const createdOnField = originalEmbed.fields.find(field => field.name === 'Created On');
         const createdOnValue = createdOnField ? createdOnField.value : 'N/A';
         const resolvedTimestamp = Math.floor(Date.now() / 1000);
@@ -72,19 +55,24 @@ async function handleRequestModal(interaction) {
                 { name: 'Resolved On', value: `<t:${resolvedTimestamp}:f>`, inline: true }
             );
 
-        // Send to archive and delete original message
         const archiveChannel = await client.channels.fetch(process.env.ARCHIVE_CHANNEL_ID);
         await archiveChannel.send({ embeds: [archiveEmbed] });
         await originalMessage.delete();
 
-        await interaction.reply({ content: 'The ticket has been successfully archived.', flags: [MessageFlags.Ephemeral] });
+        await interaction.reply({ content: 'The ticket has been successfully archived.' });
     } catch (error) {
         logger.error('Error processing ticket resolution:', error);
-        await interaction.reply({ content: 'There was an error resolving this ticket.', flags: [MessageFlags.Ephemeral] });
+        await interaction.reply({ content: 'There was an error resolving this ticket.' });
     }
 }
 
-module.exports = {
-    handleRequestButton,
-    handleRequestModal,
-};
+async function handleInteraction(interaction) {
+    if (interaction.isButton()) {
+        await handleTicketButton(interaction);
+    } else if (interaction.isModalSubmit()) {
+        await handleResolveModal(interaction);
+    }
+}
+
+module.exports = { handleInteraction };
+
