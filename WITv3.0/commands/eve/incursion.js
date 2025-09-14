@@ -1,44 +1,34 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { adminRoles } = require('../../config.js');
-const incursionSystems = require('../../helpers/incursionsystem.json');
+const configManager = require('@helpers/configManager');
+const incursionManager = require('@helpers/incursionManager'); // Use the manager
+const logger = require('@helpers/logger');
 
-// Create choices for the constellation option dynamically from the JSON file
+// Dynamically create choices from the cached incursion data
+const incursionSystems = incursionManager.get();
 const constellationChoices = incursionSystems.map(sys => ({
     name: sys.Constellation,
     value: sys.Constellation,
 }));
-// Discord has a limit of 25 choices for slash command options
 const limitedConstellationChoices = constellationChoices.slice(0, 25);
 
-/**
- * Parses a relative timestring (e.g., "1d 2h 30m ago") into a Unix timestamp.
- * @param {string} timestring - The relative time string.
- * @returns {number} The calculated Unix timestamp in seconds.
- */
 function parseTimestring(timestring) {
     const now = Date.now();
     let totalSecondsAgo = 0;
     const regex = /(\d+)\s*(d|h|m)/g;
     let match;
 
-    // Ensure the string ends with "ago" for safety, then remove it
     if (!timestring.trim().endsWith('ago')) return null;
     const parsablePart = timestring.trim().slice(0, -3).trim();
 
     while ((match = regex.exec(parsablePart)) !== null) {
         const value = parseInt(match[1]);
         const unit = match[2];
-        if (unit === 'd') {
-            totalSecondsAgo += value * 24 * 60 * 60;
-        } else if (unit === 'h') {
-            totalSecondsAgo += value * 60 * 60;
-        } else if (unit === 'm') {
-            totalSecondsAgo += value * 60;
-        }
+        if (unit === 'd') totalSecondsAgo += value * 24 * 60 * 60;
+        else if (unit === 'h') totalSecondsAgo += value * 60 * 60;
+        else if (unit === 'm') totalSecondsAgo += value * 60;
     }
 
     if (totalSecondsAgo === 0) return null;
-
     return Math.floor((now - totalSecondsAgo * 1000) / 1000);
 }
 
@@ -46,7 +36,7 @@ function parseTimestring(timestring) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('incursion')
-        .setDescription('Manage and view EVE Online Incursion information. (Admin Only)')
+        .setDescription('Manage and view EVE Online Incursion information.')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('refresh')
@@ -86,7 +76,10 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        const hasPermission = interaction.member.roles.cache.some(role => adminRoles.includes(role.name));
+        const config = configManager.get();
+        const hasPermission = interaction.member.roles.cache.some(role =>
+            config.adminRoles.includes(role.name) || config.councilRoles.includes(role.name)
+        );
 
         if (!hasPermission) {
             return interaction.reply({
@@ -98,13 +91,8 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
         await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
-        // State file logic is removed, handled by client.mockOverride now
-
         if (subcommand === 'refresh') {
-            // Clear any mock override when manually refreshing
             interaction.client.mockOverride = null;
-
-            // Trigger an update, which will now use ESI data
             await interaction.client.updateIncursions({ isManualRefresh: true });
             await interaction.editReply({ content: 'Mock state cleared. Incursion data has been manually refreshed from ESI!' });
 
@@ -119,23 +107,21 @@ module.exports = {
                 return interaction.editReply({ content: 'You must provide a constellation name when setting an active incursion state.' });
             }
 
-            if (constellationName && !incursionSystems.some(c => c.Constellation === constellationName)) {
+            const allIncursionSystems = incursionManager.get();
+            if (constellationName && !allIncursionSystems.some(c => c.Constellation === constellationName)) {
                 return interaction.editReply({ content: `Error: The constellation "${constellationName}" was not found.` });
             }
 
-            // Set the mock override in the client object, expiring in 10 minutes
             interaction.client.mockOverride = {
                 state: state,
                 constellationName: constellationName,
                 expires: Date.now() + (10 * 60 * 1000)
             };
 
-            // Parse and add any provided timestamps
             if (spawnTimestampStr) interaction.client.mockOverride.spawnTimestamp = parseTimestring(spawnTimestampStr);
             if (mobilizingTimestampStr) interaction.client.mockOverride.mobilizingTimestamp = parseTimestring(mobilizingTimestampStr);
             if (withdrawingTimestampStr) interaction.client.mockOverride.withdrawingTimestamp = parseTimestring(withdrawingTimestampStr);
 
-            // Trigger an immediate update which will now use the override
             await interaction.client.updateIncursions({ isManualRefresh: true });
 
             const constellationText = state !== 'none' ? ` in **${constellationName}**` : '';
@@ -143,4 +129,3 @@ module.exports = {
         }
     },
 };
-
