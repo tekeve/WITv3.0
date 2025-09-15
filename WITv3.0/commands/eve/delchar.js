@@ -1,8 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
-const { adminRoles, commanderRoles } = require('../../config.js');
-
-const hasAdminRole = (member) => member.roles.cache.some(role => adminRoles.includes(role.name));
+const roleManager = require('@helpers/roleManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -22,11 +20,7 @@ module.exports = {
                 .addUserOption(option => option.setName('user').setDescription('Admin only: The Discord user to delete the character from.'))),
 
     async execute(interaction) {
-        const hasPermission = interaction.member.roles.cache.some(role =>
-            adminRoles.includes(role.name) || commanderRoles.includes(role.name)
-        );
-
-        if (!hasPermission) {
+        if (!roleManager.isCommanderOrAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
                 flags: [MessageFlags.Ephemeral]
@@ -42,7 +36,7 @@ module.exports = {
         let discordMember = member;
 
         // Admin override logic
-        if (targetUser && hasAdminRole(member)) {
+        if (targetUser && roleManager.isAdmin(member)) {
             discordUser = targetUser;
             discordMember = await interaction.guild.members.fetch(targetUser.id);
         } else if (targetUser) {
@@ -59,13 +53,12 @@ module.exports = {
         if (result.success) {
             // Sync roles after successfully deleting an alt. No sync needed if the whole profile is gone.
             if (subcommand === 'alt') {
-                const userRoles = discordMember.roles.cache.map(role => role.name);
-                await charManager.updateUserRoles(discordUser.id, userRoles);
+                const userRoleIds = discordMember.roles.cache.map(role => role.id);
+                await charManager.updateUserRoles(discordUser.id, userRoleIds);
             }
-            await interaction.reply({ content: result.message});
+            await interaction.reply({ content: result.message });
         } else {
             await interaction.reply({ content: `Error: ${result.message}`});
         }
     },
 };
-

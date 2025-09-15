@@ -1,5 +1,4 @@
 const mysql = require('mysql2/promise');
-const readline = require('readline');
 const fs = require('fs');
 const path = require('path');
 const logger = require('@helpers/logger');
@@ -18,20 +17,6 @@ const dbConfig = {
 
 // Create a connection pool instead of a single connection
 const pool = mysql.createPool(dbConfig);
-
-// A function to read user input from the command line
-function prompt(question) {
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-    });
-    return new Promise(resolve => {
-        rl.question(question, answer => {
-            rl.close();
-            resolve(answer);
-        });
-    });
-}
 
 /**
  * Checks if the database connection is valid by running a simple query.
@@ -82,24 +67,9 @@ async function runSetup() {
         throw error;
     }
 
-    // Check if the old config.js file exists for migration
-    const oldConfigPath = path.join(__dirname, '../config.js');
-    if (fs.existsSync(oldConfigPath)) {
-        logger.info('Found old config.js file, migrating settings to database...');
-        try {
-            const initialConfig = require(oldConfigPath);
-            for (const [key, value] of Object.entries(initialConfig)) {
-                const valueJson = JSON.stringify(value);
-                const insertSql = 'INSERT INTO config (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)';
-                await query(insertSql, [key, valueJson]);
-            }
-            logger.success('Successfully migrated settings from config.js to the database.');
-        } catch (error) {
-            logger.error('Failed during config.js migration:', error);
-        }
-    } else {
-        logger.info('No old config.js file found, skipping migration. Please configure settings via the /config command.');
-    }
+    // The old migration logic has been removed as it is now obsolete.
+    // All configuration should be managed via the /config command.
+    logger.info('Database setup is complete. Please use the /config command to manage bot settings.');
 }
 
 
@@ -108,4 +78,3 @@ module.exports = {
     runSetup,
     ensureDatabaseExistsAndConnected,
 };
-

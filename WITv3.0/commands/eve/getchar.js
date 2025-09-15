@@ -13,6 +13,7 @@ module.exports = {
         if (!roleManager.isCommanderOrAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
+                flags: [MessageFlags.Ephemeral]
             });
         }
 
@@ -26,12 +27,12 @@ module.exports = {
             discordUser = targetUser;
             discordMember = await interaction.guild.members.fetch(targetUser.id);
         } else if (targetUser) {
-            return interaction.reply({ content: 'You do not have permission to view other users\' characters.' });
+            return interaction.reply({ content: 'You do not have permission to view other users\' characters.'});
         }
 
         // Update roles in the database every time the command is run.
-        const userRoles = discordMember.roles.cache.map(role => role.name);
-        await charManager.updateUserRoles(discordUser.id, userRoles);
+        const userRoleIds = discordMember.roles.cache.map(role => role.id);
+        await charManager.updateUserRoles(discordUser.id, userRoleIds);
 
         const charData = await charManager.getChars(discordUser.id);
 

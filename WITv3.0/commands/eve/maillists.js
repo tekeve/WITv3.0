@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const authManager = require('@helpers/authManager');
-const axios = require('axios');
 const logger = require('@helpers/logger');
+const esiService = require('@helpers/esiService');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,7 +18,6 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'list') {
-            // FIX: Added 'await' to ensure we get the user data before proceeding.
             const authData = await authManager.getUserAuthData(interaction.user.id);
             if (!authData || !authData.character_id) {
                 return interaction.editReply({
@@ -28,16 +27,17 @@ module.exports = {
 
             try {
                 const accessToken = await authManager.getAccessToken(interaction.user.id);
-                const response = await axios.get(
-                    `https://esi.evetech.net/latest/characters/${authData.character_id}/mail/lists/`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`
-                        }
-                    }
-                );
+                const headers = { 'Authorization': `Bearer ${accessToken}` };
+                const mailingLists = await esiService.get(`/characters/${authData.character_id}/mail/lists/`, null, headers);
 
-                const mailingLists = response.data;
+                // --- FIX ---
+                // The esiService now returns the data directly, so we don't need 'response.data'.
+                if (!Array.isArray(mailingLists)) {
+                    // Handle cases where the ESI service returned an error.
+                    const errorMessage = mailingLists.message || 'An unknown error occurred.';
+                    logger.error(`Failed to fetch EVE mailing lists: ${errorMessage}`);
+                    return interaction.editReply({ content: `Could not fetch your mailing lists. ESI responded with an error: \`${errorMessage}\`` });
+                }
 
                 if (mailingLists.length === 0) {
                     return interaction.editReply({ content: 'Your character is not subscribed to any mailing lists.' });
@@ -56,10 +56,11 @@ module.exports = {
                 await interaction.editReply({ embeds: [embed] });
 
             } catch (error) {
-                const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-                logger.error(`Failed to fetch EVE mailing lists: ${errorMessage}`);
-                await interaction.editReply({ content: `Could not fetch your mailing lists. The ESI might be down or your token may be invalid. Please try re-authenticating with \`/auth login\`.` });
+                // This catch block is now for unexpected errors, as ESI errors are handled above.
+                logger.error(`An unexpected error occurred while fetching mailing lists:`, error);
+                await interaction.editReply({ content: `An unexpected error occurred. Please check the logs.` });
             }
         }
     },
 };
+

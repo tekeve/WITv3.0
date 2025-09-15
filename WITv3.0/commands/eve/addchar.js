@@ -21,7 +21,7 @@ module.exports = {
 
     async execute(interaction) {
         // Use the centralized permission check
-        if (!roleManager.isCommander(interaction.member)) {
+        if (!roleManager.isCommanderOrAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
                 flags: [MessageFlags.Ephemeral]
@@ -45,20 +45,19 @@ module.exports = {
         }
 
         if (subcommand === 'main') {
-            const userRoles = discordMember.roles.cache.map(role => role.name);
-            await charManager.addMain(discordUser.id, charName, userRoles);
-            await interaction.reply({ content: `Main character **${charName}** has been registered for ${discordUser.username}.`});
+            const userRoleIds = discordMember.roles.cache.map(role => role.id);
+            await charManager.addMain(discordUser.id, charName, userRoleIds);
+            await interaction.reply({ content: `Main character **${charName}** has been registered for ${discordUser.username}.` });
         } else if (subcommand === 'alt') {
             const result = await charManager.addAlt(discordUser.id, charName);
             if (result.success) {
                 // Sync roles on alt add
-                const userRoles = discordMember.roles.cache.map(role => role.name);
-                await charManager.updateUserRoles(discordUser.id, userRoles);
-                await interaction.reply({ content: `Alt character **${charName}** has been added for ${discordUser.username}.`});
+                const userRoleIds = discordMember.roles.cache.map(role => role.id);
+                await charManager.updateUserRoles(discordUser.id, userRoleIds);
+                await interaction.reply({ content: `Alt character **${charName}** has been added for ${discordUser.username}.` });
             } else {
                 await interaction.reply({ content: `Error: ${result.message}`});
             }
         }
     },
 };
-

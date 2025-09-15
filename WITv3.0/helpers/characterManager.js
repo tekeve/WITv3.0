@@ -1,9 +1,9 @@
-const db = require('./dbService');
+const db = require('@helpers/dbService');
 
 module.exports = {
-    addMain: async (discordId, main_character, roles) => {
-        const rolesJson = JSON.stringify(roles);
-        const sql = 'INSERT INTO commander_list (discord_id, main_character, roles) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE main_character = VALUES(main_character), roles = VALUES(roles)';
+    addMain: async (discordId, main_character, roleIds) => {
+        const rolesJson = JSON.stringify(roleIds);
+        const sql = 'INSERT INTO commander_list (discord_id, main_character, role_ids) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE main_character = VALUES(main_character), role_ids = VALUES(role_ids)';
         await db.query(sql, [discordId, main_character, rolesJson]);
         return true;
     },
@@ -66,15 +66,16 @@ module.exports = {
         return rows[0] || null;
     },
 
-    findUsersInRole: async (roleName) => {
-        const sql = 'SELECT main_character, discord_id FROM commander_list WHERE JSON_CONTAINS(roles, ?)';
-        const rows = await db.query(sql, [`"${roleName}"`]);
+    findUsersWithRole: async (roleId) => {
+        // This query checks if the role_ids JSON array contains the specified roleId
+        const sql = 'SELECT main_character, discord_id FROM commander_list WHERE JSON_CONTAINS(role_ids, ?)';
+        const rows = await db.query(sql, [`"${roleId}"`]);
         return rows;
     },
 
-    updateUserRoles: async (discordId, roles) => {
-        const rolesJson = JSON.stringify(roles);
-        const sql = 'UPDATE commander_list SET roles = ? WHERE discord_id = ?';
+    updateUserRoles: async (discordId, roleIds) => {
+        const rolesJson = JSON.stringify(roleIds);
+        const sql = 'UPDATE commander_list SET role_ids = ? WHERE discord_id = ?';
         await db.query(sql, [rolesJson, discordId]);
     },
 
@@ -84,4 +85,3 @@ module.exports = {
         return rows;
     },
 };
-

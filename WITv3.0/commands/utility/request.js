@@ -1,7 +1,8 @@
 ﻿const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
 const roleManager = require('@helpers/roleManager');
-require('dotenv').config();
+const configManager = require('@helpers/configManager'); // Import config manager
+const logger = require('@helpers/logger');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,6 +22,14 @@ module.exports = {
             });
         }
 
+        const config = configManager.get(); // Get latest config
+        const requestChannelId = config.requestChannelId;
+
+        if (!requestChannelId) {
+            logger.error('requestChannelId is not configured in the database.');
+            return interaction.reply({ content: 'Error: The request channel is not configured correctly.' });
+        }
+
         const requestDetails = interaction.options.getString('details');
         const requester = interaction.user;
 
@@ -28,9 +37,9 @@ module.exports = {
         const charData = await charManager.getChars(requester.id);
         const authorName = charData ? charData.main_character : requester.tag;
 
-        const requestChannel = await interaction.client.channels.fetch(process.env.REQUEST_CHANNEL_ID);
+        const requestChannel = await interaction.client.channels.fetch(requestChannelId);
         if (!requestChannel) {
-            return interaction.reply({ content: 'Error: The request channel is not configured correctly.'});
+            return interaction.reply({ content: 'Error: The request channel could not be found.' });
         }
 
         const timestamp = Math.floor(Date.now() / 1000);
@@ -61,7 +70,6 @@ module.exports = {
 
         await requestChannel.send({ embeds: [embed], components: [buttons] });
 
-        await interaction.reply({ content: 'Your request has been submitted successfully!'});
+        await interaction.reply({ content: 'Your request has been submitted successfully!', flags: [MessageFlags.Ephemeral] });
     },
 };
-

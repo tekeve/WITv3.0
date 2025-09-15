@@ -12,9 +12,10 @@ const db = require('@helpers/dbService');
 const { startServer } = require('./server.js');
 
 const requestManager = require('@helpers/requestManager');
-const srpManager = require('@helpers/srpManager');
 const mailManager = require('@helpers/mailManager');
 const configInteractionManager = require('@helpers/configInteractionManager');
+const roleHierarchyManager = require('@helpers/roleHierarchyManager');
+const auditLogger = require('@helpers/auditLogger');
 
 // ================================================================= //
 // ==================== DEPLOY COMMANDS SCRIPT ===================== //
@@ -85,7 +86,6 @@ async function initializeApp() {
 
     // In-memory stores
     client.esiStateMap = new Map();
-    client.srpData = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null; // For mock incursion state
 
@@ -133,57 +133,52 @@ async function initializeApp() {
             if (interaction.isChatInputCommand()) {
                 const command = client.commands.get(interaction.commandName);
                 if (!command) return;
+
                 await command.execute(interaction);
-            }
-            else if (interaction.isAutocomplete()) {
+                await auditLogger.logCommand(interaction);
+
+            } else if (interaction.isAutocomplete()) {
                 const command = client.commands.get(interaction.commandName);
                 if (!command || !command.autocomplete) return;
                 await command.autocomplete(interaction);
-            }
-            else if (interaction.isStringSelectMenu()) {
-                if (interaction.customId === 'config_table_select') {
-                    await configInteractionManager.handleTableSelect(interaction);
-                } else if (interaction.customId.startsWith('config_key_select_')) {
-                    const [, , action, tableName] = interaction.customId.split('_');
-                    await configInteractionManager.handleKeySelect(interaction, action, tableName);
-                }
-            }
-            else if (interaction.isButton()) {
+
+            } else if (interaction.isButton()) {
                 const { customId } = interaction;
                 if (customId.startsWith('ticket_')) {
                     await requestManager.handleInteraction(interaction);
-                } else if (customId.startsWith('srp_')) {
-                    await srpManager.handleInteraction(interaction);
                 } else if (customId.startsWith('config_action_')) {
-                    const [, , action, tableName] = customId.split('_');
-                    await configInteractionManager.handleAction(interaction, action, tableName);
-                } else if (customId.startsWith('config_confirm_delete_')) {
-                    const [, , , tableName, key] = customId.split('_');
-                    await configInteractionManager.handleConfirmDelete(interaction, tableName, key);
-                } else if (customId === 'config_cancel_delete') {
-                    await interaction.update({ content: 'Deletion cancelled.', components: [], embeds: [] });
+                    await configInteractionManager.handleInteraction(interaction);
                 }
-            }
-            else if (interaction.isModalSubmit()) {
+
+            } else if (interaction.isModalSubmit()) {
                 const { customId } = interaction;
                 if (customId.startsWith('resolve_modal_')) {
                     await requestManager.handleInteraction(interaction);
-                } else if (customId.startsWith('srp_modal_')) {
-                    await srpManager.handleInteraction(interaction);
                 } else if (customId.startsWith('sendmail_modal_')) {
                     await mailManager.handleModal(interaction);
                 } else if (customId.startsWith('config_modal_')) {
-                    const [, , action, tableName, ...keyParts] = customId.split('_');
-                    const key = keyParts.join('_'); // Rejoin key in case it contains underscores
-                    await configInteractionManager.handleModalSubmit(interaction, action, tableName, key || null);
+                    await configInteractionManager.handleInteraction(interaction);
+                }
+
+            } else if (interaction.isStringSelectMenu()) {
+                const { customId } = interaction;
+                if (customId.startsWith('config_')) {
+                    await configInteractionManager.handleInteraction(interaction);
                 }
             }
         } catch (error) {
             logger.error(`Error during interaction:`, error);
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: 'There was an error while processing this interaction!', flags: [MessageFlags.Ephemeral] });
-            } else {
-                await interaction.reply({ content: 'There was an error while processing this interaction!', flags: [MessageFlags.Ephemeral] });
+            const errorMessage = { content: 'There was an error while processing this interaction!', flags: [MessageFlags.Ephemeral] };
+            try {
+                if (interaction.isAutocomplete()) {
+                    console.error("Failed to respond to an autocomplete interaction.");
+                } else if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp(errorMessage);
+                } else {
+                    await interaction.reply(errorMessage);
+                }
+            } catch (followUpError) {
+                logger.error('Failed to send error follow-up message:', followUpError);
             }
         }
     });
@@ -192,3 +187,4 @@ async function initializeApp() {
 }
 
 initializeApp();
+

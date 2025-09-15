@@ -1,4 +1,5 @@
 const axios = require('axios');
+const esi = require('@helpers/esiService'); // Use the new ESI service
 const logger = require('@helpers/logger');
 const authManager = require('@helpers/authManager');
 
@@ -34,8 +35,8 @@ async function handleModal(interaction) {
         };
 
         // Send the mail via ESI
-        await axios.post(
-            `https://esi.evetech.net/latest/characters/${authData.character_id}/mail/`,
+        await esi.post( // Updated to use esi
+            `/characters/${authData.character_id}/mail/`,
             {
                 approved_cost: 0,
                 body: mailBody,

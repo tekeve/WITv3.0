@@ -1,9 +1,9 @@
-const axios = require('axios');
 const { EmbedBuilder } = require('discord.js');
 const logger = require('@helpers/logger');
 const db = require('@helpers/dbService');
 const configManager = require('@helpers/configManager');
 const incursionManager = require('@helpers/incursionManager');
+const esiService = require('@helpers/esiService');
 
 // Color map for incursion states
 const stateColors = {
@@ -85,6 +85,12 @@ async function updateIncursions(client, options = {}) {
     const incursionSystems = incursionManager.get();
     const { isManualRefresh = false } = options;
 
+    if (!config.incursionChannelId) {
+        logger.warn('incursionChannelId is not configured in the database. Skipping update.');
+        isUpdating = false;
+        return;
+    }
+
     try {
         let highSecIncursion;
         const mockOverride = client.mockOverride;
@@ -113,17 +119,27 @@ async function updateIncursions(client, options = {}) {
                 logger.info('Mock override has expired. Deleting it and resuming ESI updates.');
                 client.mockOverride = null;
             }
-            const response = await axios.get('https://esi.evetech.net/latest/incursions/', { timeout: 5000 });
-            const allIncursions = response.data;
-            const enrichedIncursions = await Promise.all(allIncursions.map(async (incursion) => {
+            const allIncursions = await esiService.get('/incursions/');
+
+            // Add defensive check to ensure the response is an array
+            if (!Array.isArray(allIncursions)) {
+                // Safely log the actual response from ESI to diagnose the issue.
+                logger.error(`The ESI /incursions/ endpoint did not return an array as expected. Aborting update cycle. Raw Response:`, allIncursions);
+                isUpdating = false; // Release the lock
+                return; // Exit the function gracefully
+            }
+
+            const enrichedIncursions = [];
+            for (const incursion of allIncursions) {
                 try {
-                    const sysResponse = await axios.get(`https://esi.evetech.net/latest/universe/systems/${incursion.staging_solar_system_id}/`, { timeout: 5000 });
-                    return { ...incursion, systemData: sysResponse.data };
+                    const systemData = await esiService.get(`/universe/systems/${incursion.staging_solar_system_id}/`);
+                    enrichedIncursions.push({ ...incursion, systemData });
                 } catch (e) {
-                    logger.warn(`Could not resolve system ID ${incursion.staging_solar_system_id}`);
-                    return { ...incursion, systemData: null };
+                    // Log the specific error from esiService, which now includes more context
+                    logger.warn(`Could not resolve system ID ${incursion.staging_solar_system_id}. Error: ${e.message}`);
                 }
-            }));
+            }
+
             highSecIncursion = enrichedIncursions.find(inc => inc.systemData && inc.systemData.security_status > 0.45);
         }
 
@@ -195,12 +211,15 @@ async function updateIncursions(client, options = {}) {
             const jumpPromises = Object.entries(config.tradeHubs).map(async ([name, id]) => {
                 const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${name}:${hqSystemName}:secure`;
                 const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${name}:${hqSystemName}:shortest`;
-                const secureEsiUrl = `https://esi.evetech.net/v1/route/${id}/${currentHqId}/?flag=secure`;
-                const shortestEsiUrl = `https://esi.evetech.net/v1/route/${id}/${currentHqId}/?flag=shortest`;
+                const secureEsiUrl = `/route/${id}/${currentHqId}/?flag=secure`;
+                const shortestEsiUrl = `/route/${id}/${currentHqId}/?flag=shortest`;
                 try {
-                    const [secureRes, shortestRes] = await Promise.all([axios.get(secureEsiUrl), axios.get(shortestEsiUrl)]);
-                    const secureJumps = secureRes.data.length - 1;
-                    const shortestJumps = shortestRes.data.length - 1;
+                    const [secureRes, shortestRes] = await Promise.all([
+                        esiService.get(secureEsiUrl),
+                        esiService.get(shortestEsiUrl)
+                    ]);
+                    const secureJumps = secureRes.length - 1;
+                    const shortestJumps = shortestRes.length - 1;
                     if (secureJumps === shortestJumps) {
                         return { name, jumps: `[${secureJumps}j (safest)](${secureGatecheckUrl})` };
                     }
@@ -254,44 +273,36 @@ async function updateIncursions(client, options = {}) {
                     const lastHqName = lastHqNameData.headquarters_system.split(' (')[0];
                     const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${hqSystemName}:secure`;
                     const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${hqSystemName}:shortest`;
-                    const secureEsiUrl = `https://esi.evetech.net/v1/route/${state.lastHqSystemId}/${currentHqId}/?flag=secure`;
-                    const shortestEsiUrl = `https://esi.evetech.net/v1/route/${state.lastHqSystemId}/${currentHqId}/?flag=shortest`;
+                    const secureEsiUrl = `/route/${state.lastHqSystemId}/${currentHqId}/?flag=secure`;
+                    const shortestEsiUrl = `/route/${state.lastHqSystemId}/${currentHqId}/?flag=shortest`;
 
-                    const results = await Promise.allSettled([axios.get(secureEsiUrl), axios.get(shortestEsiUrl)]);
-                    const secureRes = results[0];
-                    const shortestRes = results[1];
-                    let secureJumps = null;
-                    let shortestJumps = null;
-                    let noRouteFound = false;
+                    try {
+                        const [secureRes, shortestRes] = await Promise.all([
+                            esiService.get(secureEsiUrl),
+                            esiService.get(shortestEsiUrl)
+                        ]);
 
-                    if (secureRes.status === 'fulfilled') {
-                        secureJumps = secureRes.value.data.length - 1;
-                    } else {
-                        const errorReason = secureRes.reason.response?.data?.error || secureRes.reason.message;
-                        logger.error(`Secure route ESI call failed: ${errorReason}`);
-                        if (errorReason.includes("No route found")) noRouteFound = true;
-                    }
+                        const secureJumps = secureRes ? secureRes.length - 1 : null;
+                        const shortestJumps = shortestRes ? shortestRes.length - 1 : null;
 
-                    if (shortestRes.status === 'fulfilled') {
-                        shortestJumps = shortestRes.value.data.length - 1;
-                    } else {
-                        const errorReason = shortestRes.reason.response?.data?.error || shortestRes.reason.message;
-                        logger.error(`Shortest route ESI call failed: ${errorReason}`);
-                        if (errorReason.includes("No route found")) noRouteFound = true;
-                    }
-
-                    if (noRouteFound && secureJumps === null && shortestJumps === null) {
-                        routeString = `**${lastHqName}**: No Stargate Route`;
-                    } else if (secureJumps !== null && secureJumps === shortestJumps) {
-                        routeString = `**${lastHqName}**: [${secureJumps}j (safest)](${secureGatecheckUrl})`;
-                    } else if (secureJumps !== null && shortestJumps !== null) {
-                        routeString = `**${lastHqName}**: [${secureJumps}j (safest)](${secureGatecheckUrl}) / [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
-                    } else if (secureJumps !== null) {
-                        routeString = `**${lastHqName}**: [${secureJumps}j (safest)](${secureGatecheckUrl})`;
-                    } else if (shortestJumps !== null) {
-                        routeString = `**${lastHqName}**: [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
-                    } else {
-                        routeString = `**${lastHqName}**: N/A`;
+                        if (secureJumps !== null && secureJumps === shortestJumps) {
+                            routeString = `**${lastHqName}**: [${secureJumps}j (safest)](${secureGatecheckUrl})`;
+                        } else if (secureJumps !== null && shortestJumps !== null) {
+                            routeString = `**${lastHqName}**: [${secureJumps}j (safest)](${secureGatecheckUrl}) / [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
+                        } else if (secureJumps !== null) {
+                            routeString = `**${lastHqName}**: [${secureJumps}j (safest)](${secureGatecheckUrl})`;
+                        } else if (shortestJumps !== null) {
+                            routeString = `**${lastHqName}**: [${shortestJumps}j (shortest)](${shortestGatecheckUrl})`;
+                        } else {
+                            routeString = `**${lastHqName}**: No Stargate Route`;
+                        }
+                    } catch (error) {
+                        if (error.message && error.message.includes("No route found")) {
+                            routeString = `**${lastHqName}**: No Stargate Route`;
+                        } else {
+                            logger.error(`Failed to get route from last HQ: ${error.message}`);
+                            routeString = `**${lastHqName}**: N/A`;
+                        }
                     }
                 }
                 fields.push({ name: '\u200b', value: '\u200b', inline: true }); // Spacer
@@ -322,7 +333,7 @@ async function updateIncursions(client, options = {}) {
             }
         }
 
-        const channel = await client.channels.fetch(process.env.INCURSION_CHANNEL_ID);
+        const channel = await client.channels.fetch(config.incursionChannelId);
 
         if (isNewSpawn) {
             if (state.incursionMessageId) {
@@ -360,7 +371,9 @@ async function updateIncursions(client, options = {}) {
         await writeState(state);
 
     } catch (error) {
-        logger.error('An unexpected error occurred during incursion update:', error);
+        // Updated error logging to be safer and prevent circular JSON errors
+        const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
+        logger.error(`An unexpected error occurred during incursion update: ${errorMessage}`, error.stack);
     } finally {
         isUpdating = false;
         logger.info('Update check finished.');
