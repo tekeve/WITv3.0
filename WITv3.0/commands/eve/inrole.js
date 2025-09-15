@@ -1,57 +1,42 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
-const configManager = require('@helpers/configManager');
 const roleManager = require('@helpers/roleManager');
-
-// Get the configuration once.
-const config = configManager.get();
-
-// Defensively create the role choices. If config or roleHierarchy is missing, default to an empty array.
-const roleChoices = (config && config.roleHierarchy)
-    ? Object.keys(config.roleHierarchy)
-        .sort()
-        .map(roleName => ({
-            name: roleName,
-            value: roleName,
-        }))
-        .slice(0, 25)
-    : [];
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('inrole')
         .setDescription('Lists the main characters of users with a specific Discord role.')
-        .addStringOption(option =>
+        .addRoleOption(option =>
             option.setName('role')
-                .setDescription('The name of the Discord role to look up')
-                .setRequired(true)
-                .addChoices(...roleChoices)),
+                .setDescription('The Discord role to look up')
+                .setRequired(true)),
 
     async execute(interaction) {
-        // Use the centralized permission check
         if (!roleManager.isCommanderOrAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
+                flags: [MessageFlags.Ephemeral]
             });
         }
 
-        const targetRoleName = interaction.options.getString('role');
+        const targetRole = interaction.options.getRole('role');
+        await interaction.deferReply();
 
-        const users = await charManager.findUsersInRole(targetRoleName);
+        const users = await charManager.findUsersInRole(targetRole.id);
 
         if (users.length === 0) {
-            return interaction.reply({ content: `No registered users found with the role **${targetRoleName}**.` });
+            return interaction.editReply({ content: `No registered users found with the role **${targetRole.name}**.` });
         }
 
-        const charList = users.map(user => `• ${user.main_character}`).join('\n');
+        const charList = users.map(user => `• ${user.main_character_name}`).join('\n');
 
         const embed = new EmbedBuilder()
-            .setColor(0x0099FF)
-            .setTitle(`Main Characters with Role: ${targetRoleName}`)
+            .setColor(targetRole.color)
+            .setTitle(`Main Characters with Role: ${targetRole.name}`)
             .setDescription(charList)
             .setTimestamp();
 
-        await interaction.reply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
     },
 };
 

@@ -10,11 +10,15 @@ const configManager = require('@helpers/configManager');
 const incursionManager = require('@helpers/incursionManager');
 const db = require('@helpers/dbService');
 const { startServer } = require('./server.js');
+const roleHierarchyManager = require('@helpers/roleHierarchyManager');
+const statusManager = require('@helpers/statusManager');
 
-const requestManager = require('@helpers/requestManager');
-const srpManager = require('@helpers/srpManager');
-const mailManager = require('@helpers/mailManager');
+// Import interaction handlers
 const configInteractionManager = require('@helpers/configInteractionManager');
+const requestManager = require('@helpers/requestManager');
+const mailManager = require('@helpers/mailManager');
+const auditLogger = require('@helpers/auditLogger');
+
 
 // ================================================================= //
 // ==================== DEPLOY COMMANDS SCRIPT ===================== //
@@ -79,18 +83,19 @@ async function initializeApp() {
 
     // Load dynamic configurations from the database
     await configManager.reloadConfig();
+    const config = configManager.get(); // Get config once for startup
     await incursionManager.loadIncursionSystems();
+    await roleHierarchyManager.loadHierarchy(); // Load the role hierarchy
 
     const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
     // In-memory stores
     client.esiStateMap = new Map();
-    client.srpData = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null; // For mock incursion state
 
-    // Start the ESI authentication callback server
-    startServer(client);
+    // Start the ESI authentication callback server, passing the config
+    startServer(client, config);
 
     // ================================================================= //
     // =================== COMMAND LOADING LOGIC ======================= //
@@ -122,8 +127,12 @@ async function initializeApp() {
     // ================================================================= //
     // ====================== EVENT LISTENERS ========================== //
     // ================================================================= //
-    client.once(Events.ClientReady, c => {
+    client.once(Events.ClientReady, async c => {
         logger.success(`Ready! Logged in as ${c.user.tag}`);
+
+        // Load and set the status from the database
+        await statusManager.initialize(client);
+
         client.updateIncursions();
         setInterval(() => client.updateIncursions(), 1 * 60 * 1000);
     });
@@ -134,56 +143,55 @@ async function initializeApp() {
                 const command = client.commands.get(interaction.commandName);
                 if (!command) return;
                 await command.execute(interaction);
+                await auditLogger.logCommand(interaction); // Log after successful execution
             }
             else if (interaction.isAutocomplete()) {
                 const command = client.commands.get(interaction.commandName);
                 if (!command || !command.autocomplete) return;
                 await command.autocomplete(interaction);
             }
-            else if (interaction.isStringSelectMenu()) {
-                if (interaction.customId === 'config_table_select') {
-                    await configInteractionManager.handleTableSelect(interaction);
-                } else if (interaction.customId.startsWith('config_key_select_')) {
-                    const [, , action, tableName] = interaction.customId.split('_');
-                    await configInteractionManager.handleKeySelect(interaction, action, tableName);
-                }
-            }
             else if (interaction.isButton()) {
                 const { customId } = interaction;
                 if (customId.startsWith('ticket_')) {
                     await requestManager.handleInteraction(interaction);
-                } else if (customId.startsWith('srp_')) {
-                    await srpManager.handleInteraction(interaction);
                 } else if (customId.startsWith('config_action_')) {
-                    const [, , action, tableName] = customId.split('_');
-                    await configInteractionManager.handleAction(interaction, action, tableName);
-                } else if (customId.startsWith('config_confirm_delete_')) {
-                    const [, , , tableName, key] = customId.split('_');
-                    await configInteractionManager.handleConfirmDelete(interaction, tableName, key);
-                } else if (customId === 'config_cancel_delete') {
-                    await interaction.update({ content: 'Deletion cancelled.', components: [], embeds: [] });
+                    await configInteractionManager.handleInteraction(interaction);
                 }
             }
             else if (interaction.isModalSubmit()) {
                 const { customId } = interaction;
                 if (customId.startsWith('resolve_modal_')) {
                     await requestManager.handleInteraction(interaction);
-                } else if (customId.startsWith('srp_modal_')) {
-                    await srpManager.handleInteraction(interaction);
                 } else if (customId.startsWith('sendmail_modal_')) {
                     await mailManager.handleModal(interaction);
                 } else if (customId.startsWith('config_modal_')) {
-                    const [, , action, tableName, ...keyParts] = customId.split('_');
-                    const key = keyParts.join('_'); // Rejoin key in case it contains underscores
-                    await configInteractionManager.handleModalSubmit(interaction, action, tableName, key || null);
+                    await configInteractionManager.handleInteraction(interaction);
+                }
+            }
+            else if (interaction.isStringSelectMenu()) {
+                const { customId } = interaction;
+                if (customId.startsWith('config_table_select') || customId.startsWith('config_remove_select')) {
+                    await configInteractionManager.handleInteraction(interaction);
                 }
             }
         } catch (error) {
             logger.error(`Error during interaction:`, error);
+
+            const replyOptions = {
+                content: 'There was an error while processing this interaction!',
+                flags: [MessageFlags.Ephemeral]
+            };
+
+            if (interaction.isAutocomplete()) {
+                // Autocomplete interactions do not have reply/followUp methods.
+                // We can only log the error. The user will see that the options failed to load.
+                return;
+            }
+
             if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: 'There was an error while processing this interaction!', flags: [MessageFlags.Ephemeral] });
+                await interaction.followUp(replyOptions).catch(e => logger.error("Failed to send follow-up error message:", e));
             } else {
-                await interaction.reply({ content: 'There was an error while processing this interaction!', flags: [MessageFlags.Ephemeral] });
+                await interaction.reply(replyOptions).catch(e => logger.error("Failed to send initial error message:", e));
             }
         }
     });
@@ -192,3 +200,4 @@ async function initializeApp() {
 }
 
 initializeApp();
+

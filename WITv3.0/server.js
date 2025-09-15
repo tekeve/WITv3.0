@@ -1,17 +1,20 @@
 ﻿const express = require('express');
 const axios = require('axios');
 const authManager = require('@helpers/authManager.js');
-const { esi } = require('./config.js');
-require('dotenv').config();
 const logger = require('@helpers/logger');
 
-const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
-const ESI_SECRET_KEY = process.env.ESI_SECRET_KEY;
-
-// This function will be called from app.js and passed the Discord client instance
-function startServer(client) {
+/**
+ * Starts the Express server for the ESI OAuth2 callback.
+ * @param {import('discord.js').Client} client - The Discord client instance.
+ * @param {object} config - The loaded bot configuration object.
+ */
+function startServer(client, config) {
     const app = express();
     const port = 3000;
+
+    // Use ESI credentials from the passed-in config object
+    const ESI_CLIENT_ID = config.esiClientId;
+    const ESI_SECRET_KEY = config.esiSecretKey;
 
     app.get('/callback', async (req, res) => {
         const { code, state } = req.query;
@@ -20,17 +23,14 @@ function startServer(client) {
             return res.status(400).send('<h1>Error</h1><p>Missing authorization code or state.</p>');
         }
 
-        // Security check: Validate the state
         const discordId = client.esiStateMap.get(state);
         if (!discordId) {
             logger.error('Invalid or expired state received in ESI callback.');
             return res.status(400).send('<h1>Error</h1><p>Invalid or expired state. Please try the /auth login command again.</p>');
         }
-        // State is used once, so delete it
         client.esiStateMap.delete(state);
 
         try {
-            // 1. Exchange the authorization code for tokens
             const base64Auth = Buffer.from(`${ESI_CLIENT_ID}:${ESI_SECRET_KEY}`).toString('base64');
             const tokenResponse = await axios.post(
                 'https://login.eveonline.com/v2/oauth/token',
@@ -49,7 +49,6 @@ function startServer(client) {
 
             const { access_token, refresh_token, expires_in } = tokenResponse.data;
 
-            // 2. Verify the access token to get character details
             const verifyResponse = await axios.get('https://login.eveonline.com/oauth/verify', {
                 headers: {
                     'Authorization': `Bearer ${access_token}`,
@@ -58,20 +57,19 @@ function startServer(client) {
 
             const { CharacterID, CharacterName } = verifyResponse.data;
 
-            // 3. Store the tokens and character info by calling a method in authManager.js
-            const expiryDate = new Date(Date.now() + expires_in * 1000);
-            const formattedExpiry = expiryDate.toISOString().slice(0, 19).replace('T', ' '); // Format for MySQL
+            // Calculate expiry as a Unix timestamp in milliseconds
+            const expiryTimestamp = Date.now() + expires_in * 1000;
 
-            authManager.saveUserAuth(discordId, {
+            await authManager.saveUserAuth(discordId, {
                 character_id: CharacterID,
                 character_name: CharacterName,
                 access_token: access_token,
                 refresh_token: refresh_token,
-                token_expiry: formattedExpiry,
+                token_expiry: expiryTimestamp,
             });
 
             logger.success(`Successfully authenticated character ${CharacterName} for Discord user ${discordId}.`);
-            res.send('<h1>Authentication Successful!</h1><p>You can now close this window and use the bot\'s ESI features.</p>');
+            res.send('<h1>Authentication Successful!</h1><p>You can now close this window. Your character has been authenticated.</p>');
 
         } catch (error) {
             const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
@@ -86,3 +84,4 @@ function startServer(client) {
 }
 
 module.exports = { startServer };
+

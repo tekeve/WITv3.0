@@ -1,196 +1,163 @@
-﻿const { ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } = require('discord.js');
+﻿const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, MessageFlags } = require('discord.js');
 const databaseManager = require('@helpers/databaseManager');
 const configManager = require('@helpers/configManager');
+const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 const logger = require('@helpers/logger');
 
-// --- Handlers for each step of the interaction flow ---
-
 /**
- * Handles the initial table selection from the dropdown.
- * @param {import('discord.js').StringSelectMenuInteraction} interaction 
+ * Handles all interactions originating from the /config command's interactive components.
+ * This is the single entry point for all config-related interactions.
+ * @param {import('discord.js').Interaction} interaction The interaction object.
  */
-async function handleTableSelect(interaction) {
-    const selectedTable = interaction.values[0];
-
-    const embed = new EmbedBuilder()
-        .setColor(0x0099FF)
-        .setTitle(`Managing Table: \`${selectedTable}\``)
-        .setDescription('Please select an action to perform on this table.');
-
-    const actionButtons = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder()
-                .setCustomId(`config_action_add_${selectedTable}`)
-                .setLabel('Add Row')
-                .setStyle(ButtonStyle.Success)
-                .setEmoji('➕'),
-            new ButtonBuilder()
-                .setCustomId(`config_action_edit_${selectedTable}`)
-                .setLabel('Edit Row')
-                .setStyle(ButtonStyle.Primary)
-                .setEmoji('✏️'),
-            new ButtonBuilder()
-                .setCustomId(`config_action_delete_${selectedTable}`)
-                .setLabel('Delete Row')
-                .setStyle(ButtonStyle.Danger)
-                .setEmoji('🗑️')
-        );
-
-    await interaction.update({ embeds: [embed], components: [actionButtons] });
+async function handleInteraction(interaction) {
+    try {
+        if (interaction.isStringSelectMenu()) {
+            if (interaction.customId === 'config_table_select') {
+                await handleTableSelect(interaction);
+            } else if (interaction.customId.startsWith('config_remove_select_')) {
+                await handleKeyRemove(interaction);
+            }
+        } else if (interaction.isButton()) {
+            if (interaction.customId.startsWith('config_action_')) {
+                const [_, __, action, tableName] = interaction.customId.split('_');
+                await handleActionButton(interaction, action, tableName);
+            }
+        } else if (interaction.isModalSubmit()) {
+            if (interaction.customId.startsWith('config_modal_')) {
+                const [_, __, action, tableName] = interaction.customId.split('_');
+                await handleModalSubmit(interaction, action, tableName);
+            }
+        }
+    } catch (error) {
+        logger.error('Error in config interaction manager:', error);
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: 'An error occurred while processing your request.', flags: [MessageFlags.Ephemeral] });
+        } else {
+            await interaction.followUp({ content: 'An error occurred while processing your request.', flags: [MessageFlags.Ephemeral] });
+        }
+    }
 }
 
 /**
- * Handles the button press for "Add", "Edit", or "Delete".
- * @param {import('discord.js').ButtonInteraction} interaction 
- * @param {string} action 
- * @param {string} tableName 
+ * Handles the selection from the initial "Select a Table" dropdown.
  */
-async function handleAction(interaction, action, tableName) {
-    if (action === 'add') {
+async function handleTableSelect(interaction) {
+    const selectedTable = interaction.values[0];
+    const components = [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`config_action_set_${selectedTable}`).setLabel('Add/Edit Entry').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`config_action_remove_${selectedTable}`).setLabel('Remove Entry').setStyle(ButtonStyle.Danger)
+        )
+    ];
+
+    await interaction.update({
+        content: `You have selected the **${selectedTable}** table. What would you like to do?`,
+        components: components
+    });
+}
+
+/**
+ * Handles the "Add/Edit" or "Remove" button presses.
+ * @param {import('discord.js').ButtonInteraction} interaction
+ * @param {string} action - The action to perform ('set' or 'remove').
+ * @param {string} tableName - The table to perform the action on.
+ */
+async function handleActionButton(interaction, action, tableName) {
+    if (action === 'set') {
         const modal = new ModalBuilder()
-            .setCustomId(`config_modal_add_${tableName}`)
-            .setTitle(`Add to '${tableName}'`);
+            .setCustomId(`config_modal_set_${tableName}`)
+            .setTitle(`Editing ${tableName}`);
 
-        const keyInput = new TextInputBuilder()
-            .setCustomId('key_input')
-            .setLabel('Key')
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder('The name of the key (e.g., adminRoles)')
-            .setRequired(true);
-
-        const valueInput = new TextInputBuilder()
-            .setCustomId('value_input')
-            .setLabel('Value')
-            .setStyle(TextInputStyle.Paragraph)
-            .setPlaceholder('The value (use JSON for arrays/objects)')
-            .setRequired(true);
+        const keyInput = new TextInputBuilder().setCustomId('key').setLabel('Key').setStyle(TextInputStyle.Short).setRequired(true);
+        const valueInput = new TextInputBuilder().setCustomId('value').setLabel('Value (use JSON for objects/arrays)').setStyle(TextInputStyle.Paragraph).setRequired(true);
 
         modal.addComponents(new ActionRowBuilder().addComponents(keyInput), new ActionRowBuilder().addComponents(valueInput));
         await interaction.showModal(modal);
 
-    } else if (action === 'edit' || action === 'delete') {
-        const keys = await databaseManager.getAllKeys(tableName);
+    } else if (action === 'remove') {
+        const keys = await databaseManager.getKeys(tableName);
 
-        if (keys.length === 0) {
-            return interaction.update({ content: `The table '${tableName}' has no rows to ${action}.`, components: [], embeds: [] });
+        if (!keys || keys.length === 0) {
+            return interaction.reply({
+                content: `There are no entries in the **${tableName}** table to remove.`,
+                flags: [MessageFlags.Ephemeral]
+            });
         }
 
-        const options = keys.slice(0, 25).map(key => ({
-            label: key.substring(0, 100), // Max label length is 100
-            value: key.substring(0, 100), // Max value length is 100
-        }));
+        // Filter out keys that are too long for Discord's select menu value field (100 char limit)
+        const validKeys = keys.filter(key => key.value.length <= 100);
+        const longKeysCount = keys.length - validKeys.length;
 
-        const keySelectMenu = new StringSelectMenuBuilder()
-            .setCustomId(`config_key_select_${action}_${tableName}`)
-            .setPlaceholder(`Select a key to ${action}...`)
+        if (validKeys.length === 0) {
+            return interaction.reply({
+                content: `There are no entries in the **${tableName}** table that can be removed via this menu. This may be because all entry keys are longer than 100 characters.`,
+                flags: [MessageFlags.Ephemeral]
+            });
+        }
+
+        const options = validKeys.map(({ name: key, value }) => ({
+            label: key.length > 100 ? key.substring(0, 97) + '...' : key, // Truncate label for display
+            value: value, // Value must be <= 100 chars
+        })).slice(0, 25);
+
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId(`config_remove_select_${tableName}`)
+            .setPlaceholder('Select an entry to remove')
             .addOptions(options);
 
-        const embed = new EmbedBuilder()
-            .setColor(action === 'edit' ? 0x3498DB : 0xE74C3C)
-            .setTitle(`Select a Key to ${action.charAt(0).toUpperCase() + action.slice(1)}`)
-            .setDescription(`You are about to ${action} a row from the \`${tableName}\` table.`);
+        const row = new ActionRowBuilder().addComponents(selectMenu);
 
-        await interaction.update({ embeds: [embed], components: [new ActionRowBuilder().addComponents(keySelectMenu)] });
-    }
-}
-
-/**
- * Handles the selection of a key to edit or delete.
- * @param {import('discord.js').StringSelectMenuInteraction} interaction 
- * @param {string} action 
- * @param {string} tableName 
- */
-async function handleKeySelect(interaction, action, tableName) {
-    const selectedKey = interaction.values[0];
-
-    if (action === 'edit') {
-        const currentValue = await databaseManager.getValue(tableName, selectedKey);
-
-        const modal = new ModalBuilder()
-            .setCustomId(`config_modal_edit_${tableName}_${selectedKey}`)
-            .setTitle(`Edit '${selectedKey}'`);
-
-        const valueInput = new TextInputBuilder()
-            .setCustomId('value_input')
-            .setLabel('New Value')
-            .setStyle(TextInputStyle.Paragraph)
-            .setValue(currentValue || '') // Pre-fill with current value
-            .setRequired(true);
-
-        modal.addComponents(new ActionRowBuilder().addComponents(valueInput));
-        await interaction.showModal(modal);
-    } else if (action === 'delete') {
-        const embed = new EmbedBuilder()
-            .setColor(0xE74C3C)
-            .setTitle('Confirm Deletion')
-            .setDescription(`Are you sure you want to delete the key \`${selectedKey}\` from the \`${tableName}\` table? This action cannot be undone.`);
-
-        const confirmationButtons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`config_confirm_delete_${tableName}_${selectedKey}`)
-                    .setLabel('Confirm Delete')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId('config_cancel_delete')
-                    .setLabel('Cancel')
-                    .setStyle(ButtonStyle.Secondary)
-            );
-        await interaction.update({ embeds: [embed], components: [confirmationButtons] });
-    }
-}
-
-/**
- * Handles the final confirmation of a deletion.
- * @param {import('discord.js').ButtonInteraction} interaction 
- * @param {string} tableName 
- * @param {string} key 
- */
-async function handleConfirmDelete(interaction, tableName, key) {
-    const success = await databaseManager.removeKey(tableName, key);
-    if (success) {
-        if (tableName === 'config') {
-            await configManager.reloadConfig();
+        let content = `Select an entry to remove from the **${tableName}** table.`;
+        if (longKeysCount > 0) {
+            content += `\n\n*Note: ${longKeysCount} entr${longKeysCount === 1 ? 'y is' : 'ies are'} not shown because their key is too long to be selected from this menu.*`;
         }
-        await interaction.update({ content: `✅ Successfully deleted **${key}** from table **${tableName}**.`, components: [], embeds: [] });
-    } else {
-        await interaction.update({ content: `❌ Failed to delete key. The table "${tableName}" may not be editable or the key no longer exists.`, components: [], embeds: [] });
+
+        await interaction.reply({
+            content: content,
+            components: [row],
+            flags: [MessageFlags.Ephemeral]
+        });
     }
 }
 
 /**
- * Handles modal submissions for adding or editing rows.
- * @param {import('discord.js').ModalSubmitInteraction} interaction 
- * @param {string} action 
- * @param {string} tableName 
- * @param {string|null} key 
+ * Handles the final removal of a key after it's selected from the dropdown.
  */
-async function handleModalSubmit(interaction, action, tableName, key) {
-    const value = interaction.fields.getTextInputValue('value_input');
-    const keyFromModal = action === 'add' ? interaction.fields.getTextInputValue('key_input') : key;
+async function handleKeyRemove(interaction) {
+    const tableName = interaction.customId.split('_')[3];
+    const keyToRemove = interaction.values[0];
 
-    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
-
-    const success = await databaseManager.setValue(tableName, keyFromModal, value);
+    const success = await databaseManager.removeKey(tableName, keyToRemove);
 
     if (success) {
-        if (tableName === 'config') {
-            await configManager.reloadConfig();
-        }
-        await interaction.editReply({ content: `✅ Successfully **${action}ed** the key \`${keyFromModal}\` in the \`${tableName}\` table.` });
-        // Update the original message to show completion
-        await interaction.message.edit({ content: `Action completed on table \`${tableName}\`. You can dismiss this message or run /config again.`, components: [], embeds: [] }).catch(e => logger.warn('Could not edit original config message after modal submit.'));
-
+        if (tableName === 'config') await configManager.reloadConfig();
+        if (tableName === 'roleHierarchy') await roleHierarchyManager.reloadHierarchy();
+        await interaction.update({ content: `✅ Successfully removed **${keyToRemove}** from the **${tableName}** table.`, components: [] });
     } else {
-        await interaction.editReply({ content: `❌ Failed to set value. The table "${tableName}" may not be editable.` });
+        await interaction.update({ content: `❌ Failed to remove **${keyToRemove}** from the **${tableName}** table.`, components: [] });
     }
 }
 
+/**
+ * Handles the submission of the "Add/Edit" modal.
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ * @param {string} action - The action being performed ('set').
+ * @param {string} tableName - The table to perform the action on.
+ */
+async function handleModalSubmit(interaction, action, tableName) {
+    const key = interaction.fields.getTextInputValue('key');
+    const value = interaction.fields.getTextInputValue('value');
 
-module.exports = {
-    handleTableSelect,
-    handleAction,
-    handleKeySelect,
-    handleConfirmDelete,
-    handleModalSubmit,
-};
+    const success = await databaseManager.setValue(tableName, key, value);
+
+    if (success) {
+        if (tableName === 'config') await configManager.reloadConfig();
+        if (tableName === 'roleHierarchy') await roleHierarchyManager.reloadHierarchy();
+        await interaction.reply({ content: `✅ Successfully set **${key}** in the **${tableName}** table.`, flags: [MessageFlags.Ephemeral] });
+    } else {
+        await interaction.reply({ content: `❌ Failed to set value in the **${tableName}** table.`, flags: [MessageFlags.Ephemeral] });
+    }
+}
+
+module.exports = { handleInteraction };
+

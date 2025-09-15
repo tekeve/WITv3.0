@@ -2,13 +2,14 @@ const db = require('@helpers/dbService');
 const logger = require('@helpers/logger');
 
 // A safelist of tables that the /config command is allowed to edit.
-const editableTables = ['config', 'google_docs', 'google_sheets'];
+const editableTables = ['config', 'google_docs', 'google_sheets', 'roleHierarchy'];
 
 // Maps table names to their respective primary key column names.
 const tableKeyMap = {
     config: 'key_name',
     google_docs: 'alias',
     google_sheets: 'alias',
+    roleHierarchy: 'roleName',
 };
 
 /**
@@ -48,63 +49,22 @@ module.exports = {
             // Use backticks to safely include the table and column names in the query
             const sql = `SELECT \`${keyColumn}\` FROM \`${tableName}\` WHERE \`${keyColumn}\` LIKE ? LIMIT 25`;
             const rows = await db.query(sql, [`%${filter}%`]);
-            return rows.map(row => ({
+
+            const mappedRows = rows.map(row => ({
                 name: row[keyColumn],
                 value: row[keyColumn],
             }));
+
+            // **FIX**: Add a filter to ensure we only return valid entries.
+            // This prevents crashes if a key in the database is unexpectedly NULL or invalid,
+            // which would cause an error when trying to read its `length` property.
+            const validRows = mappedRows.filter(row => row.name && typeof row.name === 'string');
+
+            return validRows;
+
         } catch (error) {
             logger.error(`Failed to get keys from table ${tableName}:`, error);
             return [];
-        }
-    },
-
-    /**
-     * Fetches all keys from a table.
-     * @param {string} tableName - The name of the table to query.
-     * @returns {Promise<Array<string>>} - An array of all keys.
-     */
-    getAllKeys: async (tableName) => {
-        if (!isTableEditable(tableName)) return [];
-        const keyColumn = getKeyColumnForTable(tableName);
-        if (!keyColumn) return [];
-
-        try {
-            const sql = `SELECT \`${keyColumn}\` FROM \`${tableName}\``;
-            const rows = await db.query(sql);
-            return rows.map(row => row[keyColumn]);
-        } catch (error) {
-            logger.error(`Failed to get all keys from table ${tableName}:`, error);
-            return [];
-        }
-    },
-
-    /**
-     * Fetches a single value for a given key.
-     * @param {string} tableName - The table to query.
-     * @param {string} key - The key to look for.
-     * @returns {Promise<string|null>} - The value, or null if not found.
-     */
-    getValue: async (tableName, key) => {
-        if (!isTableEditable(tableName)) return null;
-        const keyColumn = getKeyColumnForTable(tableName);
-        const valueColumnMap = {
-            config: 'value',
-            google_docs: 'doc_id',
-            google_sheets: 'sheet_id',
-        };
-        const valueColumn = valueColumnMap[tableName];
-        if (!keyColumn || !valueColumn) return null;
-
-        try {
-            const sql = `SELECT \`${valueColumn}\` FROM \`${tableName}\` WHERE \`${keyColumn}\` = ?`;
-            const rows = await db.query(sql, [key]);
-            if (rows.length > 0) {
-                return rows[0][valueColumn];
-            }
-            return null;
-        } catch (error) {
-            logger.error(`Failed to get value for key ${key} from table ${tableName}:`, error);
-            return null;
         }
     },
 
@@ -122,6 +82,7 @@ module.exports = {
             config: 'value',
             google_docs: 'doc_id',
             google_sheets: 'sheet_id',
+            roleHierarchy: 'promote', // Special handling for roleHierarchy
         };
         const keyColumn = getKeyColumnForTable(tableName);
         const valueColumn = valueColumnMap[tableName];
@@ -129,11 +90,28 @@ module.exports = {
         if (!keyColumn || !valueColumn) return false;
 
         try {
-            const sql = `
-                INSERT INTO \`${tableName}\` (\`${keyColumn}\`, \`${valueColumn}\`) 
-                VALUES (?, ?) 
-                ON DUPLICATE KEY UPDATE \`${valueColumn}\` = VALUES(\`${valueColumn}\`)`;
-            await db.query(sql, [key, value]);
+            let sql, params;
+            // Special handling for roleHierarchy which has a different structure
+            if (tableName === 'roleHierarchy') {
+                try {
+                    const parsedValue = JSON.parse(value);
+                    sql = `
+                        INSERT INTO \`roleHierarchy\` (\`roleName\`, \`promote\`, \`demote\`)
+                        VALUES (?, ?, ?)
+                        ON DUPLICATE KEY UPDATE \`promote\` = VALUES(\`promote\`), \`demote\` = VALUES(\`demote\`)`;
+                    params = [key, JSON.stringify(parsedValue.promote), JSON.stringify(parsedValue.demote)];
+                } catch (e) {
+                    logger.error('Invalid JSON provided for roleHierarchy value:', e);
+                    return false;
+                }
+            } else {
+                sql = `
+                    INSERT INTO \`${tableName}\` (\`${keyColumn}\`, \`${valueColumn}\`)
+                    VALUES (?, ?)
+                    ON DUPLICATE KEY UPDATE \`${valueColumn}\` = VALUES(\`${valueColumn}\`)`;
+                params = [key, value];
+            }
+            await db.query(sql, params);
             return true;
         } catch (error) {
             logger.error(`Failed to set value in table ${tableName}:`, error);
@@ -162,3 +140,4 @@ module.exports = {
         }
     },
 };
+

@@ -1,38 +1,37 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { manageRoles } = require('@helpers/roleManager');
-const configManager = require('@helpers/configManager');
-
-// Get the configuration once.
-const config = configManager.get();
-
-// Defensively create the role choices from the config file.
-const roleChoices = (config && config.roleHierarchy)
-    ? Object.keys(config.roleHierarchy).map(roleName => ({
-        name: roleName,
-        value: roleName,
-    }))
-    : [];
-
-// Add the special option to remove all manageable roles
-if (roleChoices.length > 0) {
-    roleChoices.push({ name: 'All Roles', value: 'REMOVE_ALL' });
-}
-
+const roleManager = require('@helpers/roleManager');
+const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('demote')
-        .setDescription('Demotes a user from a specified role. (Admin Only)')
+        .setDescription('Demotes a user or removes all their roles.')
         .addUserOption(option =>
             option.setName('user')
                 .setDescription('The user to demote.')
                 .setRequired(true))
         .addStringOption(option =>
-            option.setName('role')
-                .setDescription('The role to demote the user from, or select the remove all option.')
+            option.setName('rank')
+                .setDescription('The rank to demote the user to, or "Remove All Roles".')
                 .setRequired(true)
-                .addChoices(...roleChoices)),
+                .setAutocomplete(true)),
+
+    async autocomplete(interaction) {
+        // Fetch ranks and include the special "Remove All" option.
+        const ranks = await roleHierarchyManager.getRankNames();
+        const specialOption = 'Remove All Roles';
+        const choices = [specialOption, ...ranks];
+
+        const focusedValue = interaction.options.getFocused();
+        const filtered = choices.filter(choice => choice.toLowerCase().startsWith(focusedValue.toLowerCase())).slice(0, 25);
+
+        await interaction.respond(
+            filtered.map(choice => ({ name: choice, value: choice })),
+        );
+    },
+
     async execute(interaction) {
-        await manageRoles(interaction, 'demote');
+        await roleManager.manageRoles(interaction, 'demote');
     },
 };
+
