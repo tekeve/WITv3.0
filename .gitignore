@@ -365,3 +365,4 @@ FodyWeavers.xsd
 /WITv3.0/credentials.json
 /WITv3.0/authtokens.json
 /WITv3.0/helpers/incursionsystems.csv
+/WITv3.0/.env.local

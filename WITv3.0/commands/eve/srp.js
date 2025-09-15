@@ -1,72 +1,49 @@
-const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags } = require('discord.js');
-const roleManager = require('@helpers/roleManager');
+const { SlashCommandBuilder } = require('discord.js');
+const { v4: uuidv4 } = require('uuid');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('srp')
-        .setDescription('Submit a Ship Replacement Program (SRP) request.'),
-
+        .setDescription('Generates a unique link to file a Ship Replacement Program (SRP) request.'),
     async execute(interaction) {
-        // Use the centralized permission check
-        if (!roleManager.isCommanderOrAdmin(interaction.member)) {
-            return interaction.reply({
-                content: 'You do not have the required role to use this command.',
-                flags: [MessageFlags.Ephemeral]
-            });
-        }
+        // 1. Generate a unique token
+        const token = uuidv4();
 
-        // Create the modal for the SRP request.
-        const modal = new ModalBuilder()
-            .setCustomId('srp_modal_part1')
-            .setTitle('SRP Request');
+        // 2. Store the token with user info. `client.activeSrpTokens` was created in server.js
+        interaction.client.activeSrpTokens.set(token, {
+            interaction: interaction, // Store interaction to reply later
+            user: interaction.user
+        });
 
-        // Create the text input components for the modal.
-        const pilotNameInput = new TextInputBuilder()
-            .setCustomId('srp_pilot_name')
-            .setLabel("Pilot's Name")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder('The name of the character who lost the ship')
-            .setRequired(true);
+        // 3. **Set a timeout to automatically invalidate the token**
+        const EXPIRATION_MINUTES = 30;
+        setTimeout(() => {
+            if (interaction.client.activeSrpTokens.has(token)) {
+                console.log(`SRP Token ${token} for ${interaction.user.tag} has expired.`);
+                interaction.client.activeSrpTokens.delete(token);
+            }
+        }, EXPIRATION_MINUTES * 60 * 1000); // Convert minutes to milliseconds
 
-        const killReportInput = new TextInputBuilder()
-            .setCustomId('srp_kill_report')
-            .setLabel("Kill Report URL")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder('e.g., https://zkillboard.com/kill/...')
-            .setRequired(true);
+        // 4. Construct the URL (make sure to use your actual domain)
+        const formUrl = `http://${process.env.WEB_HOST_NAME}/srp/${token}`;
 
-        const killValueInput = new TextInputBuilder()
-            .setCustomId('srp_kill_value')
-            .setLabel("Kill Report ISK Value")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder('e.g., 1,500,000,000')
-            .setRequired(true);
-
-        const fcNameInput = new TextInputBuilder()
-            .setCustomId('srp_fc_name')
-            .setLabel("FC's Name")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("The name of the fleet commander")
-            .setRequired(true);
-
-        const shipTypeInput = new TextInputBuilder()
-            .setCustomId('srp_ship_type')
-            .setLabel("Type of Ship Lost")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder('e.g., Vindicator, Nightmare, Basilisk')
-            .setRequired(true);
-
-        // Add inputs to the modal using separate ActionRows to avoid Discord API limits.
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(pilotNameInput),
-            new ActionRowBuilder().addComponents(killReportInput),
-            new ActionRowBuilder().addComponents(killValueInput),
-            new ActionRowBuilder().addComponents(fcNameInput),
-            new ActionRowBuilder().addComponents(shipTypeInput)
-        );
-
-        // Show the modal to the user.
-        await interaction.showModal(modal);
+        // 5. Reply to the user with the link
+        await interaction.reply({
+            content: `Click the button below to open the SRP form. This link will expire in **${EXPIRATION_MINUTES} minutes**.`,
+            components: [
+                {
+                    type: 1, // Action Row
+                    components: [
+                        {
+                            type: 2, // Button
+                            label: 'Open SRP Form',
+                            style: 5, // Link Style
+                            url: formUrl
+                        }
+                    ]
+                }
+            ],
+            ephemeral: true // So only the user who ran the command can see it
+        });
     },
 };
-

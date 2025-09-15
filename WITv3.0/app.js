@@ -9,7 +9,7 @@ require('dotenv').config();
 const configManager = require('@helpers/configManager');
 const incursionManager = require('@helpers/incursionManager');
 const db = require('@helpers/dbService');
-const { startServer } = require('./server.js');
+const { startServer } = require('./web/server.js');
 
 const requestManager = require('@helpers/requestManager');
 const srpManager = require('@helpers/srpManager');
@@ -89,9 +89,6 @@ async function initializeApp() {
     client.mailSubjects = new Map();
     client.mockOverride = null; // For mock incursion state
 
-    // Start the ESI authentication callback server
-    startServer(client);
-
     // ================================================================= //
     // =================== COMMAND LOADING LOGIC ======================= //
     // ================================================================= //
@@ -124,6 +121,8 @@ async function initializeApp() {
     // ================================================================= //
     client.once(Events.ClientReady, c => {
         logger.success(`Ready! Logged in as ${c.user.tag}`);
+        // Start the ESI authentication callback server
+        startServer(c);
         client.updateIncursions();
         setInterval(() => client.updateIncursions(), 1 * 60 * 1000);
     });

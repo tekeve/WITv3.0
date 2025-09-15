@@ -3,14 +3,17 @@
   "version": "1.0.0",
   "description": "",
   "main": "app.js",
-    "scripts": {
-        "dev": "nodemon app.js --loud",
-        "verbose": "nodemon app.js --verbose",
-        "test": "echo \"Error: no test specified\" && exit 1"
-    },
+  "scripts": {
+    "dev": "nodemon app.js --loud",
+    "verbose": "nodemon app.js --verbose",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "_moduleAliases": {
     "@root": ".",
     "@helpers": "./helpers",
+    "@webHelpers": "./web/helpers",
+    "@webControllers": "./web/controllers",
+    "@webViews": "./web/views",
     "@": "./"
   },
   "keywords": [],
@@ -25,9 +28,11 @@
     "chalk": "4.1.2",
     "discord.js": "^14.22.1",
     "dotenv": "^17.2.1",
+    "ejs": "^3.1.10",
     "express": "^5.1.0",
     "googleapis": "^159.0.0",
     "module-alias": "^2.2.3",
-    "mysql2": "^3.14.4"
+    "mysql2": "^3.14.4",
+    "uuid": "^8.3.2"
   }
 }
