@@ -39,7 +39,7 @@ module.exports = {
      * @param {string} filter - The text the user has typed so far.
      * @returns {Promise<Array<{name: string, value: string}>>} - A list of choices for Discord.
      */
-    getKeys: async (tableName, filter) => {
+    getKeys: async (tableName, filter = '') => {
         if (!isTableEditable(tableName)) return [];
         const keyColumn = getKeyColumnForTable(tableName);
         if (!keyColumn) return [];
@@ -55,6 +55,56 @@ module.exports = {
         } catch (error) {
             logger.error(`Failed to get keys from table ${tableName}:`, error);
             return [];
+        }
+    },
+
+    /**
+     * Fetches all keys from a table.
+     * @param {string} tableName - The name of the table to query.
+     * @returns {Promise<Array<string>>} - An array of all keys.
+     */
+    getAllKeys: async (tableName) => {
+        if (!isTableEditable(tableName)) return [];
+        const keyColumn = getKeyColumnForTable(tableName);
+        if (!keyColumn) return [];
+
+        try {
+            const sql = `SELECT \`${keyColumn}\` FROM \`${tableName}\``;
+            const rows = await db.query(sql);
+            return rows.map(row => row[keyColumn]);
+        } catch (error) {
+            logger.error(`Failed to get all keys from table ${tableName}:`, error);
+            return [];
+        }
+    },
+
+    /**
+     * Fetches a single value for a given key.
+     * @param {string} tableName - The table to query.
+     * @param {string} key - The key to look for.
+     * @returns {Promise<string|null>} - The value, or null if not found.
+     */
+    getValue: async (tableName, key) => {
+        if (!isTableEditable(tableName)) return null;
+        const keyColumn = getKeyColumnForTable(tableName);
+        const valueColumnMap = {
+            config: 'value',
+            google_docs: 'doc_id',
+            google_sheets: 'sheet_id',
+        };
+        const valueColumn = valueColumnMap[tableName];
+        if (!keyColumn || !valueColumn) return null;
+
+        try {
+            const sql = `SELECT \`${valueColumn}\` FROM \`${tableName}\` WHERE \`${keyColumn}\` = ?`;
+            const rows = await db.query(sql, [key]);
+            if (rows.length > 0) {
+                return rows[0][valueColumn];
+            }
+            return null;
+        } catch (error) {
+            logger.error(`Failed to get value for key ${key} from table ${tableName}:`, error);
+            return null;
         }
     },
 
@@ -112,4 +162,3 @@ module.exports = {
         }
     },
 };
-
