@@ -46,6 +46,7 @@ exports.handleSrpSubmission = (client, activeSrpTokens) => async (req, res) => {
         const {
             pilot_name,
             kill_report_link,
+            kill_report_option,
             fc_name,
             backseat_info,
             backseat_other_details,

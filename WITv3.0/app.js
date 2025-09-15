@@ -3,18 +3,13 @@ const path = require('path');
 const chalk = require('chalk');
 require('module-alias/register');
 const logger = require('@helpers/logger');
-const { Client, Collection, Events, GatewayIntentBits, REST, Routes, MessageFlags } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, REST, Routes } = require('discord.js');
 require('dotenv').config();
 
 const configManager = require('@helpers/configManager');
 const incursionManager = require('@helpers/incursionManager');
 const db = require('@helpers/dbService');
 const { startServer } = require('./web/server.js');
-
-const requestManager = require('@helpers/requestManager');
-const srpManager = require('@helpers/srpManager');
-const mailManager = require('@helpers/mailManager');
-const configInteractionManager = require('@helpers/configInteractionManager');
 
 // ================================================================= //
 // ==================== DEPLOY COMMANDS SCRIPT ===================== //
@@ -54,12 +49,10 @@ async function deployCommands() {
     }
 }
 
-
 // ================================================================= //
 // =================== MAIN APPLICATION LOGIC ====================== //
 // ================================================================= //
 async function initializeApp() {
-    // Handle command-line flags
     if (process.argv.includes('--db-setup')) {
         logger.info('Running database setup...');
         await db.runSetup();
@@ -70,14 +63,12 @@ async function initializeApp() {
         process.exit(0);
     }
 
-    // Ensure database is connected before proceeding
     const dbConnected = await db.ensureDatabaseExistsAndConnected();
     if (!dbConnected) {
-        logger.error('Cannot start the application without a database connection. Please check your configuration.');
+        logger.error('Cannot start the application without a database connection.');
         return;
     }
 
-    // Load dynamic configurations from the database
     await configManager.reloadConfig();
     await incursionManager.loadIncursionSystems();
 
@@ -85,9 +76,8 @@ async function initializeApp() {
 
     // In-memory stores
     client.esiStateMap = new Map();
-    client.srpData = new Map();
     client.mailSubjects = new Map();
-    client.mockOverride = null; // For mock incursion state
+    client.mockOverride = null;
 
     // ================================================================= //
     // =================== COMMAND LOADING LOGIC ======================= //
@@ -117,75 +107,22 @@ async function initializeApp() {
     client.updateIncursions = (options) => updateIncursions(client, options);
 
     // ================================================================= //
-    // ====================== EVENT LISTENERS ========================== //
+    // ================= DYNAMIC EVENT HANDLER LOADER ================== //
     // ================================================================= //
-    client.once(Events.ClientReady, c => {
-        logger.success(`Ready! Logged in as ${c.user.tag}`);
-        // Start the ESI authentication callback server
-        startServer(c);
-        client.updateIncursions();
-        setInterval(() => client.updateIncursions(), 1 * 60 * 1000);
-    });
+    const eventsPath = path.join(__dirname, 'events');
+    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
-    client.on(Events.InteractionCreate, async interaction => {
-        try {
-            if (interaction.isChatInputCommand()) {
-                const command = client.commands.get(interaction.commandName);
-                if (!command) return;
-                await command.execute(interaction);
-            }
-            else if (interaction.isAutocomplete()) {
-                const command = client.commands.get(interaction.commandName);
-                if (!command || !command.autocomplete) return;
-                await command.autocomplete(interaction);
-            }
-            else if (interaction.isStringSelectMenu()) {
-                if (interaction.customId === 'config_table_select') {
-                    await configInteractionManager.handleTableSelect(interaction);
-                } else if (interaction.customId.startsWith('config_key_select_')) {
-                    const [, , action, tableName] = interaction.customId.split('_');
-                    await configInteractionManager.handleKeySelect(interaction, action, tableName);
-                }
-            }
-            else if (interaction.isButton()) {
-                const { customId } = interaction;
-                if (customId.startsWith('ticket_')) {
-                    await requestManager.handleInteraction(interaction);
-                } else if (customId.startsWith('srp_')) {
-                    await srpManager.handleInteraction(interaction);
-                } else if (customId.startsWith('config_action_')) {
-                    const [, , action, tableName] = customId.split('_');
-                    await configInteractionManager.handleAction(interaction, action, tableName);
-                } else if (customId.startsWith('config_confirm_delete_')) {
-                    const [, , , tableName, key] = customId.split('_');
-                    await configInteractionManager.handleConfirmDelete(interaction, tableName, key);
-                } else if (customId === 'config_cancel_delete') {
-                    await interaction.update({ content: 'Deletion cancelled.', components: [], embeds: [] });
-                }
-            }
-            else if (interaction.isModalSubmit()) {
-                const { customId } = interaction;
-                if (customId.startsWith('resolve_modal_')) {
-                    await requestManager.handleInteraction(interaction);
-                } else if (customId.startsWith('srp_modal_')) {
-                    await srpManager.handleInteraction(interaction);
-                } else if (customId.startsWith('sendmail_modal_')) {
-                    await mailManager.handleModal(interaction);
-                } else if (customId.startsWith('config_modal_')) {
-                    const [, , action, tableName, ...keyParts] = customId.split('_');
-                    const key = keyParts.join('_'); // Rejoin key in case it contains underscores
-                    await configInteractionManager.handleModalSubmit(interaction, action, tableName, key || null);
-                }
-            }
-        } catch (error) {
-            logger.error(`Error during interaction:`, error);
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: 'There was an error while processing this interaction!', flags: [MessageFlags.Ephemeral] });
-            } else {
-                await interaction.reply({ content: 'There was an error while processing this interaction!', flags: [MessageFlags.Ephemeral] });
-            }
+    for (const file of eventFiles) {
+        const filePath = path.join(eventsPath, file);
+        const event = require(filePath);
+        // Pass the client instance to each event handler
+        if (event.once) {
+            client.once(event.name, (...args) => event.execute(...args, client));
+        } else {
+            client.on(event.name, (...args) => event.execute(...args, client));
         }
-    });
+        logger.info(`Loaded event: ${event.name}`);
+    }
 
     client.login(process.env.DISCORD_TOKEN);
 }

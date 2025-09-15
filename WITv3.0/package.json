@@ -11,6 +11,7 @@
   "_moduleAliases": {
     "@root": ".",
     "@helpers": "./helpers",
+    "@embeds": "./embeds",
     "@webHelpers": "./web/helpers",
     "@webControllers": "./web/controllers",
     "@webViews": "./web/views",
