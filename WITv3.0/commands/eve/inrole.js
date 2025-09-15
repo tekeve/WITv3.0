@@ -1,6 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
-const configManager = require('@helpers/configManager');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
@@ -21,21 +20,23 @@ module.exports = {
         }
 
         const targetRole = interaction.options.getRole('role');
+        await interaction.deferReply();
 
-        const users = await charManager.findUsersWithRole(targetRole.id);
+        const users = await charManager.findUsersInRole(targetRole.id);
 
         if (users.length === 0) {
-            return interaction.reply({ content: `No registered users found with the role **${targetRole.name}**.` });
+            return interaction.editReply({ content: `No registered users found with the role **${targetRole.name}**.` });
         }
 
-        const charList = users.map(user => `• ${user.main_character}`).join('\n');
+        const charList = users.map(user => `• ${user.main_character_name}`).join('\n');
 
         const embed = new EmbedBuilder()
-            .setColor(0x0099FF)
+            .setColor(targetRole.color)
             .setTitle(`Main Characters with Role: ${targetRole.name}`)
             .setDescription(charList)
             .setTimestamp();
 
-        await interaction.reply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
     },
 };
+

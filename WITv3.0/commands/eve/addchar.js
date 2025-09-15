@@ -11,16 +11,15 @@ module.exports = {
                 .setName('main')
                 .setDescription('Register your main character.')
                 .addStringOption(option => option.setName('name').setDescription('Your main character\'s name').setRequired(true))
-                .addUserOption(option => option.setName('user').setDescription('Admin only: The Discord user to add the character for.')))
+        )
         .addSubcommand(subcommand =>
             subcommand
                 .setName('alt')
                 .setDescription('Register an alt character.')
                 .addStringOption(option => option.setName('name').setDescription('Your alt character\'s name').setRequired(true))
-                .addUserOption(option => option.setName('user').setDescription('Admin only: The Discord user to add the character for.'))),
+        ),
 
     async execute(interaction) {
-        // Use the centralized permission check
         if (!roleManager.isCommanderOrAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
@@ -30,34 +29,20 @@ module.exports = {
 
         const subcommand = interaction.options.getSubcommand();
         const charName = interaction.options.getString('name');
-        const targetUser = interaction.options.getUser('user');
-        const member = interaction.member;
+        const discordUser = interaction.user;
+        const discordMember = interaction.member;
 
-        let discordUser = interaction.user;
-        let discordMember = member;
+        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
-        // Admin override logic
-        if (targetUser && roleManager.isAdmin(member)) {
-            discordUser = targetUser;
-            discordMember = await interaction.guild.members.fetch(targetUser.id);
-        } else if (targetUser) {
-            return interaction.reply({ content: 'You do not have permission to modify other users\' characters.'});
-        }
-
+        let result;
         if (subcommand === 'main') {
-            const userRoleIds = discordMember.roles.cache.map(role => role.id);
-            await charManager.addMain(discordUser.id, charName, userRoleIds);
-            await interaction.reply({ content: `Main character **${charName}** has been registered for ${discordUser.username}.` });
+            const userRoles = discordMember.roles.cache.map(role => role.id);
+            result = await charManager.addMain(discordUser.id, charName, userRoles);
         } else if (subcommand === 'alt') {
-            const result = await charManager.addAlt(discordUser.id, charName);
-            if (result.success) {
-                // Sync roles on alt add
-                const userRoleIds = discordMember.roles.cache.map(role => role.id);
-                await charManager.updateUserRoles(discordUser.id, userRoleIds);
-                await interaction.reply({ content: `Alt character **${charName}** has been added for ${discordUser.username}.` });
-            } else {
-                await interaction.reply({ content: `Error: ${result.message}`});
-            }
+            result = await charManager.addAlt(discordUser.id, charName);
         }
+
+        await interaction.editReply({ content: result.message });
     },
 };
+

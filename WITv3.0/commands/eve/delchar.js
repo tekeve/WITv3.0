@@ -11,13 +11,13 @@ module.exports = {
                 .setName('main')
                 .setDescription('Deletes your main character and entire profile.')
                 .addStringOption(option => option.setName('name').setDescription('The name of your main character to confirm deletion').setRequired(true))
-                .addUserOption(option => option.setName('user').setDescription('Admin only: The Discord user to delete the character from.')))
+        )
         .addSubcommand(subcommand =>
             subcommand
                 .setName('alt')
                 .setDescription('Deletes an alt character from your profile.')
                 .addStringOption(option => option.setName('name').setDescription('The name of the alt character to delete').setRequired(true))
-                .addUserOption(option => option.setName('user').setDescription('Admin only: The Discord user to delete the character from.'))),
+        ),
 
     async execute(interaction) {
         if (!roleManager.isCommanderOrAdmin(interaction.member)) {
@@ -29,19 +29,9 @@ module.exports = {
 
         const subcommand = interaction.options.getSubcommand();
         const charName = interaction.options.getString('name');
-        const targetUser = interaction.options.getUser('user');
-        const member = interaction.member;
+        const discordUser = interaction.user;
 
-        let discordUser = interaction.user;
-        let discordMember = member;
-
-        // Admin override logic
-        if (targetUser && roleManager.isAdmin(member)) {
-            discordUser = targetUser;
-            discordMember = await interaction.guild.members.fetch(targetUser.id);
-        } else if (targetUser) {
-            return interaction.reply({ content: 'You do not have permission to modify other users\' characters.'});
-        }
+        await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
         let result;
         if (subcommand === 'main') {
@@ -50,15 +40,7 @@ module.exports = {
             result = await charManager.deleteAlt(discordUser.id, charName);
         }
 
-        if (result.success) {
-            // Sync roles after successfully deleting an alt. No sync needed if the whole profile is gone.
-            if (subcommand === 'alt') {
-                const userRoleIds = discordMember.roles.cache.map(role => role.id);
-                await charManager.updateUserRoles(discordUser.id, userRoleIds);
-            }
-            await interaction.reply({ content: result.message });
-        } else {
-            await interaction.reply({ content: `Error: ${result.message}`});
-        }
+        await interaction.editReply({ content: result.message });
     },
 };
+

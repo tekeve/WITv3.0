@@ -1,48 +1,53 @@
-const configManager = require('@helpers/configManager');
-const characterManager = require('@helpers/characterManager');
-const logger = require('@helpers/logger');
+const { EmbedBuilder } = require('discord.js');
+const configManager = require('./configManager');
+const logger = require('./logger');
+const charManager = require('./characterManager');
 
 /**
- * Logs the usage of a slash command to the designated audit channel.
- * Now includes the full command with all options.
- * @param {import('discord.js').ChatInputCommandInteraction} interaction The interaction object from the command.
+ * Logs a command usage to the designated audit channel.
+ * @param {import('discord.js').Interaction} interaction The interaction object from the command.
  */
 async function logCommand(interaction) {
     const config = configManager.get();
-    // **FIX**: Updated the key to match the user's database entry.
-    const auditChannelId = config.auditLogChannelId;
-
-    if (!auditChannelId) {
-        // This warning will now only appear if the 'auditLogChannelId' key is truly missing from the database.
-        logger.warn('Audit logging is enabled but auditLogChannelId is not configured in the database.');
+    if (!config || !config.auditLogChannelId) {
+        // Silently fail if the channel is not configured, but log a warning once on startup.
         return;
     }
 
     try {
-        const channel = await interaction.client.channels.fetch(auditChannelId);
+        const channel = await interaction.client.channels.fetch(config.auditLogChannelId);
         if (!channel) {
-            logger.warn(`Could not find the audit channel with ID: ${auditChannelId}`);
+            logger.warn(`Could not find audit log channel with ID: ${config.auditLogChannelId}`);
             return;
         }
 
-        const user = await characterManager.getChars(interaction.user.id);
-        const characterMain = user ? user.main_character : interaction.user.username;
-        const timestamp = Math.floor(Date.now() / 1000);
-
-        // interaction.toString() automatically formats the command and its options.
-        // e.g., "/promote user: @Username rank: Leadership"
+        const charData = await charManager.getChars(interaction.user.id);
+        const characterName = charData?.main?.character_name || interaction.user.tag;
         const fullCommand = interaction.toString();
 
-        const logMessage = `**${characterMain}** used command \`${fullCommand}\` at <t:${timestamp}:f>`;
+        const embed = new EmbedBuilder()
+            .setColor(0x4E5D94)
+            .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
+            .setDescription(`**Character:** ${characterName}\n**Command:** \`${fullCommand}\``)
+            .setTimestamp();
 
-        await channel.send(logMessage);
+        await channel.send({ embeds: [embed] });
 
     } catch (error) {
-        logger.error('Failed to log command to audit channel:', error);
+        logger.error('Failed to send audit log:', error);
+    }
+}
+
+// Initial check on startup
+function checkConfig() {
+    const config = configManager.get();
+    if (!config || !config.auditLogChannelId) {
+        logger.warn('Audit logging is enabled but auditLogChannelId is not configured in the database.');
     }
 }
 
 module.exports = {
     logCommand,
+    checkConfig
 };
 
