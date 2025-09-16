@@ -2,22 +2,12 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Embed
 const crypto = require('crypto');
 const authManager = require('@helpers/authManager.js');
 const roleManager = require('@helpers/roleManager');
-const { esi } = require('../../config.js');
 const logger = require('@helpers/logger');
-require('dotenv').config();
-
-// Load the ESI Client ID from environment variables
-const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
-
-// Check to ensure the ESI Client ID is configured.
-if (!ESI_CLIENT_ID) {
-    logger.error("FATAL: ESI_CLIENT_ID is not defined in the .env file. The /auth command will not work.");
-}
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('auth')
-        .setDescription('Authenticate your EVE Online character with the bot. (Admin Only)')
+        .setDescription('Authenticate your EVE Online character with the bot.')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('login')
@@ -32,7 +22,6 @@ module.exports = {
                 .setDescription('De-authorize your character and remove your token.')),
 
     async execute(interaction) {
-        // Use the centralized permission check
         if (!roleManager.canAuth(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
@@ -43,8 +32,13 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'login') {
-            // If the Client ID is missing, inform the user and stop.
-            if (!ESI_CLIENT_ID) {
+            // Read ESI configuration directly from environment variables
+            const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
+            const ESI_CALLBACK_URL = process.env.ESI_CALLBACK_URL;
+            const ESI_SCOPES = process.env.ESI_DEFAULT_SCOPES;
+
+            if (!ESI_CLIENT_ID || !ESI_CALLBACK_URL || !ESI_SCOPES) {
+                logger.warn('ESI configuration is missing from the .env file. A user tried to run /auth login.');
                 return interaction.reply({
                     content: 'The bot has not been configured for ESI authentication. Please contact the bot administrator.',
                     flags: [MessageFlags.Ephemeral]
@@ -54,10 +48,8 @@ module.exports = {
             const state = crypto.randomBytes(16).toString('hex');
             interaction.client.esiStateMap.set(state, interaction.user.id);
 
-            // Correctly format the scopes for the URL
-            const encodedScopes = esi.scopes.split(' ').map(scope => encodeURIComponent(scope)).join('%20');
-
-            const authUrl = `https://login.eveonline.com/v2/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(esi.callbackUrl)}&client_id=${ESI_CLIENT_ID}&scope=${encodedScopes}&state=${state}`;
+            const encodedScopes = ESI_SCOPES.split(' ').map(scope => encodeURIComponent(scope)).join('%20');
+            const authUrl = `https://login.eveonline.com/v2/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(ESI_CALLBACK_URL)}&client_id=${ESI_CLIENT_ID}&scope=${encodedScopes}&state=${state}`;
 
             const row = new ActionRowBuilder()
                 .addComponents(
@@ -68,7 +60,7 @@ module.exports = {
                 );
 
             await interaction.reply({
-                content: 'Click the button below to authorize your character. You will be redirected to the official EVE Online SSO page.',
+                content: 'Click the button below to authorize your character. This will only grant the bot permissions to send mail on your behalf and view your mailing lists.',
                 components: [row],
                 flags: [MessageFlags.Ephemeral]
             });
@@ -76,28 +68,28 @@ module.exports = {
         else if (subcommand === 'status') {
             const authData = await authManager.getUserAuthData(interaction.user.id);
             if (authData && authData.character_name) {
-                const expiryDate = new Date(authData.token_expiry);
+                // The expiry is now a Unix timestamp in milliseconds.
+                const expiryTimestamp = Math.floor(authData.token_expiry / 1000);
                 const embed = new EmbedBuilder()
                     .setColor(0x3BA55D)
                     .setTitle('Authentication Status: Connected')
                     .addFields(
                         { name: 'Authenticated Character', value: authData.character_name, inline: true },
-                        { name: 'Token Expires', value: `<t:${Math.floor(expiryDate.getTime() / 1000)}:R>`, inline: true }
+                        { name: 'Token Expires', value: `<t:${expiryTimestamp}:R>`, inline: true }
                     )
                     .setFooter({ text: 'Your token will be refreshed automatically.' });
-                await interaction.reply({ embeds: [embed]});
+                await interaction.reply({ embeds: [embed], flags: [MessageFlags.Ephemeral] });
             } else {
-                await interaction.reply({ content: 'You do not have a character authenticated with this bot.'});
+                await interaction.reply({ content: 'You do not have a character authenticated with this bot.', flags: [MessageFlags.Ephemeral] });
             }
         }
         else if (subcommand === 'logout') {
             const success = await authManager.removeUser(interaction.user.id);
             if (success) {
-                await interaction.reply({ content: 'Your authentication token and character data have been successfully removed.'});
+                await interaction.reply({ content: 'Your authentication token and character data have been successfully removed.', flags: [MessageFlags.Ephemeral] });
             } else {
-                await interaction.reply({ content: 'You do not have a character authenticated with this bot.'});
+                await interaction.reply({ content: 'You do not have a character authenticated with this bot.', flags: [MessageFlags.Ephemeral] });
             }
         }
     },
 };
-

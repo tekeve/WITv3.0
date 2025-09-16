@@ -70,7 +70,10 @@ async function initializeApp() {
     }
 
     await configManager.reloadConfig();
+    const config = configManager.get(); // Get config once for startup
     await incursionManager.loadIncursionSystems();
+    // FIX: Changed loadHierarchy to reloadHierarchy, which is correctly exported.
+    await roleHierarchyManager.reloadHierarchy(); // Load the role hierarchy
 
     const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -78,6 +81,9 @@ async function initializeApp() {
     client.esiStateMap = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null;
+
+    // Start the ESI authentication callback server, passing the config
+    startServer(client, config);
 
     // ================================================================= //
     // =================== COMMAND LOADING LOGIC ======================= //

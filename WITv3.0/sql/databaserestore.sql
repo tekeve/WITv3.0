@@ -11,30 +11,35 @@ CREATE DATABASE IF NOT EXISTS `wit-db`;
 USE `wit-db`;
 
 -- Dumping structure for table wit-db.auth
-DROP TABLE IF EXISTS `auth`;
 CREATE TABLE IF NOT EXISTS `auth` (
   `discord_id` varchar(50) NOT NULL,
   `character_id` int(11) DEFAULT NULL,
   `character_name` varchar(255) DEFAULT NULL,
   `access_token` text DEFAULT NULL,
   `refresh_token` text DEFAULT NULL,
-  `token_expiry` datetime DEFAULT NULL,
+  `token_expiry` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`discord_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
+-- Dumping data for table wit-db.auth: ~1 rows (approximately)
+REPLACE INTO `auth` (`discord_id`, `character_id`, `character_name`, `access_token`, `refresh_token`, `token_expiry`) VALUES
+	('107396590653698048', 2122370684, 'Ezabella Isu', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwucmVhZF9tYWlsLnYxIiwiZXNpLW1haWwuc2VuZF9tYWlsLnYxIl0sImp0aSI6IjE1Nzg2NGZhLWRmYzUtNDI2Yy1iYWE4LTUwZGI0NDZjODgwNyIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5Iiwic3ViIjoiQ0hBUkFDVEVSOkVWRToyMTIyMzcwNjg0IiwiYXpwIjoiOGQ1MWU2ZGMwOTRlNDkxZjkzZThjZGQyMTI3NDRhODUiLCJ0ZW5hbnQiOiJ0cmFucXVpbGl0eSIsInRpZXIiOiJsaXZlIiwicmVnaW9uIjoid29ybGQiLCJhdWQiOlsiOGQ1MWU2ZGMwOTRlNDkxZjkzZThjZGQyMTI3NDRhODUiLCJFVkUgT25saW5lIl0sIm5hbWUiOiJFemFiZWxsYSBJc3UiLCJvd25lciI6Im5palc1VVMxanpxU2xCZnE0aG4zTU1pcVhqWT0iLCJleHAiOjE3NTc5ODg5NDYsImlhdCI6MTc1Nzk4Nzc0NiwiaXNzIjoiaHR0cHM6Ly9sb2dpbi5ldmVvbmxpbmUuY29tIn0.D5lPfHRphw_m26qvYFLoxUHvogJN2M6XO-eG55iBRwdr9TyXSTzgztdRGiAXIKqIba5WHy_EkNfMmqYaUOD2llbh_CJP51bnZ3aYHIxSe_BIuOXTwrSjpfbv5GTRW8lyPIBzvLZ8l-Tc6Clzc4tokI4LNnMtl6DlgljSPUAQo-A4TdIKCdGDOdq_FojOyUoS8GVL1TLFiEyxSZrZbbfKVUIiz8HgVinlrOR3zrTRJ-IEzgOqaZZfXMMln5fAVHQXunOXJaIGQcQlSaklaKFp3di2NvWMb0tMdjPCGQGNXkbtQVz8LbKZKiEigoByCVi_QwKHQfnE-uMBWZ3xLhrcAw', 'xvOc3E2LYEKjyVR8jMv2aA==', 1757988944654);
+
 -- Dumping structure for table wit-db.bot_status
-DROP TABLE IF EXISTS `bot_status`;
 CREATE TABLE IF NOT EXISTS `bot_status` (
   `id` int(11) NOT NULL DEFAULT 1,
-  `activity` varchar(50) NOT NULL,
-  `statusText` varchar(255) NOT NULL,
+  `activity` varchar(50) DEFAULT NULL,
+  `statusText` varchar(255) DEFAULT NULL,
   `url` varchar(255) DEFAULT NULL,
   `expiryTimestamp` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- Dumping data for table wit-db.bot_status: ~1 rows (approximately)
+REPLACE INTO `bot_status` (`id`, `activity`, `statusText`, `url`, `expiryTimestamp`) VALUES
+	(1, 'Watching', 'for Incursion updates...', NULL, NULL);
 
 -- Dumping structure for table wit-db.characters
-DROP TABLE IF EXISTS `characters`;
 CREATE TABLE IF NOT EXISTS `characters` (
   `character_id` int(11) NOT NULL,
   `character_name` varchar(255) NOT NULL,
@@ -44,16 +49,32 @@ CREATE TABLE IF NOT EXISTS `characters` (
   KEY `discord_id` (`discord_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
--- Dumping structure for table wtm-wit.config
-DROP TABLE IF EXISTS `config`;
+-- Dumping data for table wit-db.characters: ~3 rows (approximately)
+REPLACE INTO `characters` (`character_id`, `character_name`, `discord_id`, `is_main`) VALUES
+	(93220962, 'Bella Cadelanne', '368778318415265792', 1),
+	(93354675, 'Blade McRavinger', '368778318415265792', 0),
+	(2122370684, 'Ezabella', '107396590653698048', 1);
+
+-- Dumping structure for table wit-db.config
 CREATE TABLE IF NOT EXISTS `config` (
   `key_name` varchar(255) NOT NULL,
   `value` longtext DEFAULT NULL,
   PRIMARY KEY (`key_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
+-- Dumping data for table wit-db.config: ~9 rows (approximately)
+REPLACE INTO `config` (`key_name`, `value`) VALUES
+	('adminRoles', '["1412546107975929917"]'),
+	('archiveChannelId', '["1411962451439652904"]'),
+	('auditLogChannelId', '["1413370040245555312"]'),
+	('authRoles', '["1412546107975929917"]'),
+	('commanderRoles', '["1412545597021622383"]'),
+	('councilRoles', '["1412546107975929917","1412546080448712826"]'),
+	('incursionChannelId', '["1364223029814759444"]'),
+	('requestChannelId', '["1411962383978725436"]'),
+	('tradeHubs', '{"Jita": "30000142","Amarr": "30002187","Dodixie": "30002659","Rens": "30002510","Hek": "30002053"}');
+
 -- Dumping structure for table wit-db.google_docs
-DROP TABLE IF EXISTS `google_docs`;
 CREATE TABLE IF NOT EXISTS `google_docs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `alias` varchar(50) NOT NULL,
@@ -62,7 +83,6 @@ CREATE TABLE IF NOT EXISTS `google_docs` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
 -- Dumping structure for table wit-db.google_sheets
-DROP TABLE IF EXISTS `google_sheets`;
 CREATE TABLE IF NOT EXISTS `google_sheets` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `alias` varchar(50) NOT NULL,
@@ -71,7 +91,6 @@ CREATE TABLE IF NOT EXISTS `google_sheets` (
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
 -- Dumping structure for table wit-db.incursion_state
-DROP TABLE IF EXISTS `incursion_state`;
 CREATE TABLE IF NOT EXISTS `incursion_state` (
   `id` int(11) NOT NULL DEFAULT 1,
   `lastIncursionState` varchar(50) DEFAULT NULL,
@@ -85,8 +104,11 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
+-- Dumping data for table wit-db.incursion_state: ~1 rows (approximately)
+REPLACE INTO `incursion_state` (`id`, `lastIncursionState`, `incursionMessageId`, `lastHqSystemId`, `spawnTimestamp`, `mobilizingTimestamp`, `withdrawingTimestamp`, `endedTimestamp`, `lastIncursionStats`) VALUES
+	(1, '20000777-established', '1417082858119499836', 30002252, 1757823480, NULL, NULL, 1757725740, NULL);
+
 -- Dumping structure for table wit-db.incursion_systems
-DROP TABLE IF EXISTS `incursion_systems`;
 CREATE TABLE IF NOT EXISTS `incursion_systems` (
   `Constellation_id` int(11) NOT NULL,
   `Constellation` varchar(255) DEFAULT NULL,
@@ -216,17 +238,26 @@ CREATE TABLE IF NOT EXISTS `mailing_lists` (
   `list_name` varchar(50) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
--- Dumping structure for table wit-db.roleHierarchy
-DROP TABLE IF EXISTS `roleHierarchy`;
-CREATE TABLE IF NOT EXISTS `roleHierarchy` (
-  `roleName` varchar(255) NOT NULL,
-  `promote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`configuration`)),
-  `demote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`configuration`)),
+-- Dumping structure for table wit-db.rolehierarchy
+CREATE TABLE IF NOT EXISTS `rolehierarchy` (
+  `roleName` varchar(50) NOT NULL,
+  `promote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`promote`)),
+  `demote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`demote`)),
   PRIMARY KEY (`roleName`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- Dumping data for table wit-db.rolehierarchy: ~8 rows (approximately)
+REPLACE INTO `rolehierarchy` (`roleName`, `promote`, `demote`) VALUES
+	('certified_trainer', '{"add":["1412546024819392733"],"remove":["1412545985388871730"]}', '{"add":[],"remove":["1412546024819392733"]}'),
+	('fleet_commander', '{"add":["1412545955106127983"],"remove":["1412545912462512168"]}', '{"add":["1412545912462512168"],"remove":["1412545955106127983"]}'),
+	('leadership', '{"add":["1412546107975929917"],"remove":[]}', '{"add":[],"remove":["1412546107975929917"]}'),
+	('line_commander', '{"add":["1412545877163118704"],"remove":["1412545820015857724"]}', '{"add":[1412545820015857724],"remove":[1412545877163118704]}'),
+	('officer', '{"add":["1412546080448712826"],"remove":[]}', '{"add":[],"remove":["1412546080448712826"]}'),
+	('resident', '{"add":["1412545597021622383","1412545820015857724"],"remove":[]}', '{"add":[],"remove":["1412545597021622383","1412545820015857724"]}'),
+	('training_ct', '{"add":["1412545985388871730"],"remove":[]}', '{"add":[],"remove":["1412545985388871730"]}'),
+	('training_fc', '{"add":["1412545912462512168"],"remove":[]}', '{"add":[],"remove":["1412545912462512168"]}');
 
 -- Dumping structure for table wit-db.users
-DROP TABLE IF EXISTS `users`;
 CREATE TABLE IF NOT EXISTS `users` (
   `discord_id` varchar(50) NOT NULL,
   `main_character_id` int(11) DEFAULT NULL,
@@ -234,3 +265,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   PRIMARY KEY (`discord_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
+-- Dumping data for table wit-db.users: ~3 rows (approximately)
+REPLACE INTO `users` (`discord_id`, `main_character_id`, `roles`) VALUES
+	('107396590653698048', 2122370684, '["410301376162299906","1055468376866168853","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]'),
+	('368778318415265792', 93220962, '["1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]');

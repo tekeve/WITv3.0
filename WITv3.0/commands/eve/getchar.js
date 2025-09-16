@@ -1,55 +1,48 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('getchar')
-        .setDescription('Displays your registered characters.')
-        .addUserOption(option => option.setName('user').setDescription('Admin only: The Discord user to get characters for.')),
+        .setDescription('Displays registered characters.')
+        .addUserOption(option => option.setName('user').setDescription('The Discord user to get characters for (defaults to you).')),
 
     async execute(interaction) {
-        // Use the centralized permission check
         if (!roleManager.isCommanderOrAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You do not have the required role to use this command.',
+                flags: [MessageFlags.Ephemeral]
             });
         }
 
-        const targetUser = interaction.options.getUser('user');
+        const targetUser = interaction.options.getUser('user') || interaction.user;
+        const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
-        let discordUser = interaction.user;
-        let discordMember = interaction.member;
-
-        // Admin override logic, now using the roleManager
-        if (targetUser && roleManager.isAdmin(interaction.member)) {
-            discordUser = targetUser;
-            discordMember = await interaction.guild.members.fetch(targetUser.id);
-        } else if (targetUser) {
-            return interaction.reply({ content: 'You do not have permission to view other users\' characters.' });
+        if (!targetMember) {
+            return interaction.reply({ content: 'Could not find that user in the server.', flags: [MessageFlags.Ephemeral] });
         }
 
         // Update roles in the database every time the command is run.
-        const userRoles = discordMember.roles.cache.map(role => role.name);
-        await charManager.updateUserRoles(discordUser.id, userRoles);
+        const userRoles = targetMember.roles.cache.map(role => role.id);
+        await charManager.updateUserRoles(targetUser.id, userRoles);
 
-        const charData = await charManager.getChars(discordUser.id);
+        const charData = await charManager.getChars(targetUser.id);
 
-        if (!charData) {
-            return interaction.reply({ content: `No characters registered for ${discordUser.username}.` });
+        if (!charData || !charData.main) {
+            return interaction.reply({ content: `No main character registered for ${targetUser.username}.`, flags: [MessageFlags.Ephemeral] });
         }
-
-        const alts = charData.alt_characters ? JSON.parse(charData.alt_characters) : [];
 
         const embed = new EmbedBuilder()
             .setColor(0x0099FF)
-            .setTitle(`Registered Characters for ${discordUser.username}`)
+            .setAuthor({ name: `Registered Characters for ${targetUser.username}`, iconURL: targetUser.displayAvatarURL() })
             .addFields(
-                { name: 'Main Character', value: charData.main_character || 'Not Set' },
-                { name: 'Alts', value: alts.length > 0 ? alts.join('\n') : 'None' }
+                { name: 'Main Character', value: charData.main.character_name },
+                { name: 'Alts', value: charData.alts.length > 0 ? charData.alts.map(a => a.character_name).join('\n') : 'None' }
             )
             .setTimestamp();
 
-        await interaction.reply({ embeds: [embed] });
+        await interaction.reply({ embeds: [embed],  });
     },
 };
+

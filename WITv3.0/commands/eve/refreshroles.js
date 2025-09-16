@@ -1,9 +1,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
-const { adminRoles } = require('../../config.js');
+const roleManager = require('@helpers/roleManager');
 const logger = require('@helpers/logger');
-
-const hasAdminRole = (member) => member.roles.cache.some(role => adminRoles.includes(role.name));
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -11,7 +9,8 @@ module.exports = {
         .setDescription('Syncs the roles of all registered users from Discord to the database. (Admin Only)'),
 
     async execute(interaction) {
-        if (!hasAdminRole(interaction.member)) {
+        // Corrected the permission check to use the centralized roleManager.
+        if (!roleManager.isAdmin(interaction.member)) {
             return interaction.reply({ content: 'You do not have permission to use this command.'});
         }
 
@@ -29,8 +28,9 @@ module.exports = {
             for (const user of allUsers) {
                 try {
                     const member = await interaction.guild.members.fetch(user.discord_id);
-                    const currentRoles = member.roles.cache.map(role => role.name);
-                    await charManager.updateUserRoles(user.discord_id, currentRoles);
+                    // Switched to updating with role IDs for consistency.
+                    const currentRoleIds = member.roles.cache.map(role => role.id);
+                    await charManager.updateUserRoles(user.discord_id, currentRoleIds);
                     successCount++;
                 } catch (error) {
                     // This likely means the user has left the server

@@ -1,81 +1,95 @@
 const axios = require('axios');
-require('dotenv').config();
 const logger = require('@helpers/logger');
 const db = require('@helpers/dbService');
-const charManager = require('@helpers/characterManager');
-
-const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
-const ESI_SECRET_KEY = process.env.ESI_SECRET_KEY;
-
 
 /**
- * Helper to format a JS Date object into a MySQL DATETIME compatible string.
- * @param {Date} date - The date object to format.
- * @returns {string} - The formatted date string (YYYY-MM-DD HH:MM:SS).
- */
-const formatMySqlDateTime = (date) => {
-    return date.toISOString().slice(0, 19).replace('T', ' ');
-};
-
-/**
- * Saves or updates a user's authentication data in the database.
- * This now checks for a main character and adds alts.
+ * Saves a new or updated authentication entry for a user.
  * @param {string} discordId - The user's Discord ID.
- * @param {object} authData - The authentication data object from ESI.
- * @returns {Promise<{success: boolean, message: string}>}
+ * @param {object} authData - The authentication data from ESI.
  */
 async function saveUserAuth(discordId, authData) {
-    const existingUser = await charManager.getChars(discordId);
-    if (!existingUser || !existingUser.main_character) {
-        return { success: false, message: 'No main character registered. Please use `/addchar main` first.' };
-    }
+    try {
+        // This query will insert a new row or update the existing one if the discord_id already exists.
+        const sql = `
+            INSERT INTO auth (discord_id, character_id, character_name, access_token, refresh_token, token_expiry)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                character_id = VALUES(character_id),
+                character_name = VALUES(character_name),
+                access_token = VALUES(access_token),
+                refresh_token = VALUES(refresh_token),
+                token_expiry = VALUES(token_expiry)`;
 
-    if (existingUser.main_character.toLowerCase() === authData.character_name.toLowerCase()) {
-        try {
-            const sql = 'UPDATE commander_list SET character_id = ?, character_name = ?, access_token = ?, refresh_token = ?, token_expiry = ? WHERE discord_id = ?';
-            await db.query(sql, [authData.character_id, authData.character_name, authData.access_token, authData.refresh_token, authData.token_expiry, discordId]);
-            return { success: true, message: `Successfully authenticated main character ${authData.character_name}.` };
-        } catch (error) {
-            logger.error(`Error updating main character auth data for ${discordId}:`, error);
-            return { success: false, message: 'A database error occurred while updating your main character.' };
-        }
-    } else {
-        try {
-            await charManager.addAlt(discordId, authData.character_name);
-            const sql = 'UPDATE commander_list SET character_id = ?, character_name = ?, access_token = ?, refresh_token = ?, token_expiry = ? WHERE discord_id = ?';
-            await db.query(sql, [authData.character_id, authData.character_name, authData.access_token, authData.refresh_token, authData.token_expiry, discordId]);
-            return { success: true, message: `Successfully authenticated alt character ${authData.character_name}. It has been added to your profile.` };
-        } catch (error) {
-            logger.error(`Error authenticating alt character for ${discordId}:`, error);
-            return { success: false, message: 'A database error occurred while authenticating your alt character.' };
-        }
+        await db.query(sql, [
+            discordId,
+            authData.character_id,
+            authData.character_name,
+            authData.access_token,
+            authData.refresh_token,
+            authData.token_expiry
+        ]);
+        logger.success(`Saved/updated auth data for ${authData.character_name} (${discordId})`);
+    } catch (error) {
+        logger.error(`Error in saveUserAuth for ${discordId}:`, error);
     }
 }
 
+/**
+ * Fetches the user's authentication data.
+ * @param {string} discordId - The user's Discord ID.
+ * @returns {Promise<object|null>} The auth data or null if not found.
+ */
+async function getUserAuthData(discordId) {
+    try {
+        const sql = 'SELECT * FROM auth WHERE discord_id = ?';
+        const rows = await db.query(sql, [discordId]);
+        return rows[0] || null;
+    } catch (error) {
+        logger.error(`Error fetching user auth data for ${discordId}:`, error);
+        return null;
+    }
+}
 
 /**
- * The main function to get a valid access token, refreshing if necessary.
+ * Removes a user's authentication data from the database.
+ * @param {string} discordId - The Discord ID of the user.
+ * @returns {Promise<boolean>} True if successful, false otherwise.
+ */
+async function removeUser(discordId) {
+    try {
+        const sql = 'DELETE FROM auth WHERE discord_id = ?';
+        const result = await db.query(sql, [discordId]);
+        return result.affectedRows > 0;
+    } catch (error) {
+        logger.error(`Error removing auth data for user ${discordId}:`, error);
+        return false;
+    }
+}
+
+/**
+ * Gets a valid access token, refreshing if necessary.
  * @param {string} discordId - The user's Discord ID.
  * @returns {Promise<string|null>} The valid access token or null if unavailable.
  */
 async function getAccessToken(discordId) {
-    let userData;
-    try {
-        // Ensure character_id is also selected here for consistency
-        const sql = 'SELECT discord_id, access_token, refresh_token, token_expiry, character_name, character_id FROM commander_list WHERE discord_id = ?';
-        const rows = await db.query(sql, [discordId]);
-        userData = rows[0];
-    } catch (error) {
-        logger.error('Error fetching user data from DB:', error);
+    // Read ESI credentials directly from environment variables
+    const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
+    const ESI_SECRET_KEY = process.env.ESI_SECRET_KEY;
+
+    if (!ESI_CLIENT_ID || !ESI_SECRET_KEY) {
+        logger.error('ESI_CLIENT_ID or ESI_SECRET_KEY not found in .env file. Cannot refresh token.');
         return null;
     }
 
-    if (!userData) {
-        return null; // User not authenticated
+    const userData = await getUserAuthData(discordId);
+
+    if (!userData || !userData.refresh_token) {
+        return null; // User not authenticated or missing refresh token
     }
 
-    const tokenExpires = new Date(userData.token_expiry).getTime();
-    const isExpired = Date.now() >= tokenExpires - (60 * 1000);
+    // Check if the token is expired or close to expiring (within 60 seconds)
+    const expiryTimestamp = userData.token_expiry; // This is a BIGINT Unix timestamp in ms
+    const isExpired = Date.now() >= expiryTimestamp - (60 * 1000);
 
     if (!isExpired) {
         return userData.access_token;
@@ -99,56 +113,35 @@ async function getAccessToken(discordId) {
             }
         );
 
-        const newAccessToken = response.data.access_token;
-        const newRefreshToken = response.data.refresh_token;
-        const expiresIn = response.data.expires_in;
+        const { access_token, refresh_token, expires_in } = response.data;
+        const newExpiryTimestamp = Date.now() + expires_in * 1000;
 
-        const updateSql = 'UPDATE commander_list SET access_token = ?, refresh_token = ?, token_expiry = ? WHERE discord_id = ?';
-        const newExpiry = formatMySqlDateTime(new Date(Date.now() + expiresIn * 1000));
-        await db.query(updateSql, [newAccessToken, newRefreshToken, newExpiry, discordId]);
+        await saveUserAuth(discordId, {
+            ...userData, // Carry over existing character info
+            access_token: access_token,
+            refresh_token: refresh_token,
+            token_expiry: newExpiryTimestamp,
+        });
 
-        return newAccessToken;
+        logger.success(`Successfully refreshed token for ${userData.character_name}.`);
+        return access_token;
 
     } catch (error) {
-        logger.error('Error refreshing token:', error.response ? error.response.data : error.message);
+        // If refresh fails (e.g., token revoked), clear the invalid token from the DB.
+        if (error.response && error.response.status === 400) {
+            logger.warn(`Refresh token for ${userData.character_name} (${discordId}) is invalid or revoked. Clearing from database.`);
+            await removeUser(discordId);
+        } else {
+            const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
+            logger.error(`Error refreshing ESI token for ${discordId}: ${errorMessage}`);
+        }
         return null;
     }
 }
 
 module.exports = {
-    /**
-     * Fetches a user's authentication data from the database.
-     * @param {string} discordId - The user's Discord ID.
-     * @returns {Promise<object|null>} The user's auth data or null.
-     */
-    getUserAuthData: async (discordId) => {
-        try {
-            // FIX: Added 'character_id' to the SELECT statement.
-            const sql = 'SELECT discord_id, character_name, character_id, access_token, refresh_token, token_expiry FROM commander_list WHERE discord_id = ?';
-            const rows = await db.query(sql, [discordId]);
-            return rows[0] || null;
-        } catch (error) {
-            logger.error('Error fetching user auth data:', error);
-            return null;
-        }
-    },
-
-    /**
-     * Removes a user's authentication data from the database.
-     * @param {string} discordId - The user's Discord ID.
-     * @returns {Promise<boolean>} True if the user was removed, false otherwise.
-     */
-    removeUser: async (discordId) => {
-        try {
-            const sql = 'UPDATE commander_list SET character_id = NULL, character_name = NULL, access_token = NULL, refresh_token = NULL, token_expiry = NULL WHERE discord_id = ?';
-            const result = await db.query(sql, [discordId]);
-            return result.affectedRows > 0;
-        } catch (error) {
-            logger.error('Error removing user auth data:', error);
-            return false;
-        }
-    },
-
     saveUserAuth,
+    getUserAuthData,
+    removeUser,
     getAccessToken,
 };

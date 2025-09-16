@@ -12,10 +12,11 @@ module.exports = {
             return interaction.reply({ content: 'You do not have permission to use this command.', flags: [MessageFlags.Ephemeral] });
         }
 
-        const tableChoices = databaseManager.editableTables.map(table => ({
-            label: table.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), // Prettify name
-            value: table,
-        }));
+        const tableChoices = databaseManager.editableTables.map(table => {
+            let label = table.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            if (table === 'roleHierarchy') label = 'Role Hierarchy'; // Specific label
+            return { label, value: table };
+        });
 
         const tableSelectMenu = new StringSelectMenuBuilder()
             .setCustomId('config_table_select')
@@ -32,3 +33,4 @@ module.exports = {
         await interaction.reply({ embeds: [embed], components: [row], flags: [MessageFlags.Ephemeral] });
     },
 };
+

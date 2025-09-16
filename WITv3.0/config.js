@@ -1,153 +1,158 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const roleManager = require('@helpers/roleManager');
-const databaseManager = require('@helpers/databaseManager');
-const configManager = require('@helpers/configManager');
-
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('config')
-        .setDescription('Manage bot configuration.')
-        .addSubcommand(subcommand =>
-            subcommand
-                .setName('view')
-                .setDescription('View the current core bot configuration.')
-        )
-        .addSubcommand(subcommand =>
-            subcommand
-                .setName('set')
-                .setDescription('Add or update a configuration value.')
-                .addStringOption(option =>
-                    option.setName('table')
-                        .setDescription('The configuration table to edit.')
-                        .setRequired(true)
-                        .addChoices(
-                            { name: 'Core Config', value: 'config' },
-                            { name: 'Google Docs', value: 'google_docs' },
-                            { name: 'Google Sheets', value: 'google_sheets' }
-                        ))
-                .addStringOption(option =>
-                    option.setName('key')
-                        .setDescription('The configuration key to set (e.g., adminRoles).')
-                        .setRequired(true)
-                        .setAutocomplete(true))
-                .addStringOption(option =>
-                    option.setName('value')
-                        .setDescription('The new value for the key (use JSON for arrays/objects).')
-                        .setRequired(true))
-        )
-        .addSubcommand(subcommand =>
-            subcommand
-                .setName('remove')
-                .setDescription('Remove a configuration entry.')
-                .addStringOption(option =>
-                    option.setName('table')
-                        .setDescription('The configuration table to edit.')
-                        .setRequired(true)
-                        .addChoices(
-                            { name: 'Core Config', value: 'config' },
-                            { name: 'Google Docs', value: 'google_docs' },
-                            { name: 'Google Sheets', value: 'google_sheets' }
-                        ))
-                .addStringOption(option =>
-                    option.setName('key')
-                        .setDescription('The key of the entry to remove.')
-                        .setRequired(true)
-                        .setAutocomplete(true))
-        ),
-
-    async autocomplete(interaction) {
-        const focusedOption = interaction.options.getFocused(true);
-        const table = interaction.options.getString('table');
-
-        if (focusedOption.name === 'key' && table) {
-            const keys = await databaseManager.getKeys(table);
-            const filtered = keys.filter(key => key.startsWith(focusedOption.value)).slice(0, 25);
-            await interaction.respond(
-                filtered.map(key => ({ name: key, value: key })),
-            );
-        }
+    // Add the system IDs for the major trade hubs.
+    tradeHubs: {
+        'Jita': 30000617,
+        'Amarr': 30002187,
+        'Dodixie': 30002659,
+        'Hek': 30002053,
+        'Rens': 30002510,
     },
 
-    async execute(interaction) {
-        if (!roleManager.isAdmin(interaction.member)) {
-            return interaction.reply({ content: 'You do not have permission to use this command.' });
-        }
+    // The roles that can manage other users' characters, and solve/deny request tickets
+    adminRoles: [
+        'Moderator',
+        'Leadership',
+        'Officer',
+        'Big Cheese',
+    ],
+    // Roles that can manage incursion commands
+    councilRoles: [
+        'Leadership',
+        'Officer',
+    ],
+    // Roles that can use the /inrole command
+    commanderRoles: [
+        'Commander'
+    ],
+    // Add the roles that can use the /auth command
+    authRoles: [
+        'Moderator',
+        'Big Cheese',
+    ],
 
-        const subcommand = interaction.options.getSubcommand();
+    // You can get these IDs from the URL of your Google Sheet and Doc
+    // Example URL: https://docs.google.com/spreadsheets/d/THIS_IS_THE_ID/edit
+    // Use simple, lowercase names as the keys (e.g., 'roster', 'rules').
 
-        if (subcommand === 'view') {
-            await interaction.deferReply();
+    //Google Sheets/Docs Info
+    googleSheets: {
+        'todo': '1A-QWH2SYQlXH1uNl3KJS-NfvVTPWidAx0UlBtifdAH8',
+        'fleet': '1sTF1NxruAiUKOr52wKu33ka14mx3_xCH',
+        //'inventory': 'YOUR_SECOND_SHEET_ID_HERE',
+        //'finances': 'ANOTHER_SHEET_ID_HERE',
+    },
+    googleDocs: {
+        'test': '1bZxBnoDmcD0EpaPJx9-CjZbY0tTl98vGqkqKkyENyF8',
+        //'guide': 'YOUR_SECOND_DOC_ID_HERE',
+    },
+    // ESI Application details for OAuth
+    // You MUST create an application at https://developers.eveonline.com/
+    esi: {
+        // These should be in your .env file
+        clientId: process.env.ESI_CLIENT_ID,
+        secretKey: process.env.ESI_SECRET_KEY,
+        // This MUST match the Callback URL in your ESI Application.
+        // The port should be one that is open on your server/computer.
+        callbackUrl: process.env.ESI_CALLBACK_URL,
+        // The scopes your bot needs. 'esi-mail.send_mail.v1' is required for sending mail. 'esi-mail.read_mail.v1' is required to identify mailing list ID's
+        scopes: process.env.ESI_DEFAULT_SCOPES
 
-            const config = configManager.get();
-            if (!config || Object.keys(config).length === 0) {
-                return interaction.editReply({ content: 'Configuration is not loaded or is empty.' });
+    },
+    // Add the SRP mailing list ID for in-game mail notifications.
+    srpMailingListId: '145241588',
+
+    // New Role Hierarchy for Promotions and Demotions
+    roleHierarchy: {
+        'Commander': {
+            promote: {
+                add: ['Commander'],
+                remove: []
+            },
+            demote: {
+                add: [],
+                remove: ['Commander']
             }
-
-            const embed = new EmbedBuilder()
-                .setTitle('Current Bot Configuration')
-                .setColor(0x0099FF)
-                .setTimestamp();
-
-            const fields = [];
-            for (const [key, value] of Object.entries(config)) {
-                // Truncate long values to prevent embed errors
-                let valueString = JSON.stringify(value, null, 2);
-                if (valueString.length > 1024) {
-                    valueString = valueString.substring(0, 1021) + '...';
-                }
-
-                // Add to fields array, respecting the 25-field limit
-                if (fields.length < 25) {
-                    fields.push({ name: key, value: `\`\`\`json\n${valueString}\`\`\`` });
-                } else {
-                    break;
-                }
+        },
+        'Resident': {
+            promote: {
+                add: ['Commander', 'Resident'],
+                remove: []
+            },
+            demote: {
+                add: [],
+                remove: ['Commander', 'Resident']
             }
-
-            if (fields.length > 0) {
-                embed.addFields(fields);
-            } else {
-                embed.setDescription('No configuration settings found.');
+        },
+        'Line Commander': {
+            promote: {
+                add: ['Line Commander'],
+                remove: ['Resident']
+            },
+            demote: {
+                add: ['Resident'],
+                remove: ['Line Commander']
             }
-
-            if (Object.keys(config).length > 25) {
-                embed.setFooter({ text: 'Note: Configuration has more than 25 entries. Only the first 25 are shown.' });
+        },
+        'Training FC': {
+            promote: {
+                add: ['Training FC'],
+                remove: []
+            },
+            demote: {
+                add: [],
+                remove: ['Training FC']
             }
-
-            await interaction.editReply({ embeds: [embed] });
-
-        } else if (subcommand === 'set') {
-            await interaction.deferReply();
-            const table = interaction.options.getString('table');
-            const key = interaction.options.getString('key');
-            const value = interaction.options.getString('value');
-
-            const success = await databaseManager.setValue(table, key, value);
-
-            if (success) {
-                if (table === 'config') {
-                    await configManager.reloadConfig();
-                }
-                await interaction.editReply({ content: `Successfully set **${key}** in table **${table}**.` });
-            } else {
-                await interaction.editReply({ content: `Failed to set value. The table "${table}" may not be editable.` });
+        },
+        'Fleet Commander': {
+            promote: {
+                add: ['Fleet Commander'],
+                remove: ['Training FC']
+            },
+            demote: {
+                add: ['Line Commander'],
+                remove: ['Fleet Commander']
             }
-        } else if (subcommand === 'remove') {
-            await interaction.deferReply();
-            const table = interaction.options.getString('table');
-            const key = interaction.options.getString('key');
-
-            const success = await databaseManager.removeKey(table, key);
-
-            if (success) {
-                if (table === 'config') {
-                    await configManager.reloadConfig();
-                }
-                await interaction.editReply({ content: `Successfully removed **${key}** from table **${table}**.` });
-            } else {
-                await interaction.editReply({ content: `Failed to remove key. The table "${table}" may not be editable.` });
+        },
+        'Training CT': {
+            promote: {
+                add: ['Training CT'],
+                remove: []
+            },
+            demote: {
+                add: [],
+                remove: ['Training CT']
             }
-        }
+        },
+        'Certified Trainer': {
+            promote: {
+                add: ['Certified Trainer'],
+                remove: ['Training CT']
+            },
+            demote: {
+                add: [],
+                remove: ['Certified Trainer']
+            }
+        },
+        'Officer': {
+            promote: {
+                add: ['Officer'],
+                remove: []
+            },
+            demote: {
+                add: [],
+                remove: ['Officer']
+            }
+        },
+        'Leadership': {
+            promote: {
+                add: ['Leadership'],
+                remove: ['Officer']
+            },
+            demote: {
+                add: [],
+                remove: ['Leadership']
+            }
+        },
     },
 };
 

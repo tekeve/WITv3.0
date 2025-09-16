@@ -2,13 +2,31 @@ const db = require('@helpers/dbService');
 const logger = require('@helpers/logger');
 
 // A safelist of tables that the /config command is allowed to edit.
-const editableTables = ['config', 'google_docs', 'google_sheets'];
+const editableTables = [
+    'auth',
+    'bot_status',
+    'characters',
+    'config',
+    'google_docs',
+    'google_sheets',
+    'incursion_state',
+    'incursion_systems',
+    'roleHierarchy',
+    'users'
+];
 
 // Maps table names to their respective primary key column names.
 const tableKeyMap = {
+    auth: 'discord_id',
+    bot_status: 'id',
+    characters: 'character_id',
     config: 'key_name',
     google_docs: 'alias',
     google_sheets: 'alias',
+    incursion_state: 'id',
+    incursion_systems: 'Constellation_id',
+    roleHierarchy: 'roleName',
+    users: 'discord_id',
 };
 
 /**
@@ -48,10 +66,19 @@ module.exports = {
             // Use backticks to safely include the table and column names in the query
             const sql = `SELECT \`${keyColumn}\` FROM \`${tableName}\` WHERE \`${keyColumn}\` LIKE ? LIMIT 25`;
             const rows = await db.query(sql, [`%${filter}%`]);
-            return rows.map(row => ({
+
+            const mappedRows = rows.map(row => ({
                 name: row[keyColumn],
                 value: row[keyColumn],
             }));
+
+            // **FIX**: Add a filter to ensure we only return valid entries.
+            // This prevents crashes if a key in the database is unexpectedly NULL or invalid,
+            // which would cause an error when trying to read its `length` property.
+            const validRows = mappedRows.filter(row => row.name && typeof row.name === 'string');
+
+            return validRows;
+
         } catch (error) {
             logger.error(`Failed to get keys from table ${tableName}:`, error);
             return [];
@@ -59,81 +86,49 @@ module.exports = {
     },
 
     /**
-     * Fetches all keys from a table.
-     * @param {string} tableName - The name of the table to query.
-     * @returns {Promise<Array<string>>} - An array of all keys.
-     */
-    getAllKeys: async (tableName) => {
-        if (!isTableEditable(tableName)) return [];
-        const keyColumn = getKeyColumnForTable(tableName);
-        if (!keyColumn) return [];
-
-        try {
-            const sql = `SELECT \`${keyColumn}\` FROM \`${tableName}\``;
-            const rows = await db.query(sql);
-            return rows.map(row => row[keyColumn]);
-        } catch (error) {
-            logger.error(`Failed to get all keys from table ${tableName}:`, error);
-            return [];
-        }
-    },
-
-    /**
-     * Fetches a single value for a given key.
-     * @param {string} tableName - The table to query.
-     * @param {string} key - The key to look for.
-     * @returns {Promise<string|null>} - The value, or null if not found.
-     */
-    getValue: async (tableName, key) => {
-        if (!isTableEditable(tableName)) return null;
-        const keyColumn = getKeyColumnForTable(tableName);
-        const valueColumnMap = {
-            config: 'value',
-            google_docs: 'doc_id',
-            google_sheets: 'sheet_id',
-        };
-        const valueColumn = valueColumnMap[tableName];
-        if (!keyColumn || !valueColumn) return null;
-
-        try {
-            const sql = `SELECT \`${valueColumn}\` FROM \`${tableName}\` WHERE \`${keyColumn}\` = ?`;
-            const rows = await db.query(sql, [key]);
-            if (rows.length > 0) {
-                return rows[0][valueColumn];
-            }
-            return null;
-        } catch (error) {
-            logger.error(`Failed to get value for key ${key} from table ${tableName}:`, error);
-            return null;
-        }
-    },
-
-    /**
      * Sets (inserts or updates) a value in a specified table.
+     * This now supports simple key-value tables and complex multi-column tables via JSON.
      * @param {string} tableName - The name of the table to modify.
-     * @param {string} key - The key of the entry to set.
-     * @param {string} value - The value to set for the key.
+     * @param {string} primaryKeyValue - The value of the primary key for the row to modify.
+     * @param {string} rowDataJson - The full row data as a JSON string.
      * @returns {Promise<boolean>} - True on success, false on failure.
      */
-    setValue: async (tableName, key, value) => {
+    setValue: async (tableName, primaryKeyValue, rowDataJson) => {
         if (!isTableEditable(tableName)) return false;
-        // The value column is different for each table, so we map it here.
-        const valueColumnMap = {
-            config: 'value',
-            google_docs: 'doc_id',
-            google_sheets: 'sheet_id',
-        };
         const keyColumn = getKeyColumnForTable(tableName);
-        const valueColumn = valueColumnMap[tableName];
+        if (!keyColumn) return false;
 
-        if (!keyColumn || !valueColumn) return false;
+        let rowData;
+        try {
+            rowData = JSON.parse(rowDataJson);
+        } catch (e) {
+            logger.error(`Invalid JSON provided for table ${tableName}:`, e.message);
+            return false;
+        }
+
+        // Ensure the primary key from the input field is included in the data object
+        rowData[keyColumn] = primaryKeyValue;
+
+        const columns = Object.keys(rowData);
+        const placeholders = columns.map(() => '?').join(', ');
+        const values = columns.map(col => {
+            const value = rowData[col];
+            // Stringify objects/arrays for JSON columns
+            return typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+        });
+
+        const updateClause = columns
+            .filter(col => col !== keyColumn)
+            .map(col => `\`${col}\` = VALUES(\`${col}\`)`)
+            .join(', ');
 
         try {
             const sql = `
-                INSERT INTO \`${tableName}\` (\`${keyColumn}\`, \`${valueColumn}\`) 
-                VALUES (?, ?) 
-                ON DUPLICATE KEY UPDATE \`${valueColumn}\` = VALUES(\`${valueColumn}\`)`;
-            await db.query(sql, [key, value]);
+                INSERT INTO \`${tableName}\` (\`${columns.join('`, `')}\`)
+                VALUES (${placeholders})
+                ON DUPLICATE KEY UPDATE ${updateClause}`;
+
+            await db.query(sql, values);
             return true;
         } catch (error) {
             logger.error(`Failed to set value in table ${tableName}:`, error);
@@ -162,3 +157,4 @@ module.exports = {
         }
     },
 };
+

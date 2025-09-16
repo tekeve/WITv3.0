@@ -1,5 +1,5 @@
-﻿const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { adminRoles, commanderRoles, councilRoles, authRoles } = require('../../config.js');
+﻿const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const roleManager = require('@helpers/roleManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -10,13 +10,14 @@ module.exports = {
         const member = interaction.member;
         const commands = interaction.client.commands;
 
-        // Helper functions to check for role categories
-        const isAdmin = member.roles.cache.some(role => adminRoles.includes(role.name));
-        const isCouncil = member.roles.cache.some(role => councilRoles.includes(role.name));
-        const isCommander = member.roles.cache.some(role => commanderRoles.includes(role.name));
-        const canAuth = member.roles.cache.some(role => authRoles.includes(role.name));
+        // Centralized permission checks from roleManager
+        const isAdmin = roleManager.isAdmin(member);
+        const isCouncil = roleManager.isCouncil(member);
+        const isCommander = roleManager.isCommander(member);
+        const canAuth = roleManager.canAuth(member);
 
         // Define which commands fall into which permission groups
+        // This structure makes it easy to see who can run what.
         const commandPermissions = {
             'promote': isAdmin,
             'demote': isAdmin,
@@ -26,6 +27,7 @@ module.exports = {
             'doc': isAdmin,
             'sendmail': isAdmin,
             'maillists': isAdmin,
+            'config': isAdmin,
             'incursion': isAdmin || isCouncil,
             'inrole': isAdmin || isCommander,
             'addchar': isAdmin || isCommander,
@@ -34,8 +36,8 @@ module.exports = {
             'srp': isAdmin || isCommander,
             'request': isAdmin || isCommander,
             'auth': canAuth,
-            'ping': true, // Assuming ping is for everyone
-            'help': true, // Help is always available
+            'ping': true, // Everyone can use ping
+            'help': true,  // Everyone can use help
         };
 
         // Filter commands based on the user's permissions
