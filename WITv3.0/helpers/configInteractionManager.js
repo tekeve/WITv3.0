@@ -19,12 +19,14 @@ async function handleInteraction(interaction) {
             }
         } else if (interaction.isButton()) {
             if (interaction.customId.startsWith('config_action_')) {
-                const [_, __, action, tableName] = interaction.customId.split('_');
+                const [_, __, action, ...tableNameParts] = interaction.customId.split('_');
+                const tableName = tableNameParts.join('_');
                 await handleActionButton(interaction, action, tableName);
             }
         } else if (interaction.isModalSubmit()) {
             if (interaction.customId.startsWith('config_modal_')) {
-                const [_, __, action, tableName] = interaction.customId.split('_');
+                const [_, __, action, ...tableNameParts] = interaction.customId.split('_');
+                const tableName = tableNameParts.join('_');
                 await handleModalSubmit(interaction, action, tableName);
             }
         }
@@ -134,7 +136,7 @@ async function handleActionButton(interaction, action, tableName) {
  * Handles the final removal of a key after it's selected from the dropdown.
  */
 async function handleKeyRemove(interaction) {
-    const tableName = interaction.customId.split('_')[3];
+    const tableName = interaction.customId.substring('config_remove_select_'.length);
     const keyToRemove = interaction.values[0];
 
     const success = await databaseManager.removeKey(tableName, keyToRemove);
@@ -163,11 +165,10 @@ async function handleModalSubmit(interaction, action, tableName) {
     if (success) {
         if (tableName === 'config') await configManager.reloadConfig();
         if (tableName === 'roleHierarchy') await roleHierarchyManager.reloadHierarchy();
-        await interaction.reply({ content: `✅ Successfully set **${key}** in the **${tableName}** table.`, flags: [MessageFlags.Ephemeral] });
+        await interaction.reply({ content: `✅ Successfully set **${primaryKeyValue}** in the **${tableName}** table.`, flags: [MessageFlags.Ephemeral] });
     } else {
         await interaction.reply({ content: `❌ Failed to set value in the **${tableName}** table.`, flags: [MessageFlags.Ephemeral] });
     }
 }
 
 module.exports = { handleInteraction };
-
