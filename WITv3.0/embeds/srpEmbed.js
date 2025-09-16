@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const charManager = require('@helpers/characterManager');
+const charManager = require('@helpers/characterManager'); // Path updated
 
 /**
  * Builds a Discord embed for an SRP request from web form data.
@@ -15,17 +15,22 @@ async function buildSrpEmbed(payload) {
     const submitterCharData = await charManager.getChars(user.id);
     const submitterName = submitterCharData ? submitterCharData.main_character : user.tag;
 
-    // Format the kill report link for the embed
+    // --- MODIFIED SECTION START ---
+    // Format the killmail data into a full in-game link format.
     let killReportValue = 'Not Provided';
     if (formData.kill_report_option === 'link' && formData.kill_report_link) {
+        // Extract the ID and Hash from the ESI URL
         const match = formData.kill_report_link.match(/killmails\/(\d+)\/([a-f0-9]+)\//);
         if (match) {
             const killmailId = match[1];
-            killReportValue = `[zKillboard Link](https://zkillboard.com/kill/${killmailId}/)`;
+            const killmailHash = match[2];
+            // Format as a clean, copy-pastable in-game link inside a Discord code block
+            killReportValue = `\`<url=killReport:${killmailId}:${killmailHash}>${formData.pilot_name}</url>\``;
         } else {
             killReportValue = 'Invalid ESI Link Format';
         }
     }
+    // --- MODIFIED SECTION END ---
 
     // Combine backseat info if 'Other' was selected
     const backseatDetails = formData.backseat_info === 'Other'
@@ -46,7 +51,8 @@ async function buildSrpEmbed(payload) {
             { name: 'ISK Value', value: `${formattedValue} ISK`, inline: true },
             { name: 'FC Name', value: formData.fc_name, inline: true },
             { name: 'Backseat Info', value: backseatDetails, inline: true },
-            { name: 'Kill Report', value: killReportValue, inline: true },
+            // --- MODIFIED FIELD TITLE ---
+            { name: 'Ingame Kill Link', value: killReportValue, inline: true },
             { name: 'SRPable?', value: formData.srpable, inline: true },
             { name: 'SRP Paid?', value: formData.srp_paid, inline: true },
             { name: '\u200B', value: '\u200B', inline: true }, // Spacer
@@ -59,3 +65,4 @@ async function buildSrpEmbed(payload) {
 }
 
 module.exports = { buildSrpEmbed };
+
