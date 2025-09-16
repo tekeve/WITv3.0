@@ -85,7 +85,8 @@ async function initializeApp() {
     await configManager.reloadConfig();
     const config = configManager.get(); // Get config once for startup
     await incursionManager.loadIncursionSystems();
-    await roleHierarchyManager.loadHierarchy(); // Load the role hierarchy
+    // FIX: Changed loadHierarchy to reloadHierarchy, which is correctly exported.
+    await roleHierarchyManager.reloadHierarchy(); // Load the role hierarchy
 
     const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -131,7 +132,8 @@ async function initializeApp() {
         logger.success(`Ready! Logged in as ${c.user.tag}`);
 
         // Load and set the status from the database
-        await statusManager.initialize(client);
+        // FIX: Changed initialize to loadStatus, which is the correct function name.
+        await statusManager.loadStatus(client);
 
         client.updateIncursions();
         setInterval(() => client.updateIncursions(), 1 * 60 * 1000);
@@ -200,4 +202,3 @@ async function initializeApp() {
 }
 
 initializeApp();
-

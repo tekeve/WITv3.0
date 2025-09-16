@@ -6,15 +6,14 @@ const logger = require('@helpers/logger');
 /**
  * Starts the Express server for the ESI OAuth2 callback.
  * @param {import('discord.js').Client} client - The Discord client instance.
- * @param {object} config - The loaded bot configuration object.
  */
-function startServer(client, config) {
+function startServer(client) {
     const app = express();
     const port = 3000;
 
-    // Use ESI credentials from the passed-in config object
-    const ESI_CLIENT_ID = config.esiClientId;
-    const ESI_SECRET_KEY = config.esiSecretKey;
+    // Use ESI credentials directly from environment variables
+    const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
+    const ESI_SECRET_KEY = process.env.ESI_SECRET_KEY;
 
     app.get('/callback', async (req, res) => {
         const { code, state } = req.query;
@@ -84,4 +83,3 @@ function startServer(client, config) {
 }
 
 module.exports = { startServer };
-

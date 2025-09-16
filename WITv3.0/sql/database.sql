@@ -210,6 +210,12 @@ REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard
 	(20000784, 'Aokinen', 'Onnamon,Tsuruma, Uuhulanen', 'Astoh, Rohamaa, Samanuhi', 'Uchomida (0.5)', 'Samanuni VI - Caldari Navy Anchorage', '30045322', 'NOTISLAND', '500001', 'The Citadel', 10000033),
 	(30000154, 'Onirvura', '', '', '', '', '', 'NOTISLAND', '500001', 'Lonetrek', 10000016);
 
+-- Dumping structure for table wit-db.mailing_lists
+CREATE TABLE IF NOT EXISTS `mailing_lists` (
+  `list_id` int(11) NOT NULL,
+  `list_name` varchar(50) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
 -- Dumping structure for table wit-db.roleHierarchy
 DROP TABLE IF EXISTS `roleHierarchy`;
 CREATE TABLE IF NOT EXISTS `roleHierarchy` (
@@ -218,7 +224,6 @@ CREATE TABLE IF NOT EXISTS `roleHierarchy` (
   `demote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`configuration`)),
   PRIMARY KEY (`roleName`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
-
 
 -- Dumping structure for table wit-db.users
 DROP TABLE IF EXISTS `users`;

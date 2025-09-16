@@ -30,15 +30,7 @@ module.exports = {
                 const headers = { 'Authorization': `Bearer ${accessToken}` };
                 const mailingLists = await esiService.get(`/characters/${authData.character_id}/mail/lists/`, null, headers);
 
-                // --- FIX ---
-                // The esiService now returns the data directly, so we don't need 'response.data'.
-                if (!Array.isArray(mailingLists)) {
-                    // Handle cases where the ESI service returned an error.
-                    const errorMessage = mailingLists.message || 'An unknown error occurred.';
-                    logger.error(`Failed to fetch EVE mailing lists: ${errorMessage}`);
-                    return interaction.editReply({ content: `Could not fetch your mailing lists. ESI responded with an error: \`${errorMessage}\`` });
-                }
-
+                // With the esiService fix, we can be more confident mailingLists is an array if the call succeeds.
                 if (mailingLists.length === 0) {
                     return interaction.editReply({ content: 'Your character is not subscribed to any mailing lists.' });
                 }
@@ -56,11 +48,11 @@ module.exports = {
                 await interaction.editReply({ embeds: [embed] });
 
             } catch (error) {
-                // This catch block is now for unexpected errors, as ESI errors are handled above.
-                logger.error(`An unexpected error occurred while fetching mailing lists:`, error);
-                await interaction.editReply({ content: `An unexpected error occurred. Please check the logs.` });
+                // The catch block will now correctly handle errors thrown from the ESI service.
+                const errorMessage = error.response?.data?.error || error.message || 'An unknown error occurred.';
+                logger.error(`Failed to fetch EVE mailing lists:`, error);
+                await interaction.editReply({ content: `Could not fetch your mailing lists. ESI responded with an error: \`${errorMessage}\`` });
             }
         }
     },
 };
-

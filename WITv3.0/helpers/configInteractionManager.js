@@ -66,10 +66,20 @@ async function handleActionButton(interaction, action, tableName) {
     if (action === 'set') {
         const modal = new ModalBuilder()
             .setCustomId(`config_modal_set_${tableName}`)
-            .setTitle(`Editing ${tableName}`);
+            .setTitle(`Add/Edit Entry in ${tableName}`);
 
-        const keyInput = new TextInputBuilder().setCustomId('key').setLabel('Key').setStyle(TextInputStyle.Short).setRequired(true);
-        const valueInput = new TextInputBuilder().setCustomId('value').setLabel('Value (use JSON for objects/arrays)').setStyle(TextInputStyle.Paragraph).setRequired(true);
+        const keyInput = new TextInputBuilder()
+            .setCustomId('key')
+            .setLabel('Primary Key Value')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const valueInput = new TextInputBuilder()
+            .setCustomId('value')
+            .setLabel('Row Data (JSON format)')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Enter the full row data as a JSON object. The primary key will be overwritten by the field above.')
+            .setRequired(true);
 
         modal.addComponents(new ActionRowBuilder().addComponents(keyInput), new ActionRowBuilder().addComponents(valueInput));
         await interaction.showModal(modal);
@@ -142,13 +152,13 @@ async function handleKeyRemove(interaction) {
  * Handles the submission of the "Add/Edit" modal.
  * @param {import('discord.js').ModalSubmitInteraction} interaction
  * @param {string} action - The action being performed ('set').
- * @param {string} tableName - The table to perform the action on.
+  * @param {string} tableName - The table to perform the action on.
  */
 async function handleModalSubmit(interaction, action, tableName) {
-    const key = interaction.fields.getTextInputValue('key');
-    const value = interaction.fields.getTextInputValue('value');
+    const primaryKeyValue = interaction.fields.getTextInputValue('key');
+    const rowDataJson = interaction.fields.getTextInputValue('value');
 
-    const success = await databaseManager.setValue(tableName, key, value);
+    const success = await databaseManager.setValue(tableName, primaryKeyValue, rowDataJson);
 
     if (success) {
         if (tableName === 'config') await configManager.reloadConfig();

@@ -27,7 +27,7 @@ async function manageRoles(interaction, action) {
         });
     }
 
-    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    await interaction.deferReply({  });
 
     // Extract options directly from the command interaction
     const targetUser = interaction.options.getUser('user');

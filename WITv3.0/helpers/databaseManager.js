@@ -2,14 +2,31 @@ const db = require('@helpers/dbService');
 const logger = require('@helpers/logger');
 
 // A safelist of tables that the /config command is allowed to edit.
-const editableTables = ['config', 'google_docs', 'google_sheets', 'roleHierarchy'];
+const editableTables = [
+    'auth',
+    'bot_status',
+    'characters',
+    'config',
+    'google_docs',
+    'google_sheets',
+    'incursion_state',
+    'incursion_systems',
+    'roleHierarchy',
+    'users'
+];
 
 // Maps table names to their respective primary key column names.
 const tableKeyMap = {
+    auth: 'discord_id',
+    bot_status: 'id',
+    characters: 'character_id',
     config: 'key_name',
     google_docs: 'alias',
     google_sheets: 'alias',
+    incursion_state: 'id',
+    incursion_systems: 'Constellation_id',
     roleHierarchy: 'roleName',
+    users: 'discord_id',
 };
 
 /**
@@ -70,48 +87,48 @@ module.exports = {
 
     /**
      * Sets (inserts or updates) a value in a specified table.
+     * This now supports simple key-value tables and complex multi-column tables via JSON.
      * @param {string} tableName - The name of the table to modify.
-     * @param {string} key - The key of the entry to set.
-     * @param {string} value - The value to set for the key.
+     * @param {string} primaryKeyValue - The value of the primary key for the row to modify.
+     * @param {string} rowDataJson - The full row data as a JSON string.
      * @returns {Promise<boolean>} - True on success, false on failure.
      */
-    setValue: async (tableName, key, value) => {
+    setValue: async (tableName, primaryKeyValue, rowDataJson) => {
         if (!isTableEditable(tableName)) return false;
-        // The value column is different for each table, so we map it here.
-        const valueColumnMap = {
-            config: 'value',
-            google_docs: 'doc_id',
-            google_sheets: 'sheet_id',
-            roleHierarchy: 'promote', // Special handling for roleHierarchy
-        };
         const keyColumn = getKeyColumnForTable(tableName);
-        const valueColumn = valueColumnMap[tableName];
+        if (!keyColumn) return false;
 
-        if (!keyColumn || !valueColumn) return false;
+        let rowData;
+        try {
+            rowData = JSON.parse(rowDataJson);
+        } catch (e) {
+            logger.error(`Invalid JSON provided for table ${tableName}:`, e.message);
+            return false;
+        }
+
+        // Ensure the primary key from the input field is included in the data object
+        rowData[keyColumn] = primaryKeyValue;
+
+        const columns = Object.keys(rowData);
+        const placeholders = columns.map(() => '?').join(', ');
+        const values = columns.map(col => {
+            const value = rowData[col];
+            // Stringify objects/arrays for JSON columns
+            return typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
+        });
+
+        const updateClause = columns
+            .filter(col => col !== keyColumn)
+            .map(col => `\`${col}\` = VALUES(\`${col}\`)`)
+            .join(', ');
 
         try {
-            let sql, params;
-            // Special handling for roleHierarchy which has a different structure
-            if (tableName === 'roleHierarchy') {
-                try {
-                    const parsedValue = JSON.parse(value);
-                    sql = `
-                        INSERT INTO \`roleHierarchy\` (\`roleName\`, \`promote\`, \`demote\`)
-                        VALUES (?, ?, ?)
-                        ON DUPLICATE KEY UPDATE \`promote\` = VALUES(\`promote\`), \`demote\` = VALUES(\`demote\`)`;
-                    params = [key, JSON.stringify(parsedValue.promote), JSON.stringify(parsedValue.demote)];
-                } catch (e) {
-                    logger.error('Invalid JSON provided for roleHierarchy value:', e);
-                    return false;
-                }
-            } else {
-                sql = `
-                    INSERT INTO \`${tableName}\` (\`${keyColumn}\`, \`${valueColumn}\`)
-                    VALUES (?, ?)
-                    ON DUPLICATE KEY UPDATE \`${valueColumn}\` = VALUES(\`${valueColumn}\`)`;
-                params = [key, value];
-            }
-            await db.query(sql, params);
+            const sql = `
+                INSERT INTO \`${tableName}\` (\`${columns.join('`, `')}\`)
+                VALUES (${placeholders})
+                ON DUPLICATE KEY UPDATE ${updateClause}`;
+
+            await db.query(sql, values);
             return true;
         } catch (error) {
             logger.error(`Failed to set value in table ${tableName}:`, error);

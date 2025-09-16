@@ -3,7 +3,6 @@ const crypto = require('crypto');
 const authManager = require('@helpers/authManager.js');
 const roleManager = require('@helpers/roleManager');
 const logger = require('@helpers/logger');
-const configManager = require('@helpers/configManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -31,15 +30,15 @@ module.exports = {
         }
 
         const subcommand = interaction.options.getSubcommand();
-        const config = configManager.get(); // Get fresh config for every execution
 
         if (subcommand === 'login') {
-            const ESI_CLIENT_ID = config.esiClientId;
-            const ESI_CALLBACK_URL = config.esiCallbackUrl;
-            const ESI_SCOPES = config.esiScopes;
+            // Read ESI configuration directly from environment variables
+            const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
+            const ESI_CALLBACK_URL = process.env.ESI_CALLBACK_URL;
+            const ESI_SCOPES = process.env.ESI_DEFAULT_SCOPES;
 
             if (!ESI_CLIENT_ID || !ESI_CALLBACK_URL || !ESI_SCOPES) {
-                logger.warn('ESI configuration is missing from the database. A user tried to run /auth login.');
+                logger.warn('ESI configuration is missing from the .env file. A user tried to run /auth login.');
                 return interaction.reply({
                     content: 'The bot has not been configured for ESI authentication. Please contact the bot administrator.',
                     flags: [MessageFlags.Ephemeral]
@@ -94,4 +93,3 @@ module.exports = {
         }
     },
 };
-
