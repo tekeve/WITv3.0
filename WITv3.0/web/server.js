@@ -24,12 +24,12 @@ function startServer(client) {
     app.set('views', path.join(__dirname, 'views'));
 
     // In-memory storage for active SRP tokens. For production, use a database or Redis.
-    const activeSrpTokens = new Map();
-    client.activeSrpTokens = activeSrpTokens; // Attach to client for access in commands
+    //const activeSrpTokens = new Map();
+    //client.activeSrpTokens = activeSrpTokens; // Attach to client for access in commands
 
     // Load and use the router, passing the client object
     app.use('/', authRoutes(client));
-    app.use('/', srpRoutes(client, activeSrpTokens));
+    app.use('/', srpRoutes(client, client.activeSrpTokens));
 
     // Optional: Add a simple root route for health checks
     app.get('/', (req, res) => {

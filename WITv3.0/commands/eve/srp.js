@@ -19,7 +19,7 @@ module.exports = {
         const EXPIRATION_MINUTES = 30;
         setTimeout(() => {
             if (interaction.client.activeSrpTokens.has(token)) {
-                console.log(`SRP Token ${token} for ${interaction.user.tag} has expired.`);
+                logger.warn(`SRP Token ${token} for ${interaction.user.tag} has expired.`);
                 interaction.client.activeSrpTokens.delete(token);
             }
         }, EXPIRATION_MINUTES * 60 * 1000); // Convert minutes to milliseconds

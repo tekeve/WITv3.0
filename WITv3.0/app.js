@@ -11,6 +11,8 @@ const incursionManager = require('@helpers/incursionManager');
 const db = require('@helpers/dbService');
 const { startServer } = require('./web/server.js');
 
+const roleHierarchyManager = require('@helpers/roleHierarchyManager');
+
 // ================================================================= //
 // ==================== DEPLOY COMMANDS SCRIPT ===================== //
 // ================================================================= //
@@ -78,12 +80,13 @@ async function initializeApp() {
     const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
     // In-memory stores
+    client.activeSrpTokens = new Map();
     client.esiStateMap = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null;
 
     // Start the ESI authentication callback server, passing the config
-    startServer(client, config);
+    startServer(client);
 
     // ================================================================= //
     // =================== COMMAND LOADING LOGIC ======================= //

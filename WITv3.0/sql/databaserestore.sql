@@ -49,6 +49,22 @@ CREATE TABLE IF NOT EXISTS `characters` (
   KEY `discord_id` (`discord_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
+-- Dumping structure for table wit-db.srp_history
+CREATE TABLE IF NOT EXISTS `srp_history` (
+	`id` INT(11) NOT NULL AUTO_INCREMENT,
+	`pilot_name` VARCHAR(255) NOT NULL,
+	`kill_report_link` VARCHAR(255) NULL DEFAULT NULL,
+	`fc_name` VARCHAR(255) NOT NULL,
+	`fc_status` VARCHAR(255) NOT NULL
+	`backseat_details` VARCHAR(255) NULL DEFAULT NULL,
+	`ship_type` VARCHAR(255) NOT NULL,
+	`srpable` VARCHAR(255) NOT NULL,
+	`srp_paid` VARCHAR(255) NOT NULL,
+	`loss_description` TEXT NOT NULL,
+	`loot_status` TEXT NOT NULL,
+	PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
 -- Dumping data for table wit-db.characters: ~3 rows (approximately)
 REPLACE INTO `characters` (`character_id`, `character_name`, `discord_id`, `is_main`) VALUES
 	(93220962, 'Bella Cadelanne', '368778318415265792', 1),

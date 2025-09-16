@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const charManager = require('@helpers/characterManager'); // Path updated
+const charManager = require('../helpers/characterManager'); // Path updated
 
 /**
  * Builds a Discord embed for an SRP request from web form data.
