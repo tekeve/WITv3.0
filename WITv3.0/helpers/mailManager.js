@@ -6,7 +6,7 @@ const authManager = require('@helpers/authManager');
 async function handleModal(interaction) {
     const { customId, client } = interaction;
 
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
 
     // Extract the unique mail ID from the modal's custom ID
     const mailId = customId.substring('sendmail_modal_'.length);
@@ -24,6 +24,10 @@ async function handleModal(interaction) {
 
     try {
         const accessToken = await authManager.getAccessToken(interaction.user.id);
+        if (!accessToken) {
+            return interaction.editReply({ content: 'Could not retrieve a valid access token. Please try to `/auth login` again.' });
+        }
+
         const recipientId = parseInt(mailData.mailingList, 10);
         if (isNaN(recipientId)) {
             return interaction.editReply({ content: 'Error: The mailing list ID must be a number.' });
@@ -35,7 +39,7 @@ async function handleModal(interaction) {
         };
 
         // Send the mail via ESI
-        await esi.post( // Updated to use esi
+        await esi.post(
             `/characters/${authData.character_id}/mail/`,
             {
                 approved_cost: 0,
@@ -44,10 +48,8 @@ async function handleModal(interaction) {
                 subject: mailData.subject,
             },
             {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                }
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
             }
         );
         await interaction.editReply({ content: 'EVE Mail has been sent successfully!' });
