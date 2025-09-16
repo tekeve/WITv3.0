@@ -111,7 +111,7 @@ async function initializeApp() {
     // ================================================================= //
     // ============ STATE MANAGEMENT & HELPER FUNCTIONS ================ //
     // ================================================================= //
-    const { updateIncursions } = require('@helpers/incursionUpdater.js');
+    const { updateIncursions } = require('@helpers/incursionController.js');
     client.updateIncursions = (options) => updateIncursions(client, options);
 
     // ================================================================= //
