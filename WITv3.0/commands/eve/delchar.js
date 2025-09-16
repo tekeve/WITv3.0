@@ -49,7 +49,7 @@ module.exports = {
             effectiveUser = interaction.user;
         }
 
-        await interaction.deferReply({  });
+        await interaction.deferReply();
 
         let result;
         if (subcommand === 'main') {
