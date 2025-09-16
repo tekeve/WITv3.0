@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { MessageFlags } = require('discord.js');
 const esi = require('@helpers/esiService'); // Use the new ESI service
 const logger = require('@helpers/logger');
 const authManager = require('@helpers/authManager');
@@ -6,7 +7,7 @@ const authManager = require('@helpers/authManager');
 async function handleModal(interaction) {
     const { customId, client } = interaction;
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
     // Extract the unique mail ID from the modal's custom ID
     const mailId = customId.substring('sendmail_modal_'.length);
