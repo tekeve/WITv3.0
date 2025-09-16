@@ -22,7 +22,7 @@ module.exports = {
             return interaction.editReply({ content: `No registered users found with the role **${targetRole.name}**.` });
         }
 
-        const charList = users.map(user => `• ${user.main_character_name}`).join('\n');
+        const charList = users.map(user => `- ${user.main_character_name}`).join('\n');
 
         const embed = new EmbedBuilder()
             .setColor(targetRole.color)

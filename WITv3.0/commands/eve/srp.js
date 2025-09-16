@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { v4: uuidv4 } = require('uuid');
 
 module.exports = {
@@ -44,7 +44,7 @@ module.exports = {
                     ]
                 }
             ],
-            ephemeral: true // So only the user who ran the command can see it
+            flags: [MessageFlags.Ephemeral]
         });
     },
 };

@@ -1,4 +1,4 @@
-﻿const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+﻿const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
@@ -40,6 +40,9 @@ module.exports = {
             .setDescription(commandList || 'You do not have permission to use any commands.')
             .setTimestamp();
 
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({
+            embeds: [embed],
+            flags: [MessageFlags.Ephemeral]
+        });
     },
 };

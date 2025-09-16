@@ -58,7 +58,7 @@ module.exports = {
             return interaction.reply({ content: 'Could not find that user in the server.', flags: [MessageFlags.Ephemeral] });
         }
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply();
 
         let result;
         if (subcommand === 'main') {
