@@ -4,6 +4,7 @@ const requestManager = require('@helpers/requestManager');
 const mailManager = require('@helpers/mailManager');
 const configInteractionManager = require('@helpers/configInteractionManager');
 const roleManager = require('@helpers/roleManager');
+const auditLogger = require('@helpers/auditLogger');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -12,7 +13,11 @@ module.exports = {
             if (interaction.isChatInputCommand()) {
                 const command = client.commands.get(interaction.commandName);
                 if (!command) return;
-                // DYNAMIC PERMISSION CHECK
+
+                // Log the command usage
+                await auditLogger.logCommand(interaction);
+
+                // Dynamic Permissions Check
                 const permissionChecks = {
                     admin: roleManager.isAdmin,
                     council: roleManager.isCouncilOrAdmin,

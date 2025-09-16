@@ -2,6 +2,7 @@ const { MessageFlags } = require('discord.js');
 const configManager = require('@helpers/configManager');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 const logger = require('@helpers/logger');
+const auditLogger = require('@helpers/auditLogger');
 
 /**
  * Finds a role in a guild by its ID.
@@ -98,6 +99,11 @@ async function manageRoles(interaction, action) {
         if (removedRoles.length > 0) replyMessage += `> **Removed:** ${removedRoles.join(', ')}\n`;
         if (addedRoles.length === 0 && removedRoles.length === 0) {
             replyMessage = `No role changes were necessary for ${targetUser.tag}.`;
+        }
+
+        // Log the audit event if any roles were changed.
+        if (addedRoles.length > 0 || removedRoles.length > 0) {
+            await auditLogger.logRoleChange(interaction, targetUser, action, addedRoles, removedRoles);
         }
 
         await interaction.editReply({ content: replyMessage });
