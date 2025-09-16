@@ -4,6 +4,7 @@ const statusManager = require('@helpers/statusManager'); // Import the new manag
 const logger = require('@helpers/logger');
 
 module.exports = {
+    permission: 'admin',
     data: new SlashCommandBuilder()
         .setName('setstatus')
         .setDescription('Manage the bot\'s custom status (Admin Only).')
@@ -47,12 +48,6 @@ module.exports = {
         ),
 
     async execute(interaction) {
-        if (!roleManager.isAdmin(interaction.member)) {
-            return interaction.reply({
-                content: 'You do not have the required role to use this command.',
-                flags: [MessageFlags.Ephemeral]
-            });
-        }
 
         const subcommand = interaction.options.getSubcommand();
 

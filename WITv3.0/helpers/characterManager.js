@@ -1,6 +1,6 @@
-const db = require('./dbService');
-const logger = require('./logger');
-const esiService = require('./esiService');
+const db = require('@helpers/database');
+const logger = require('@helpers/logger');
+const esiService = require('@helpers/esiService');
 
 /**
  * Fetches character details from ESI using the correct endpoint.

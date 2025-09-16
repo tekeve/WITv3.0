@@ -1,5 +1,5 @@
 const logger = require('@helpers/logger');
-const db = require('@helpers/dbService');
+const db = require('@helpers/database');
 
 /**
  * Renders the SRP form if the token is valid.

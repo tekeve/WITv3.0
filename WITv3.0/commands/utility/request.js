@@ -1,10 +1,10 @@
 ﻿const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
-const roleManager = require('@helpers/roleManager');
 const configManager = require('@helpers/configManager'); // Import config manager
 const logger = require('@helpers/logger');
 
 module.exports = {
+    permission: 'commander',
     data: new SlashCommandBuilder()
         .setName('request')
         .setDescription('Submit a request ticket.')
@@ -14,13 +14,6 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        // Use the centralized permission check
-        if (!roleManager.isCommanderOrAdmin(interaction.member)) {
-            return interaction.reply({
-                content: 'You do not have the required role to use this command.',
-                flags: [MessageFlags.Ephemeral]
-            });
-        }
 
         const config = configManager.get(); // Get latest config
         const requestChannelId = config.requestChannelId;

@@ -1,5 +1,5 @@
-const db = require('@helpers/dbService');
-const logger = require('./logger');
+const db = require('@helpers/database');
+const logger = require('@helpers/logger');
 
 let config = null; // In-memory cache for the config
 
@@ -24,7 +24,7 @@ async function loadConfig() {
             }
         }
 
-        config = newConfig; // Atomically update the config cache
+        config = newConfig; // Automically update the config cache
         logger.success('Configuration loaded/reloaded from the database.');
 
     } catch (error) {

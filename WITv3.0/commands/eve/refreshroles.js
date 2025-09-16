@@ -4,15 +4,12 @@ const roleManager = require('@helpers/roleManager');
 const logger = require('@helpers/logger');
 
 module.exports = {
+    permission: 'admin',
     data: new SlashCommandBuilder()
         .setName('refreshroles')
         .setDescription('Syncs the roles of all registered users from Discord to the database. (Admin Only)'),
 
     async execute(interaction) {
-        // Corrected the permission check to use the centralized roleManager.
-        if (!roleManager.isAdmin(interaction.member)) {
-            return interaction.reply({ content: 'You do not have permission to use this command.'});
-        }
 
         await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 

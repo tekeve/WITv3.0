@@ -1,18 +1,15 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, MessageFlags } = require('discord.js');
-const roleManager = require('@helpers/roleManager');
-const databaseManager = require('@helpers/databaseManager');
+const tableManager = require('@helpers/managers/tableManager');
 
 module.exports = {
+    permission: 'admin',
     data: new SlashCommandBuilder()
         .setName('config')
         .setDescription('Manage bot configuration tables using an interactive menu.'),
 
     async execute(interaction) {
-        if (!roleManager.isAdmin(interaction.member)) {
-            return interaction.reply({ content: 'You do not have permission to use this command.', flags: [MessageFlags.Ephemeral] });
-        }
 
-        const tableChoices = databaseManager.editableTables.map(table => {
+        const tableChoices = tableManager.editableTables.map(table => {
             let label = table.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             if (table === 'roleHierarchy') label = 'Role Hierarchy'; // Specific label
             return { label, value: table };

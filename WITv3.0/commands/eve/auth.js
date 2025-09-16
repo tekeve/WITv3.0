@@ -5,6 +5,7 @@ const roleManager = require('@helpers/roleManager');
 const logger = require('@helpers/logger');
 
 module.exports = {
+    permission: 'auth',
     data: new SlashCommandBuilder()
         .setName('auth')
         .setDescription('Authenticate your EVE Online character with the bot.')
@@ -22,13 +23,6 @@ module.exports = {
                 .setDescription('De-authorize your character and remove your token.')),
 
     async execute(interaction) {
-        if (!roleManager.canAuth(interaction.member)) {
-            return interaction.reply({
-                content: 'You do not have the required role to use this command.',
-                flags: [MessageFlags.Ephemeral]
-            });
-        }
-
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'login') {

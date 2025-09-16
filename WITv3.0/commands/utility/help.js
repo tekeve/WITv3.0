@@ -2,6 +2,10 @@
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
+    // Each command should export a 'permission' property.
+    // This allows the help command and interaction handler to check permissions dynamically.
+    // Possible values: 'admin', 'council', 'commander', 'auth', 'public'
+    permission: 'public',
     data: new SlashCommandBuilder()
         .setName('help')
         .setDescription('Lists all available commands you have permission to use.'),
@@ -10,38 +14,21 @@ module.exports = {
         const member = interaction.member;
         const commands = interaction.client.commands;
 
-        // Centralized permission checks from roleManager
-        const isAdmin = roleManager.isAdmin(member);
-        const isCouncil = roleManager.isCouncil(member);
-        const isCommander = roleManager.isCommander(member);
-        const canAuth = roleManager.canAuth(member);
-
-        // Define which commands fall into which permission groups
-        // This structure makes it easy to see who can run what.
-        const commandPermissions = {
-            'promote': isAdmin,
-            'demote': isAdmin,
-            'setstatus': isAdmin,
-            'refreshroles': isAdmin,
-            'sheet': isAdmin,
-            'doc': isAdmin,
-            'sendmail': isAdmin,
-            'maillists': isAdmin,
-            'config': isAdmin,
-            'incursion': isAdmin || isCouncil,
-            'inrole': isAdmin || isCommander,
-            'addchar': isAdmin || isCommander,
-            'delchar': isAdmin || isCommander,
-            'getchar': isAdmin || isCommander,
-            'srp': isAdmin || isCommander,
-            'request': isAdmin || isCommander,
-            'auth': canAuth,
-            'ping': true, // Everyone can use ping
-            'help': true,  // Everyone can use help
+        // An object mapping permission levels to checking functions from roleManager
+        const permissionChecks = {
+            admin: roleManager.isAdmin,
+            council: roleManager.isCouncilOrAdmin, // Council can do their own things + admin things
+            commander: roleManager.isCommanderOrAdmin, // Commanders can do their own things + admin things
+            auth: roleManager.canAuth,
+            public: () => true, // Everyone can use public commands
         };
 
-        // Filter commands based on the user's permissions
-        const availableCommands = commands.filter(command => commandPermissions[command.data.name]);
+        const availableCommands = commands.filter(command => {
+            // Default to 'admin' permission if not specified on the command file
+            const requiredPermission = command.permission || 'admin';
+            const hasPermission = permissionChecks[requiredPermission];
+            return hasPermission ? hasPermission(member) : false;
+        });
 
         const commandList = availableCommands.map(command => {
             return `**/${command.data.name}**: ${command.data.description}`;
@@ -53,6 +40,6 @@ module.exports = {
             .setDescription(commandList || 'You do not have permission to use any commands.')
             .setTimestamp();
 
-        await interaction.reply({ embeds: [embed]});
+        await interaction.reply({ embeds: [embed], ephemeral: true });
     },
 };

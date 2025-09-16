@@ -35,6 +35,7 @@ function parseTimestring(timestring) {
 
 
 module.exports = {
+    permission: 'admin',
     data: new SlashCommandBuilder()
         .setName('incursion')
         .setDescription('Manage and view EVE Online Incursion information.')
@@ -94,12 +95,6 @@ module.exports = {
     },
 
     async execute(interaction) {
-        if (!roleManager.isAdmin(interaction.member)) {
-            return interaction.reply({
-                content: 'You do not have permission to use this command.',
-            });
-        }
-
         const subcommand = interaction.options.getSubcommand();
         await interaction.deferReply();
 

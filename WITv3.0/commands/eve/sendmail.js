@@ -4,6 +4,7 @@ const roleManager = require('@helpers/roleManager');
 const crypto = require('crypto');
 
 module.exports = {
+    permission: 'admin',
     data: new SlashCommandBuilder()
         .setName('sendmail')
         .setDescription('Send an in-game EVE Mail via an authenticated character.')
@@ -17,13 +18,6 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        // Use the centralized permission check
-        if (!roleManager.isAdmin(interaction.member)) {
-            return interaction.reply({
-                content: 'You do not have the required role to use this command.',
-            });
-        }
-
         // Auth Check
         const authData = await authManager.getUserAuthData(interaction.user.id);
         if (!authData) {

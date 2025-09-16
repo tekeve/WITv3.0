@@ -3,19 +3,13 @@ const charManager = require('@helpers/characterManager');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
+    permission: 'commander',
     data: new SlashCommandBuilder()
         .setName('getchar')
         .setDescription('Displays registered characters.')
         .addUserOption(option => option.setName('user').setDescription('The Discord user to get characters for (defaults to you).')),
 
     async execute(interaction) {
-        if (!roleManager.isCommanderOrAdmin(interaction.member)) {
-            return interaction.reply({
-                content: 'You do not have the required role to use this command.',
-                flags: [MessageFlags.Ephemeral]
-            });
-        }
-
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 

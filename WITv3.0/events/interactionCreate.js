@@ -3,6 +3,7 @@ const logger = require('@helpers/logger');
 const requestManager = require('@helpers/requestManager');
 const mailManager = require('@helpers/mailManager');
 const configInteractionManager = require('@helpers/configInteractionManager');
+const roleManager = require('@helpers/roleManager');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -11,6 +12,25 @@ module.exports = {
             if (interaction.isChatInputCommand()) {
                 const command = client.commands.get(interaction.commandName);
                 if (!command) return;
+                // DYNAMIC PERMISSION CHECK
+                const permissionChecks = {
+                    admin: roleManager.isAdmin,
+                    council: roleManager.isCouncilOrAdmin,
+                    commander: roleManager.isCommanderOrAdmin,
+                    auth: roleManager.canAuth,
+                    public: () => true,
+                };
+
+                const requiredPermission = command.permission || 'admin';
+                const hasPermission = permissionChecks[requiredPermission];
+
+                if (!hasPermission || !hasPermission(interaction.member)) {
+                    return interaction.reply({
+                        content: 'You do not have the required permission to use this command.',
+                        flags: [MessageFlags.Ephemeral]
+                    });
+                }
+
                 await command.execute(interaction);
             }
             else if (interaction.isAutocomplete()) {
@@ -47,9 +67,7 @@ module.exports = {
                 } else if (customId.startsWith('sendmail_modal_')) {
                     await mailManager.handleModal(interaction);
                 } else if (customId.startsWith('config_modal_')) {
-                    const [, , action, tableName, ...keyParts] = customId.split('_');
-                    const key = keyParts.join('_'); // Rejoin key in case it contains underscores
-                    await configInteractionManager.handleModalSubmit(interaction, action, tableName, key || null);
+                    await configInteractionManager.handleInteraction(interaction);
                 }
             }
         } catch (error) {

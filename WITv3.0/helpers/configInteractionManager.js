@@ -1,5 +1,5 @@
 ﻿const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder, MessageFlags } = require('discord.js');
-const databaseManager = require('@helpers/databaseManager');
+const tableManager = require('@helpers/managers/tableManager');
 const configManager = require('@helpers/configManager');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 const logger = require('@helpers/logger');
@@ -87,7 +87,7 @@ async function handleActionButton(interaction, action, tableName) {
         await interaction.showModal(modal);
 
     } else if (action === 'remove') {
-        const keys = await databaseManager.getKeys(tableName);
+        const keys = await tableManager.getKeys(tableName);
 
         if (!keys || keys.length === 0) {
             return interaction.reply({
@@ -160,7 +160,7 @@ async function handleModalSubmit(interaction, action, tableName) {
     const primaryKeyValue = interaction.fields.getTextInputValue('key');
     const rowDataJson = interaction.fields.getTextInputValue('value');
 
-    const success = await databaseManager.setValue(tableName, primaryKeyValue, rowDataJson);
+    const success = await tableManager.setValue(tableName, primaryKeyValue, rowDataJson);
 
     if (success) {
         if (tableName === 'config') await configManager.reloadConfig();

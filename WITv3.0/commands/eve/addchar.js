@@ -3,6 +3,10 @@ const charManager = require('@helpers/characterManager');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
+    // ADD THIS PROPERTY TO ALL COMMAND FILES
+    // This makes permissions self-documenting and readable by other parts of the bot.
+    permission: 'commander', // Can be 'admin', 'council', 'commander', 'auth', or 'public'
+
     data: new SlashCommandBuilder()
         .setName('addchar')
         .setDescription('Add a character to a profile.')
@@ -30,7 +34,6 @@ module.exports = {
         let effectiveMember;
 
         if (targetUserOption) {
-            // If a target is specified, you must have council/admin roles.
             if (!roleManager.isCouncilOrAdmin(interaction.member)) {
                 return interaction.reply({
                     content: 'You do not have the required role to manage characters for other users.',
@@ -40,7 +43,7 @@ module.exports = {
             effectiveUser = targetUserOption;
             effectiveMember = await interaction.guild.members.fetch(targetUserOption.id).catch(() => null);
         } else {
-            // If no target, it's a self-add; requires commander/admin roles.
+            // This command is for commanders to manage their own alts, or admins to manage anyone.
             if (!roleManager.isCommanderOrAdmin(interaction.member)) {
                 return interaction.reply({
                     content: 'You do not have the required role to use this command.',
@@ -55,7 +58,7 @@ module.exports = {
             return interaction.reply({ content: 'Could not find that user in the server.', flags: [MessageFlags.Ephemeral] });
         }
 
-        await interaction.deferReply({  });
+        await interaction.deferReply({ ephemeral: true });
 
         let result;
         if (subcommand === 'main') {

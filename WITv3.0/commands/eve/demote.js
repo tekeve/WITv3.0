@@ -3,6 +3,7 @@ const roleManager = require('@helpers/roleManager');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 
 module.exports = {
+    permission: 'admin',
     data: new SlashCommandBuilder()
         .setName('demote')
         .setDescription('Demotes a user or removes all their roles.')

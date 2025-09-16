@@ -1,4 +1,4 @@
-const db = require('@helpers/dbService');
+const db = require('@helpers/database');
 const logger = require('@helpers/logger');
 
 let hierarchyCache = null;

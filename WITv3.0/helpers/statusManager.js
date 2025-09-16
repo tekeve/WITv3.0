@@ -1,6 +1,6 @@
 const { ActivityType } = require('discord.js');
-const db = require('./dbService');
-const logger = require('./logger');
+const db = require('@helpers/database');
+const logger = require('@helpers/logger');
 
 // Store the timeout ID in a variable to manage it
 let expiryTimeout = null;

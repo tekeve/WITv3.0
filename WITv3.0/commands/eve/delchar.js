@@ -3,6 +3,7 @@ const charManager = require('@helpers/characterManager');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
+    permission: 'commander',
     data: new SlashCommandBuilder()
         .setName('delchar')
         .setDescription('Delete a character from a profile.')

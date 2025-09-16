@@ -1,5 +1,5 @@
-const db = require('./dbService');
-const logger = require('./logger');
+const db = require('@helpers/database');
+const logger = require('@helpers/logger');
 
 let incursionSystems = null;
 

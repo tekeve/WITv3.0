@@ -2,10 +2,10 @@ const { SlashCommandBuilder } = require('discord.js');
 const { getSheetsService } = require('@helpers/googleAuth.js');
 const configManager = require('@helpers/configManager');
 const logger = require('@helpers/logger');
-const roleManager = require('@helpers/roleManager');
-const databaseManager = require('@helpers/databaseManager'); // Import the new manager
+const tableManager = require('@helpers/managers/tableManager');
 
 module.exports = {
+    permission: 'admin',
     data: new SlashCommandBuilder()
         .setName('sheet')
         .setDescription('Interact with Google Sheets (Admin Only)')
@@ -41,15 +41,11 @@ module.exports = {
     async autocomplete(interaction) {
         const focusedValue = interaction.options.getFocused();
         // Use our database manager to get suggestions from the 'google_sheets' table
-        const choices = await databaseManager.getKeys('google_sheets', focusedValue);
+        const choices = await tableManager.getKeys('google_sheets', focusedValue);
         await interaction.respond(choices.slice(0, 25));
     },
 
     async execute(interaction) {
-        if (!roleManager.isAdmin(interaction.member)) {
-            return interaction.reply({ content: 'You do not have permission to use this command.' });
-        }
-
         await interaction.deferReply();
 
         try {

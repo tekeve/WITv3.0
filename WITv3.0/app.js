@@ -8,7 +8,7 @@ require('dotenv').config();
 
 const configManager = require('@helpers/configManager');
 const incursionManager = require('@helpers/incursionManager');
-const db = require('@helpers/dbService');
+const db = require('@helpers/database');
 const { startServer } = require('./web/server.js');
 
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
@@ -74,7 +74,6 @@ async function initializeApp() {
     await configManager.reloadConfig();
     const config = configManager.get(); // Get config once for startup
     await incursionManager.loadIncursionSystems();
-    // FIX: Changed loadHierarchy to reloadHierarchy, which is correctly exported.
     await roleHierarchyManager.reloadHierarchy(); // Load the role hierarchy
 
     const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -101,10 +100,10 @@ async function initializeApp() {
         for (const file of commandFiles) {
             const filePath = path.join(commandsPath, file);
             const command = require(filePath);
-            if ('data' in command && ('execute' in command || 'autocomplete' in command)) {
+            if ('data' in command && ('execute' in command || 'autocomplete' in command) && 'permission' in command) {
                 client.commands.set(command.data.name, command);
             } else {
-                logger.warn(`The command at ${filePath} is missing a required property.`);
+                logger.warn(`The command at ${filePath} is missing a required "data", "execute", "autocomplete", or "permission" property.`);
             }
         }
     }

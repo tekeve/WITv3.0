@@ -1,4 +1,4 @@
-const db = require('@helpers/dbService');
+const db = require('@helpers/database'); // Use the new database service
 const logger = require('@helpers/logger');
 
 // A safelist of tables that the /config command is allowed to edit.
@@ -48,7 +48,6 @@ function getKeyColumnForTable(tableName) {
 }
 
 module.exports = {
-    // Expose the list of editable tables for the command builder
     editableTables,
 
     /**
@@ -63,22 +62,10 @@ module.exports = {
         if (!keyColumn) return [];
 
         try {
-            // Use backticks to safely include the table and column names in the query
             const sql = `SELECT \`${keyColumn}\` FROM \`${tableName}\` WHERE \`${keyColumn}\` LIKE ? LIMIT 25`;
             const rows = await db.query(sql, [`%${filter}%`]);
-
-            const mappedRows = rows.map(row => ({
-                name: row[keyColumn],
-                value: row[keyColumn],
-            }));
-
-            // **FIX**: Add a filter to ensure we only return valid entries.
-            // This prevents crashes if a key in the database is unexpectedly NULL or invalid,
-            // which would cause an error when trying to read its `length` property.
-            const validRows = mappedRows.filter(row => row.name && typeof row.name === 'string');
-
-            return validRows;
-
+            const validRows = rows.filter(row => row[keyColumn] && typeof row[keyColumn] === 'string');
+            return validRows.map(row => ({ name: row[keyColumn], value: row[keyColumn] }));
         } catch (error) {
             logger.error(`Failed to get keys from table ${tableName}:`, error);
             return [];
@@ -87,7 +74,6 @@ module.exports = {
 
     /**
      * Sets (inserts or updates) a value in a specified table.
-     * This now supports simple key-value tables and complex multi-column tables via JSON.
      * @param {string} tableName - The name of the table to modify.
      * @param {string} primaryKeyValue - The value of the primary key for the row to modify.
      * @param {string} rowDataJson - The full row data as a JSON string.
@@ -106,14 +92,11 @@ module.exports = {
             return false;
         }
 
-        // Ensure the primary key from the input field is included in the data object
         rowData[keyColumn] = primaryKeyValue;
 
         const columns = Object.keys(rowData);
-        const placeholders = columns.map(() => '?').join(', ');
         const values = columns.map(col => {
             const value = rowData[col];
-            // Stringify objects/arrays for JSON columns
             return typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
         });
 
@@ -125,7 +108,7 @@ module.exports = {
         try {
             const sql = `
                 INSERT INTO \`${tableName}\` (\`${columns.join('`, `')}\`)
-                VALUES (${placeholders})
+                VALUES (${columns.map(() => '?').join(', ')})
                 ON DUPLICATE KEY UPDATE ${updateClause}`;
 
             await db.query(sql, values);
@@ -157,4 +140,3 @@ module.exports = {
         }
     },
 };
-

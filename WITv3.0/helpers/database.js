@@ -9,55 +9,57 @@ const dbConfig = {
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
-    multipleStatements: true, // Keep this for setup
+    multipleStatements: true,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
 };
 
-// Create a connection pool instead of a single connection
+// Create a connection pool
 const pool = mysql.createPool(dbConfig);
 
 /**
- * Checks if the database connection is valid by running a simple query.
- * @returns {Promise<boolean>} - True if the connection is successful, false otherwise.
+ * Checks if the database connection is valid.
+ * @returns {Promise<boolean>}
  */
 async function ensureDatabaseExistsAndConnected() {
     try {
-        await pool.query('SELECT 1 + 1 AS solution');
+        await pool.query('SELECT 1');
         logger.success('Database connection successful!');
         return true;
     } catch (error) {
-        // We don't need to log the full error here, as a simple failure message is enough.
-        // The setup instructions will guide the user.
         return false;
     }
 }
 
-// Public function to execute a query from the pool
+/**
+ * Executes a SQL query.
+ * @param {string} sql The SQL query string.
+ * @param {Array} [args] The arguments for the query.
+ * @returns {Promise<any>}
+ */
 async function query(sql, args) {
     try {
         const [rows] = await pool.execute(sql, args);
         return rows;
     } catch (error) {
         logger.error(`Database query failed: ${error.message}`);
-        throw error; // Re-throw the error to be caught by the caller
+        throw error;
     }
 }
 
-// New function to handle database setup from an SQL file
+/**
+ * Runs the initial database setup from the .sql file.
+ */
 async function runSetup() {
     logger.info('Starting database setup...');
-
     try {
         const sqlFilePath = path.join(process.cwd(), './sql/database.sql');
         const sqlScript = fs.readFileSync(sqlFilePath, 'utf8');
         const statements = sqlScript.split(';').filter(statement => statement.trim() !== '');
-        logger.info(`Found ${statements.length} SQL statements to execute.`);
 
-        for (const [index, statement] of statements.entries()) {
+        for (const statement of statements) {
             if (statement) {
-                logger.info(`Executing statement ${index + 1}/${statements.length}...`);
                 await pool.query(statement);
             }
         }
@@ -66,12 +68,7 @@ async function runSetup() {
         logger.error('Failed to run database setup script:', error);
         throw error;
     }
-
-    // The old migration logic has been removed as it is now obsolete.
-    // All configuration should be managed via the /config command.
-    logger.info('Database setup is complete. Please use the /config command to manage bot settings.');
 }
-
 
 module.exports = {
     query,

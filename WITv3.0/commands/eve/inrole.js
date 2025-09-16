@@ -3,6 +3,7 @@ const charManager = require('@helpers/characterManager');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
+    permission: 'commander',
     data: new SlashCommandBuilder()
         .setName('inrole')
         .setDescription('Lists the main characters of users with a specific Discord role.')
@@ -12,13 +13,6 @@ module.exports = {
                 .setRequired(true)),
 
     async execute(interaction) {
-        if (!roleManager.isCommanderOrAdmin(interaction.member)) {
-            return interaction.reply({
-                content: 'You do not have the required role to use this command.',
-                flags: [MessageFlags.Ephemeral]
-            });
-        }
-
         const targetRole = interaction.options.getRole('role');
         await interaction.deferReply();
 

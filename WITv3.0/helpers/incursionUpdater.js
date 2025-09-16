@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const logger = require('@helpers/logger');
-const db = require('@helpers/dbService');
+const db = require('@helpers/database');
 const configManager = require('@helpers/configManager');
 const incursionManager = require('@helpers/incursionManager');
 const esiService = require('@helpers/esiService');

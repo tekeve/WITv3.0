@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('discord.js');
 const { v4: uuidv4 } = require('uuid');
 
 module.exports = {
+    permission: 'commander',
     data: new SlashCommandBuilder()
         .setName('srp')
         .setDescription('Generates a unique link to file a Ship Replacement Program (SRP) request.'),

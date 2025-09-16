@@ -1,6 +1,6 @@
 const axios = require('axios');
 const logger = require('@helpers/logger');
-const db = require('@helpers/dbService');
+const db = require('@helpers/database');
 
 /**
  * Saves a new or updated authentication entry for a user.
