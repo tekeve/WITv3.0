@@ -3,7 +3,7 @@ const roleManager = require('@helpers/roleManager');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 
 module.exports = {
-    permission: 'admin',
+    permission: 'council',
     data: new SlashCommandBuilder()
         .setName('promote')
         .setDescription('Promotes a user to a specified rank.')

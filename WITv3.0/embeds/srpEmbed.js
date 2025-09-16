@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const charManager = require('../helpers/characterManager'); // Path updated
+const charManager = require('@helpers/characterManager'); // Path updated
 
 /**
  * Builds a Discord embed for an SRP request from web form data.
@@ -13,7 +13,11 @@ async function buildSrpEmbed(payload) {
 
     // Determine who submitted the request
     const submitterCharData = await charManager.getChars(user.id);
-    const submitterName = submitterCharData ? submitterCharData.main_character : user.tag;
+    
+    // --- START FIX ---
+    // Safely access the character name using optional chaining and provide a fallback.
+    const submitterName = submitterCharData?.main?.character_name || user.tag;
+    // --- END FIX ---
 
     // --- MODIFIED SECTION START ---
     // Format the killmail data into a full in-game link format.

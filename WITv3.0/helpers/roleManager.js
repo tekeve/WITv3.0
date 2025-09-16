@@ -3,6 +3,7 @@ const configManager = require('@helpers/configManager');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 const logger = require('@helpers/logger');
 const auditLogger = require('@helpers/auditLogger');
+const { buildPromotionEmbed } = require('@embeds/promoteEmbed');
 
 /**
  * Finds a role in a guild by its ID.
@@ -20,21 +21,54 @@ const findRoleById = (guild, roleId) => {
  * @param {'promote' | 'demote'} action - The action to perform.
  */
 async function manageRoles(interaction, action) {
-    // Centralized permission check
-    if (!isAdmin(interaction.member)) {
-        return interaction.reply({
-            content: 'You do not have permission to use this command.',
-            flags: [MessageFlags.Ephemeral]
-        });
-    }
-
-    await interaction.deferReply({  });
-
-    // Extract options directly from the command interaction
     const targetUser = interaction.options.getUser('user');
     const targetRankName = interaction.options.getString('rank');
+    let dmSendFailed = false; // Flag to track DM status
+
+    // New permission check logic
+    const isLeadershipAction = targetRankName.toLowerCase() === 'leadership';
+    // The "Remove All Roles" option is specific to the demote command.
+    const isRemoveAllAction = action === 'demote' && targetRankName === 'Remove All Roles';
+
+    if (isLeadershipAction || isRemoveAllAction) {
+        // Admin is required for leadership changes or removing all roles
+        if (!isAdmin(interaction.member)) {
+            return interaction.reply({
+                content: 'You must be an Admin to manage the Leadership rank or remove all roles.',
+                flags: [MessageFlags.Ephemeral]
+            });
+        }
+    } else {
+        // Council is sufficient for all other promotions/demotions
+        if (!isCouncilOrAdmin(interaction.member)) {
+            return interaction.reply({
+                content: 'You must have the Council role to use this command.',
+                flags: [MessageFlags.Ephemeral]
+            });
+        }
+    }
+
+    await interaction.deferReply({});
+
     const member = await interaction.guild.members.fetch(targetUser.id);
     const hierarchy = await roleHierarchyManager.get();
+    const config = configManager.get();
+
+    // --- Send DM on Promotion ---
+    if (action === 'promote') {
+        const promotionDMs = config.promotionDMs || {};
+        const dmData = promotionDMs[targetRankName];
+
+        if (dmData && dmData.channelId && dmData.message) {
+            const promotionEmbed = buildPromotionEmbed(targetRankName, dmData);
+            try {
+                await targetUser.send({ embeds: [promotionEmbed] });
+            } catch (dmError) {
+                logger.warn(`Could not send promotion DM to ${targetUser.tag}. They may have DMs disabled.`);
+                dmSendFailed = true;
+            }
+        }
+    }
 
     // Handle the special "Remove All" case for demotion
     if (action === 'demote' && targetRankName === 'Remove All Roles') {
@@ -99,6 +133,11 @@ async function manageRoles(interaction, action) {
         if (removedRoles.length > 0) replyMessage += `> **Removed:** ${removedRoles.join(', ')}\n`;
         if (addedRoles.length === 0 && removedRoles.length === 0) {
             replyMessage = `No role changes were necessary for ${targetUser.tag}.`;
+        }
+
+        // Add the DM failure note to the reply if needed.
+        if (dmSendFailed) {
+            replyMessage += `\n*(Note: Could not send a confirmation DM to the user.)*`;
         }
 
         // Log the audit event if any roles were changed.
