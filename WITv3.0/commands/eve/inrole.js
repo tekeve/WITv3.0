@@ -6,7 +6,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('inrole')
         .setDescription('Lists the main characters of users with a specific Discord role.')
-        .addRoleOption(option =>
+        .addRoleOption(option => // FIX: Changed from addStringOption to addRoleOption
             option.setName('role')
                 .setDescription('The Discord role to look up')
                 .setRequired(true)),

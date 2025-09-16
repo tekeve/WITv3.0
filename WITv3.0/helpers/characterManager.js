@@ -3,35 +3,30 @@ const logger = require('./logger');
 const esiService = require('./esiService');
 
 /**
- * Fetches character details from ESI.
+ * Fetches character details from ESI using the correct endpoint.
  * @param {string} characterName - The name of the character to look up.
  * @returns {Promise<{character_id: number, character_name: string}|null>}
  */
 async function getCharacterDetails(characterName) {
     try {
-        const searchResponse = await esiService.get('/search/', {
-            categories: 'character',
-            search: characterName,
-            strict: true
-        });
+        // Using the POST /universe/ids endpoint is more direct for resolving names.
+        // The body of the request should be an array of names.
+        const idResponse = await esiService.post('/universe/ids/', [characterName]);
 
-        if (!searchResponse || !searchResponse.character || searchResponse.character.length === 0) {
+        // Check if the response includes a 'characters' array and if it's not empty
+        if (!idResponse || !idResponse.characters || idResponse.characters.length === 0) {
             return null;
         }
 
-        const characterId = searchResponse.character[0];
-        const characterResponse = await esiService.get(`/characters/${characterId}/`);
-
-        if (!characterResponse) {
-            return null;
-        }
+        const characterData = idResponse.characters[0];
 
         return {
-            character_id: characterId,
-            character_name: characterResponse.name
+            character_id: characterData.id,
+            character_name: characterData.name
         };
     } catch (error) {
-        logger.error(`Failed to get character details for ${characterName}:`, error);
+        // Log the detailed error, but return null so the command can give a clean "character not found" message.
+        logger.error(`Failed to get character details for ${characterName}:`, error.message);
         return null;
     }
 }
@@ -219,4 +214,6 @@ module.exports = {
         return await db.query(sql);
     },
 };
+
+
 

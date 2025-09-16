@@ -1,7 +1,6 @@
 const axios = require('axios');
 const logger = require('@helpers/logger');
 const db = require('@helpers/dbService');
-const configManager = require('@helpers/configManager');
 
 /**
  * Saves a new or updated authentication entry for a user.
@@ -73,12 +72,12 @@ async function removeUser(discordId) {
  * @returns {Promise<string|null>} The valid access token or null if unavailable.
  */
 async function getAccessToken(discordId) {
-    const config = configManager.get();
-    const ESI_CLIENT_ID = config.esiClientId;
-    const ESI_SECRET_KEY = config.esiSecretKey;
+    // Read ESI credentials directly from environment variables
+    const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
+    const ESI_SECRET_KEY = process.env.ESI_SECRET_KEY;
 
     if (!ESI_CLIENT_ID || !ESI_SECRET_KEY) {
-        logger.error('ESI credentials not found in database config. Cannot refresh token.');
+        logger.error('ESI_CLIENT_ID or ESI_SECRET_KEY not found in .env file. Cannot refresh token.');
         return null;
     }
 
@@ -146,4 +145,3 @@ module.exports = {
     removeUser,
     getAccessToken,
 };
-
