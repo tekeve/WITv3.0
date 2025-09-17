@@ -5,6 +5,7 @@
   "main": "app.js",
   "scripts": {
     "dev": "nodemon app.js --loud",
+    "deploy": "node app.js --deploy",
     "verbose": "nodemon app.js --verbose",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

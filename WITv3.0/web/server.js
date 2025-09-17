@@ -6,6 +6,7 @@ require('dotenv').config();
 // Import the router factory function from its new location
 const authRoutes = require('./routes/authRoutes');
 const srpRoutes = require('./routes/srpRoutes');
+const setupRoutes = require('./routes/setupRoutes');
 
 /**
  * Initializes and starts the Express web server.
@@ -30,6 +31,7 @@ function startServer(client) {
     // Load and use the router, passing the client object
     app.use('/', authRoutes(client));
     app.use('/', srpRoutes(client, client.activeSrpTokens));
+    app.use('/', setupRoutes(client, client.activeSetupTokens));
 
     // Optional: Add a simple root route for health checks
     app.get('/', (req, res) => {

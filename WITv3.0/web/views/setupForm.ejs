@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Setup Form</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #1e293b;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 2.5rem;
+            border-radius: 0.75rem;
+            background-color: #334155;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid #475569;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #f8fafc;
+        }
+        h1 {
+            font-size: 1.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        h2 {
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin-top: 2rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 0.5rem;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        @media (min-width: 640px) {
+            .form-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        .form-group {
+            margin-bottom: 0;
+        }
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #cbd5e1;
+        }
+        input[type="text"], input[type="url"], textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 0.375rem;
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            color: #e2e8f0;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
+        }
+        textarea {
+            min-height: 120px;
+            font-family: monospace;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.375rem;
+            background-color: #0ea5e9;
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            margin-top: 2.5rem;
+        }
+        button:hover { background-color: #38bdf8; }
+        small {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 0.25rem;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bot Initial Configuration</h1>
+        <form action="/setup/<%= token %>" method="POST">
+
+            <h2>Role Configuration</h2>
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label for="adminRoles">Admin Roles</label>
+                    <input type="text" id="adminRoles" name="adminRoles" required>
+                    <small>Comma-separated list of Role IDs.</small>
+                </div>
+                <div class="form-group">
+                    <label for="councilRoles">Council Roles</label>
+                    <input type="text" id="councilRoles" name="councilRoles" required>
+                     <small>Comma-separated list of Role IDs.</small>
+                </div>
+                <div class="form-group">
+                    <label for="commanderRoles">Commander Roles</label>
+                    <input type="text" id="commanderRoles" name="commanderRoles" required>
+                     <small>Comma-separated list of Role IDs.</small>
+                </div>
+                 <div class="form-group full-width">
+                    <label for="authRoles">Auth Roles</label>
+                    <input type="text" id="authRoles" name="authRoles" required>
+                    <small>Comma-separated list of Role IDs that can use /auth.</small>
+                </div>
+            </div>
+
+            <h2>Channel Configuration</h2>
+             <div class="form-grid">
+                <div class="form-group">
+                    <label for="requestChannelId">Request Channel ID</label>
+                    <input type="text" id="requestChannelId" name="requestChannelId" required>
+                </div>
+                <div class="form-group">
+                    <label for="archiveChannelId">Archive Channel ID</label>
+                    <input type="text" id="archiveChannelId" name="archiveChannelId" required>
+                </div>
+                <div class="form-group">
+                    <label for="auditLogChannelId">Audit Log Channel ID</label>
+                    <input type="text" id="auditLogChannelId" name="auditLogChannelId" required>
+                </div>
+                <div class="form-group">
+                    <label for="incursionChannelId">Incursion Channel ID</label>
+                    <input type="text" id="incursionChannelId" name="incursionChannelId" required>
+                </div>
+                 <div class="form-group">
+                    <label for="srpChannelId">SRP Channel ID</label>
+                    <input type="text" id="srpChannelId" name="srpChannelId" required>
+                </div>
+            </div>
+
+            <button type="submit">Save Configuration & Lock Setup</button>
+        </form>
+    </div>
+</body>
+</html>
+
