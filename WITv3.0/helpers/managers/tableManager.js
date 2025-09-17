@@ -49,6 +49,7 @@ function getKeyColumnForTable(tableName) {
 
 module.exports = {
     editableTables,
+    getKeyColumnForTable, // Added this function to the exports
 
     /**
      * Fetches keys from a table for autocomplete suggestions.

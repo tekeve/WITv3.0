@@ -7,6 +7,7 @@ require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
 const srpRoutes = require('./routes/srpRoutes');
 const setupRoutes = require('./routes/setupRoutes');
+const webeditRoutes = require('./routes/webeditRoutes');
 
 /**
  * Initializes and starts the Express web server.
@@ -32,6 +33,7 @@ function startServer(client) {
     app.use('/', authRoutes(client));
     app.use('/', srpRoutes(client, client.activeSrpTokens));
     app.use('/', setupRoutes(client, client.activeSetupTokens));
+    app.use('/', webeditRoutes(client, client.activeWebEditTokens));
 
     // Optional: Add a simple root route for health checks
     app.get('/', (req, res) => {

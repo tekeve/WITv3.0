@@ -81,6 +81,7 @@ async function initializeApp() {
     // In-memory stores
     client.activeSrpTokens = new Map();
     client.activeSetupTokens = new Map();
+    client.activeWebEditTokens = new Map();
     client.esiStateMap = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null;

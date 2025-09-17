@@ -39,7 +39,7 @@ exports.showEditor = (client) => async (req, res) => {
 };
 
 /**
- * Handles the submission from the web editor and updates the database.
+ * Handles the submission from the web editor and updates, adds, or deletes rows.
  * @param {Client} client - The Discord client instance.
  * @returns An async function to handle the POST request.
  */
@@ -50,25 +50,44 @@ exports.handleUpdate = (client) => async (req, res) => {
     if (!tokenData) {
         return res.status(404).render('error', { title: 'Link Invalid', message: 'This web editor link has expired. Your changes were not saved.' });
     }
-    client.activeWebEditTokens.delete(token); // Invalidate token immediately after use
+    client.activeWebEditTokens.delete(token); // Invalidate token immediately
 
     const { tableName } = tokenData;
-    const { rows } = req.body;
-
-    if (!rows) {
-        return res.status(400).render('error', { title: 'No Data', message: 'No data was submitted for update.' });
-    }
+    const { rows, newRows, deletedRows } = req.body;
+    const keyColumn = tableManager.getKeyColumnForTable(tableName);
+    const dbPromises = [];
 
     try {
-        const updatePromises = Object.entries(rows).map(([primaryKeyValue, rowData]) => {
-            // The tableManager's setValue function expects the full row data as a JSON string.
-            // It will handle inserting or updating the row based on the primary key.
-            return tableManager.setValue(tableName, primaryKeyValue, JSON.stringify(rowData));
-        });
+        // 1. Handle Deletions
+        if (deletedRows && Array.isArray(deletedRows)) {
+            for (const keyToDelete of deletedRows) {
+                dbPromises.push(tableManager.removeKey(tableName, keyToDelete));
+            }
+        }
 
-        await Promise.all(updatePromises);
+        // 2. Handle Additions
+        if (newRows && Array.isArray(newRows)) {
+            for (const rowData of newRows) {
+                const primaryKeyValue = rowData[keyColumn];
+                if (primaryKeyValue) { // Ensure the new row has a primary key
+                    dbPromises.push(tableManager.setValue(tableName, primaryKeyValue, JSON.stringify(rowData)));
+                }
+            }
+        }
 
-        // If a critical table like config or roleHierarchy was edited, we must reload it into the bot's cache.
+        // 3. Handle Updates
+        if (rows) {
+            for (const [primaryKeyValue, rowData] of Object.entries(rows)) {
+                // Ensure we don't try to update a row that was also marked for deletion
+                if (!deletedRows || !deletedRows.includes(primaryKeyValue)) {
+                    dbPromises.push(tableManager.setValue(tableName, primaryKeyValue, JSON.stringify(rowData)));
+                }
+            }
+        }
+
+        await Promise.all(dbPromises);
+
+        // Reload config if necessary
         if (tableName === 'config') {
             const configManager = require('@helpers/configManager');
             await configManager.reloadConfig();

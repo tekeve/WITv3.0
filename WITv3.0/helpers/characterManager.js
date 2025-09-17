@@ -3,29 +3,22 @@ const logger = require('@helpers/logger');
 const esiService = require('@helpers/esiService');
 
 /**
- * Fetches character details from ESI using the correct endpoint.
+ * Fetches character details from ESI.
  * @param {string} characterName - The name of the character to look up.
  * @returns {Promise<{character_id: number, character_name: string}|null>}
  */
 async function getCharacterDetails(characterName) {
     try {
-        // Using the POST /universe/ids endpoint is more direct for resolving names.
-        // The body of the request should be an array of names.
         const idResponse = await esiService.post('/universe/ids/', [characterName]);
-
-        // Check if the response includes a 'characters' array and if it's not empty
         if (!idResponse || !idResponse.characters || idResponse.characters.length === 0) {
             return null;
         }
-
         const characterData = idResponse.characters[0];
-
         return {
             character_id: characterData.id,
             character_name: characterData.name
         };
     } catch (error) {
-        // Log the detailed error, but return null so the command can give a clean "character not found" message.
         logger.error(`Failed to get character details for ${characterName}:`, error.message);
         return null;
     }
@@ -46,25 +39,14 @@ module.exports = {
         }
 
         try {
-            // Check if the user already has a main character.
-            const existingMainSql = `
-                SELECT c.character_id FROM users u
-                JOIN characters c ON u.main_character_id = c.character_id
-                WHERE u.discord_id = ?`;
-            const existingMain = await db.query(existingMainSql, [discordId]);
-
+            const existingMain = await db.query('SELECT character_id FROM users WHERE discord_id = ? AND is_main = 1', [discordId]);
             if (existingMain.length > 0) {
                 return { success: false, message: 'You already have a main character registered. Use `/delchar main` to remove it first.' };
             }
 
-            // Add character to characters table
-            const charSql = 'INSERT INTO characters (character_id, character_name, discord_id, is_main) VALUES (?, ?, ?, 1) ON DUPLICATE KEY UPDATE character_name = VALUES(character_name), discord_id = VALUES(discord_id), is_main = 1';
-            await db.query(charSql, [charDetails.character_id, charDetails.character_name, discordId]);
-
-            // Add user to users table
             const rolesJson = JSON.stringify(roles);
-            const userSql = 'INSERT INTO users (discord_id, main_character_id, roles) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE main_character_id = VALUES(main_character_id), roles = VALUES(roles)';
-            await db.query(userSql, [discordId, charDetails.character_id, rolesJson]);
+            const sql = 'INSERT INTO users (character_id, discord_id, character_name, roles, is_main) VALUES (?, ?, ?, ?, 1) ON DUPLICATE KEY UPDATE discord_id = VALUES(discord_id), character_name = VALUES(character_name), roles = VALUES(roles), is_main = 1';
+            await db.query(sql, [charDetails.character_id, discordId, charDetails.character_name, rolesJson]);
 
             return { success: true, message: `Main character **${charDetails.character_name}** has been registered.` };
         } catch (error) {
@@ -95,8 +77,8 @@ module.exports = {
         }
 
         try {
-            const sql = 'INSERT INTO characters (character_id, character_name, discord_id, is_main) VALUES (?, ?, ?, 0) ON DUPLICATE KEY UPDATE character_name = VALUES(character_name), discord_id = VALUES(discord_id), is_main = 0';
-            await db.query(sql, [charDetails.character_id, charDetails.character_name, discordId]);
+            const sql = 'INSERT INTO users (character_id, discord_id, character_name, is_main) VALUES (?, ?, ?, 0) ON DUPLICATE KEY UPDATE discord_id = VALUES(discord_id), character_name = VALUES(character_name), is_main = 0';
+            await db.query(sql, [charDetails.character_id, discordId, charDetails.character_name]);
             return { success: true, message: `Alt character **${charDetails.character_name}** has been added.` };
         } catch (error) {
             logger.error('Error in addAlt:', error);
@@ -105,7 +87,7 @@ module.exports = {
     },
 
     /**
-     * Deletes a user's entire profile (main, alts, user entry, auth).
+     * Deletes a user's main character and all their alts.
      * @param {string} discordId - The user's Discord ID.
      * @param {string} mainCharNameToConfirm - The name for confirmation.
      * @returns {Promise<{success: boolean, message: string}>}
@@ -121,9 +103,7 @@ module.exports = {
         }
 
         try {
-            await db.query('DELETE FROM characters WHERE discord_id = ?', [discordId]);
             await db.query('DELETE FROM users WHERE discord_id = ?', [discordId]);
-            await db.query('DELETE FROM auth WHERE discord_id = ?', [discordId]);
             return { success: true, message: `Main character ${user.main.character_name} and all associated alts have been deleted.` };
         } catch (error) {
             logger.error('Error in deleteMain:', error);
@@ -150,7 +130,7 @@ module.exports = {
         }
 
         try {
-            await db.query('DELETE FROM characters WHERE character_id = ?', [altToDelete.character_id]);
+            await db.query('DELETE FROM users WHERE character_id = ? AND is_main = 0', [altToDelete.character_id]);
             return { success: true, message: `Alt character **${altName}** has been deleted.` };
         } catch (error) {
             logger.error('Error in deleteAlt:', error);
@@ -164,8 +144,7 @@ module.exports = {
      * @returns {Promise<{main: object, alts: object[]}|null>}
      */
     getChars: async (discordId) => {
-        const sql = 'SELECT character_id, character_name, is_main FROM characters WHERE discord_id = ?';
-        const rows = await db.query(sql, [discordId]);
+        const rows = await db.query('SELECT character_id, character_name, is_main FROM users WHERE discord_id = ?', [discordId]);
         if (rows.length === 0) return null;
 
         const main = rows.find(r => r.is_main);
@@ -180,40 +159,31 @@ module.exports = {
      */
     findUsersInRole: async (roleId) => {
         const sql = `
-            SELECT c.character_name as main_character_name
-            FROM users u
-            JOIN characters c ON u.main_character_id = c.character_id
-            WHERE JSON_CONTAINS(u.roles, ?)`;
-        // JSON_CONTAINS expects a stringified value, and the value we check against is the role ID.
+            SELECT character_name as main_character_name
+            FROM users
+            WHERE is_main = 1 AND JSON_CONTAINS(roles, ?)`;
         const rows = await db.query(sql, [`"${roleId}"`]);
         return rows;
     },
 
     /**
-     * Updates the stored Discord roles for a user.
+     * Updates the stored Discord roles for a user across all their characters.
      * @param {string} discordId - The user's Discord ID.
      * @param {string[]} roles - An array of role IDs.
      */
     updateUserRoles: async (discordId, roles) => {
         const rolesJson = JSON.stringify(roles);
-        // Ensure user exists before updating
-        const userCheckSql = 'SELECT discord_id FROM users WHERE discord_id = ?';
-        const userExists = await db.query(userCheckSql, [discordId]);
-        if (userExists.length > 0) {
-            const sql = 'UPDATE users SET roles = ? WHERE discord_id = ?';
-            await db.query(sql, [rolesJson, discordId]);
-        }
+        const sql = 'UPDATE users SET roles = ? WHERE discord_id = ?';
+        await db.query(sql, [rolesJson, discordId]);
     },
 
     /**
-     * Gets all registered users.
+     * Gets all registered users with a main character.
      * @returns {Promise<Array<{discord_id: string}>>}
      */
     getAllUsers: async () => {
-        const sql = 'SELECT discord_id FROM users';
+        const sql = 'SELECT DISTINCT discord_id FROM users WHERE is_main = 1';
         return await db.query(sql);
     },
 };
-
-
 

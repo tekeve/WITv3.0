@@ -7,7 +7,7 @@ const configManager = require('@helpers/configManager'); // Import config manage
 async function handleTicketButton(interaction) {
     // Permission check
     if (!roleManager.isAdmin(interaction.member)) {
-        return interaction.reply({ content: 'You do not have permission to resolve tickets.' });
+        return interaction.reply({ content: 'You do not have permission to resolve tickets.', flags: [MessageFlags.Ephemeral] });
     }
 
     const modal = new ModalBuilder().setTitle('Resolve Request Ticket');
@@ -34,14 +34,14 @@ async function handleResolveModal(interaction) {
 
     if (!config.requestChannelId || !config.archiveChannelId) {
         logger.error('requestChannelId or archiveChannelId is not configured in the database.');
-        return interaction.reply({ content: 'Error: Request system channels are not configured.' });
+        return interaction.reply({ content: 'Error: Request system channels are not configured.', flags: [MessageFlags.Ephemeral] });
     }
 
     try {
         const resolverCharData = await charManager.getChars(interaction.user.id);
-        const resolverName = resolverCharData ? resolverCharData.main_character : interaction.user.tag;
+        const resolverName = resolverCharData?.main?.character_name || interaction.user.tag;
 
-        const requestChannel = await client.channels.fetch(config.requestChannelId);
+        const requestChannel = await client.channels.fetch(config.requestChannelId[0]); // Channels are arrays now
         const originalMessage = await requestChannel.messages.fetch(messageId);
         const originalEmbed = originalMessage.embeds[0];
 
@@ -62,7 +62,7 @@ async function handleResolveModal(interaction) {
                 { name: 'Resolved On', value: `<t:${resolvedTimestamp}:f>`, inline: true }
             );
 
-        const archiveChannel = await client.channels.fetch(config.archiveChannelId);
+        const archiveChannel = await client.channels.fetch(config.archiveChannelId[0]);
         await archiveChannel.send({ embeds: [archiveEmbed] });
         await originalMessage.delete();
 
@@ -82,3 +82,4 @@ async function handleInteraction(interaction) {
 }
 
 module.exports = { handleInteraction };
+

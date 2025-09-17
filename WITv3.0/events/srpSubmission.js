@@ -8,13 +8,19 @@ module.exports = {
         logger.info(`Processing srpSubmission event for user ${payload.user.tag}`);
         const { interaction } = payload;
 
+        // srpChannelId
+
+
         try {
-            const srpChannelId = process.env.SRP_CHANNEL_ID;
+            // Get the srpChannelId from the config object
+            const srpChannelId = config.srpChannelId ? config.srpChannelId[0] : null;
+
             if (!srpChannelId) {
-                logger.error("SRP_CHANNEL_ID is not configured.");
+                logger.error("srpChannelId is not configured in the database.");
                 return interaction.followUp({
                     content: 'SRP submitted, but the bot is misconfigured. Could not post to the SRP channel.',
-                    flags: [MessageFlags.Ephemeral] });
+                    flags: [MessageFlags.Ephemeral]
+                });
             }
 
             const srpChannel = await client.channels.fetch(srpChannelId);

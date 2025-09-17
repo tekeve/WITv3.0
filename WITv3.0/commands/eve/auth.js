@@ -26,9 +26,8 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
 
         if (subcommand === 'login') {
-            // Read ESI configuration directly from environment variables
             const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
-            const ESI_CALLBACK_URL = process.env.ESI_CALLBACK_URL;
+            const ESI_CALLBACK_URL = `http://${process.env.WEB_HOST_NAME}/callback`;
             const ESI_SCOPES = process.env.ESI_DEFAULT_SCOPES;
 
             if (!ESI_CLIENT_ID || !ESI_CALLBACK_URL || !ESI_SCOPES) {
@@ -54,7 +53,7 @@ module.exports = {
                 );
 
             await interaction.reply({
-                content: 'Click the button below to authorize your character. This will only grant the bot permissions to send mail on your behalf and view your mailing lists.',
+                content: 'Click the button below to authorize your character. This will only grant the bot permissions to send mail on your behalf and view your mailing lists. **Important:** You must authenticate with a character already registered to your profile.',
                 components: [row],
                 flags: [MessageFlags.Ephemeral]
             });
@@ -62,7 +61,6 @@ module.exports = {
         else if (subcommand === 'status') {
             const authData = await authManager.getUserAuthData(interaction.user.id);
             if (authData && authData.character_name) {
-                // The expiry is now a Unix timestamp in milliseconds.
                 const expiryTimestamp = Math.floor(authData.token_expiry / 1000);
                 const embed = new EmbedBuilder()
                     .setColor(0x3BA55D)
@@ -78,7 +76,7 @@ module.exports = {
             }
         }
         else if (subcommand === 'logout') {
-            const success = await authManager.removeUser(interaction.user.id);
+            const success = await authManager.removeAuth(interaction.user.id);
             if (success) {
                 await interaction.reply({ content: 'Your authentication token and character data have been successfully removed.', flags: [MessageFlags.Ephemeral] });
             } else {
@@ -87,3 +85,4 @@ module.exports = {
         }
     },
 };
+
