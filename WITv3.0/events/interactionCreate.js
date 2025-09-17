@@ -2,6 +2,7 @@ const { Events, MessageFlags } = require('discord.js');
 const logger = require('@helpers/logger');
 const requestManager = require('@helpers/requestManager');
 const mailManager = require('@helpers/mailManager');
+const webEditInteractionManager = require('@interactions/webeditInteraction');
 const roleManager = require('@helpers/roleManager');
 const auditLogger = require('@helpers/auditLogger');
 
@@ -41,6 +42,10 @@ module.exports = {
                 const command = client.commands.get(interaction.commandName);
                 if (!command || !command.autocomplete) return;
                 await command.autocomplete(interaction);
+            } else if (interaction.isStringSelectMenu()) {
+                if (interaction.customId.startsWith('webedit_')) {
+                    await webEditInteractionManager.handleInteraction(interaction);
+                }
             }
             else if (interaction.isButton()) {
                 const { customId } = interaction;

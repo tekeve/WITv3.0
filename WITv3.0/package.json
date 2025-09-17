@@ -13,6 +13,7 @@
     "@root": ".",
     "@helpers": "./helpers",
     "@embeds": "./embeds",
+    "@interactions": "./interactions",
     "@webHelpers": "./web/helpers",
     "@webControllers": "./web/controllers",
     "@webViews": "./web/views",
