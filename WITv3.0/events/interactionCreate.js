@@ -2,7 +2,6 @@ const { Events, MessageFlags } = require('discord.js');
 const logger = require('@helpers/logger');
 const requestManager = require('@helpers/requestManager');
 const mailManager = require('@helpers/mailManager');
-const configInteractionManager = require('@helpers/configInteractionManager');
 const roleManager = require('@helpers/roleManager');
 const auditLogger = require('@helpers/auditLogger');
 
@@ -43,26 +42,10 @@ module.exports = {
                 if (!command || !command.autocomplete) return;
                 await command.autocomplete(interaction);
             }
-            else if (interaction.isStringSelectMenu()) {
-                if (interaction.customId === 'config_table_select') {
-                    await configInteractionManager.handleTableSelect(interaction);
-                } else if (interaction.customId.startsWith('config_key_select_')) {
-                    const [, , action, tableName] = interaction.customId.split('_');
-                    await configInteractionManager.handleKeySelect(interaction, action, tableName);
-                }
-            }
             else if (interaction.isButton()) {
                 const { customId } = interaction;
                 if (customId.startsWith('ticket_')) {
                     await requestManager.handleInteraction(interaction);
-                } else if (customId.startsWith('config_action_')) {
-                    const [, , action, tableName] = customId.split('_');
-                    await configInteractionManager.handleAction(interaction, action, tableName);
-                } else if (customId.startsWith('config_confirm_delete_')) {
-                    const [, , , tableName, key] = customId.split('_');
-                    await configInteractionManager.handleConfirmDelete(interaction, tableName, key);
-                } else if (customId === 'config_cancel_delete') {
-                    await interaction.update({ content: 'Deletion cancelled.', components: [], embeds: [] });
                 }
             }
             else if (interaction.isModalSubmit()) {
@@ -71,8 +54,6 @@ module.exports = {
                     await requestManager.handleInteraction(interaction);
                 } else if (customId.startsWith('sendmail_modal_')) {
                     await mailManager.handleModal(interaction);
-                } else if (customId.startsWith('config_modal_')) {
-                    await configInteractionManager.handleInteraction(interaction);
                 }
             }
         } catch (error) {
