@@ -137,7 +137,7 @@ async function initializeApp() {
     }
 
     // Schedule periodic check for GitHub updates (e.g., every 5 minutes)
-    setInterval(() => githubWatcher.checkGithubForUpdates(client), 5 * 60 * 1000);
+    setInterval(() => githubWatcher.checkGithubForUpdates(client), 1 * 60 * 1000);
 
 
     client.login(process.env.DISCORD_TOKEN);
