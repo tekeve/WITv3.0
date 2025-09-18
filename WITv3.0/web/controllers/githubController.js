@@ -25,7 +25,12 @@ function verifySignature(req) {
     const hmac = crypto.createHmac('sha256', secret);
     const digest = 'sha256=' + hmac.update(JSON.stringify(req.body)).digest('hex');
 
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+    try {
+        return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+    } catch (error) {
+        logger.error('Error during signature comparison:', error);
+        return false;
+    }
 }
 
 
@@ -34,7 +39,7 @@ function verifySignature(req) {
  * @param {Client} client The Discord client instance.
  * @returns An async function that handles the request and response.
  */
-exports.handleWebhook = (client) => async (req, res) => {
+exports.handleWebhook = (client) => (req, res) => {
     if (!verifySignature(req)) {
         logger.warn('Received an invalid GitHub webhook signature.');
         return res.status(401).send('Invalid signature');
@@ -44,10 +49,22 @@ exports.handleWebhook = (client) => async (req, res) => {
 
     // We only care about 'push' events
     if (event === 'push') {
-        logger.info('Received a push event from GitHub webhook.');
-        // Trigger the check for updates
-        await checkGithubForUpdates(client);
-    }
+        logger.info('Received a push event from GitHub webhook. Acknowledging immediately.');
 
-    res.status(204).send(); // Send a 'No Content' response to GitHub
+        // --- FIX: Acknowledge GitHub immediately ---
+        // Send a 'No Content' response right away to prevent a timeout.
+        res.status(204).send();
+
+        // --- Process the update in the background ---
+        // Call the update function without 'await'.
+        // This lets the response be sent while the heavy lifting happens afterward.
+        checkGithubForUpdates(client).catch(err => {
+            logger.error('Error processing GitHub webhook payload in the background:', err);
+        });
+
+    } else {
+        // If it's not a push event, just acknowledge it and do nothing.
+        res.status(204).send();
+    }
 };
+
