@@ -8,6 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const srpRoutes = require('./routes/srpRoutes');
 const setupRoutes = require('./routes/setupRoutes');
 const webeditRoutes = require('./routes/webeditRoutes');
+const githubRoutes = require('./routes/githubRoutes');
 
 /**
  * Initializes and starts the Express web server.
@@ -19,6 +20,8 @@ function startServer(client) {
 
     // Middleware to parse URL-encoded bodies (as sent by HTML forms)
     app.use(express.urlencoded({ extended: true }));
+    // Middleware to parse JSON bodies (for webhooks)
+    app.use(express.json());
 
     // Set the view engine to EJS and tell Express where to find the templates
     // Using path.join makes this path absolute and less prone to errors
@@ -34,6 +37,7 @@ function startServer(client) {
     app.use('/', srpRoutes(client, client.activeSrpTokens));
     app.use('/', setupRoutes(client, client.activeSetupTokens));
     app.use('/', webeditRoutes(client, client.activeWebEditTokens));
+    app.use('/', githubRoutes(client));
 
     // Optional: Add a simple root route for health checks
     app.get('/', (req, res) => {

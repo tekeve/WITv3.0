@@ -12,6 +12,7 @@ const db = require('@helpers/database');
 const { startServer } = require('./web/server.js');
 
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
+const githubWatcher = require('@helpers/githubWatcher');
 
 // ================================================================= //
 // ==================== DEPLOY COMMANDS SCRIPT ===================== //
@@ -75,6 +76,7 @@ async function initializeApp() {
     const config = configManager.get(); // Get config once for startup
     await incursionManager.loadIncursionSystems();
     await roleHierarchyManager.reloadHierarchy(); // Load the role hierarchy
+    await githubWatcher.initializeLastSha(); // Initialize the last known commit SHA
 
     const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -133,6 +135,10 @@ async function initializeApp() {
         }
         logger.info(`Loaded event: ${event.name}`);
     }
+
+    // Schedule periodic check for GitHub updates (e.g., every 5 minutes)
+    setInterval(() => githubWatcher.checkGithubForUpdates(client), 5 * 60 * 1000);
+
 
     client.login(process.env.DISCORD_TOKEN);
 }
