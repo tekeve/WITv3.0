@@ -20,7 +20,7 @@ function startServer(client) {
 
     // Middleware to parse URL-encoded bodies (as sent by HTML forms)
     app.use(express.urlencoded({ extended: true }));
-    // Middleware to parse JSON bodies (for webhooks)
+    // Middleware to parse JSON bodies (for webhooks) 
     app.use(express.json());
 
     // Set the view engine to EJS and tell Express where to find the templates
