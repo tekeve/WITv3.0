@@ -3,20 +3,19 @@ const path = require('path');
 const chalk = require('chalk');
 require('module-alias/register');
 const logger = require('@helpers/logger');
-const { Client, Collection, GatewayIntentBits, REST, Routes } = require('discord.js');
+// --- MODIFICATION START ---
+// We are importing Partials and expanding the list of GatewayIntentBits.
+const { Client, Collection, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
+// --- MODIFICATION END ---
 require('dotenv').config();
 
 const configManager = require('@helpers/configManager');
 const incursionManager = require('@helpers/incursionManager');
 const db = require('@helpers/database');
 const { startServer } = require('./web/server.js');
-
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
-const githubWatcher = require('@helpers/githubWatcher');
 
-// ================================================================= //
-// ==================== DEPLOY COMMANDS SCRIPT ===================== //
-// ================================================================= //
+// ... (deployCommands function remains the same) ...
 async function deployCommands() {
     const commandsToDeploy = [];
     const client = { commands: new Collection() }; // Mock client for command loading
@@ -73,12 +72,24 @@ async function initializeApp() {
     }
 
     await configManager.reloadConfig();
-    const config = configManager.get(); // Get config once for startup
     await incursionManager.loadIncursionSystems();
-    await roleHierarchyManager.reloadHierarchy(); // Load the role hierarchy
-    await githubWatcher.initializeLastSha(); // Initialize the last known commit SHA
+    await roleHierarchyManager.reloadHierarchy();
 
-    const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+    // --- MODIFICATION START ---
+    // This is the critical change. We are now telling the bot to subscribe to all the
+    // events required for the action log to function correctly.
+    const client = new Client({
+        intents: [
+            GatewayIntentBits.Guilds,
+            GatewayIntentBits.GuildMembers,
+            GatewayIntentBits.GuildMessages,
+            GatewayIntentBits.MessageContent,
+            GatewayIntentBits.GuildVoiceStates
+        ],
+        partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
+    });
+    // --- MODIFICATION END ---
+
 
     // In-memory stores
     client.activeSrpTokens = new Map();
@@ -88,12 +99,10 @@ async function initializeApp() {
     client.mailSubjects = new Map();
     client.mockOverride = null;
 
-    // Start the ESI authentication callback server, passing the config
+    // Start the ESI authentication callback server
     startServer(client);
 
-    // ================================================================= //
-    // =================== COMMAND LOADING LOGIC ======================= //
-    // ================================================================= //
+    // ... (Command Loading Logic remains the same) ...
     client.commands = new Collection();
     const foldersPath = path.join(__dirname, 'commands');
     const commandFolders = fs.readdirSync(foldersPath);
@@ -136,11 +145,8 @@ async function initializeApp() {
         logger.info(`Loaded event: ${event.name}`);
     }
 
-    // Schedule periodic check for GitHub updates (e.g., every 5 minutes)
-    setInterval(() => githubWatcher.checkGithubForUpdates(client), 1 * 60 * 1000);
-
-
     client.login(process.env.DISCORD_TOKEN);
 }
 
 initializeApp();
+

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('@helpers/logger');
 
 module.exports = {
     permission: 'commander',
