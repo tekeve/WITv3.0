@@ -3,18 +3,18 @@ const reminderManager = require('@helpers/reminderManager');
 const logger = require('@helpers/logger');
 
 /**
- * Parses a time string like "1d 2h 30m" into milliseconds.
+ * Parses a duration string (e.g., "1d 2h 30m") into milliseconds.
  * @param {string} timeString The string to parse.
- * @returns {number|null} The duration in milliseconds, or null if invalid.
+ * @returns {number|null} Duration in milliseconds, or null if invalid.
  */
 function parseDuration(timeString) {
     const regex = /(\d+)\s*(d|h|m|s)/gi;
     let totalMilliseconds = 0;
     let match;
-    let foundMatch = false;
+
+    if (!timeString) return null;
 
     while ((match = regex.exec(timeString)) !== null) {
-        foundMatch = true;
         const value = parseInt(match[1], 10);
         const unit = match[2].toLowerCase();
 
@@ -34,7 +34,7 @@ function parseDuration(timeString) {
         }
     }
 
-    return foundMatch ? totalMilliseconds : null;
+    return totalMilliseconds > 0 ? totalMilliseconds : null;
 }
 
 module.exports = {
@@ -58,36 +58,36 @@ module.exports = {
                     option.setName('private')
                         .setDescription('Send the reminder in a DM instead of this channel? (Default: False)'))
                 .addBooleanOption(option =>
-                    option.setName('ephemeral')
-                        .setDescription('Show this confirmation only to you? (Default: True)')))
+                    option.setName('show_publicly')
+                        .setDescription('Show this confirmation message publicly? (Default: False)')))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('list')
-                .setDescription('View all of your current reminders.'))
+                .setDescription('Lists your upcoming reminders.'))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('delete')
-                .setDescription('Delete a specific reminder by its ID.')
+                .setDescription('Deletes a specific reminder.')
                 .addIntegerOption(option =>
                     option.setName('id')
-                        .setDescription('The ID of the reminder to delete.')
+                        .setDescription('The ID of the reminder to delete (from /remindme list).')
                         .setRequired(true)
                         .setAutocomplete(true)))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('clear')
-                .setDescription('Delete all of your reminders.')),
+                .setDescription('Deletes all of your reminders.')),
 
     async autocomplete(interaction) {
-        const focusedOption = interaction.options.getFocused(true);
-        if (focusedOption.name === 'id') {
-            const reminders = await reminderManager.getReminders(interaction.user.id);
-            const choices = reminders.map(r => ({
-                name: `ID: ${r.id} | In ${new Date(r.remind_at).toLocaleTimeString()} | "${r.reminder_text.substring(0, 50)}..."`,
+        const focusedValue = interaction.options.getFocused();
+        const reminders = await reminderManager.getReminders(interaction.user.id);
+        const choices = reminders
+            .map(r => ({
+                name: `ID: ${r.id} | In ${r.is_private ? 'DM' : 'channel'} | "${r.reminder_text.substring(0, 50)}..."`,
                 value: r.id
-            })).slice(0, 25); // Limit to 25 choices for Discord API
-            await interaction.respond(choices);
-        }
+            }))
+            .filter(choice => choice.name.includes(focusedValue)); // Simple filter
+        await interaction.respond(choices.slice(0, 25));
     },
 
     async execute(interaction) {
@@ -99,17 +99,24 @@ module.exports = {
                 const when = interaction.options.getString('when');
                 const message = interaction.options.getString('message');
                 const isPrivate = interaction.options.getBoolean('private') ?? false;
-                const isEphemeral = interaction.options.getBoolean('ephemeral') ?? true;
+                const showPublicly = interaction.options.getBoolean('show_publicly') ?? false;
 
-                await interaction.deferReply({ ephemeral: isEphemeral });
-
-                const duration = parseDuration(when);
-                if (duration === null || duration <= 0) {
-                    return interaction.editReply({ content: 'Invalid time format. Please use a format like `1d`, `2h 30m`, or `10m`.', ephemeral: true });
+                const replyOptions = {};
+                // The reply should be ephemeral (only visible to the user) unless they explicitly set it to be public.
+                if (!showPublicly) {
+                    replyOptions.flags = [MessageFlags.Ephemeral];
                 }
 
-                if (message.length > 1024) {
-                    return interaction.editReply({ content: 'Reminder message cannot be longer than 1024 characters.', ephemeral: true });
+                await interaction.deferReply(replyOptions);
+
+                const duration = parseDuration(when);
+                if (!duration) {
+                    // This reply must be ephemeral so other users don't see the error.
+                    return interaction.editReply({ content: 'Invalid time format. Please use a format like `1d 2h 30m`.', flags: [MessageFlags.Ephemeral] });
+                }
+
+                if (message.length > 1000) {
+                    return interaction.editReply({ content: 'Your reminder message cannot be longer than 1000 characters.', flags: [MessageFlags.Ephemeral] });
                 }
 
                 const remindAt = Date.now() + duration;
@@ -120,52 +127,50 @@ module.exports = {
 
                     const remindTimestamp = Math.floor(remindAt / 1000);
                     const destination = isPrivate ? 'via DM' : 'in this channel';
-                    await interaction.editReply({ content: `✅ Got it! I will remind you ${destination} on <t:${remindTimestamp}:f> (<t:${remindTimestamp}:R>).`, ephemeral: isEphemeral });
+                    // The ephemeral state is inherited from deferReply, so no need to set it again here.
+                    await interaction.editReply({ content: `✅ Got it! I will remind you ${destination} on <t:${remindTimestamp}:f> (<t:${remindTimestamp}:R>).` });
                 } catch (error) {
                     logger.error('Failed to add reminder:', error);
-                    await interaction.editReply({ content: 'A database error occurred while setting your reminder.', ephemeral: true });
+                    await interaction.editReply({ content: 'A database error occurred while setting your reminder.', flags: [MessageFlags.Ephemeral] });
                 }
                 break;
             }
             case 'list': {
-                await interaction.deferReply({ ephemeral: true });
+                await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
                 const reminders = await reminderManager.getReminders(user.id);
                 if (reminders.length === 0) {
-                    return interaction.editReply({ content: 'You have no active reminders.', ephemeral: true });
+                    return interaction.editReply({ content: 'You have no upcoming reminders.' });
                 }
 
                 const embed = new EmbedBuilder()
                     .setColor(0x5865F2)
-                    .setTitle(`Your ${reminders.length} Active Reminder(s)`)
+                    .setTitle('Your Upcoming Reminders')
                     .setDescription(reminders.map(r => {
                         const remindTimestamp = Math.floor(r.remind_at / 1000);
-                        return `**ID:** \`${r.id}\` - Due <t:${remindTimestamp}:R>\n> ${r.reminder_text}`;
+                        const destination = r.is_private ? 'DM' : 'Channel';
+                        return `**ID:** ${r.id} | **When:** <t:${remindTimestamp}:R> | **Where:** ${destination}\n> ${r.reminder_text.substring(0, 200)}`;
                     }).join('\n\n'))
-                    .setFooter({ text: 'Use /remindme delete to remove a reminder.' })
                     .setTimestamp();
 
-                await interaction.editReply({ embeds: [embed], ephemeral: true });
+                await interaction.editReply({ embeds: [embed] });
                 break;
             }
             case 'delete': {
-                await interaction.deferReply({ ephemeral: true });
+                await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
                 const reminderId = interaction.options.getInteger('id');
                 const success = await reminderManager.deleteReminder(reminderId, user.id);
+
                 if (success) {
-                    await interaction.editReply({ content: `Reminder with ID \`${reminderId}\` has been deleted.`, ephemeral: true });
+                    await interaction.editReply({ content: '✅ Reminder deleted successfully.' });
                 } else {
-                    await interaction.editReply({ content: `Could not find a reminder with ID \`${reminderId}\` that you own, or it may have already been sent.`, ephemeral: true });
+                    await interaction.editReply({ content: '❌ Could not find a reminder with that ID, or it does not belong to you.' });
                 }
                 break;
             }
             case 'clear': {
-                await interaction.deferReply({ ephemeral: true });
-                const count = await reminderManager.deleteAllReminders(user.id);
-                if (count > 0) {
-                    await interaction.editReply({ content: `Successfully deleted all ${count} of your reminders.`, ephemeral: true });
-                } else {
-                    await interaction.editReply({ content: 'You had no active reminders to delete.', ephemeral: true });
-                }
+                await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+                const deletedCount = await reminderManager.deleteAllReminders(user.id);
+                await interaction.editReply({ content: `✅ Successfully deleted ${deletedCount} reminder(s).` });
                 break;
             }
         }

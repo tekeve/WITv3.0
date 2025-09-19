@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+﻿const { EmbedBuilder } = require('discord.js');
 const db = require('@helpers/database');
 const logger = require('@helpers/logger');
 const configManager = require('@helpers/configManager');
@@ -32,14 +32,6 @@ async function getActionLogSettings() {
 }
 
 /**
- * Clears the in-memory settings cache. Called after settings are updated.
- */
-function invalidateSettingsCache() {
-    settingsCache = null;
-    logger.info('Action log settings cache has been invalidated.');
-}
-
-/**
  * Main function to post a log message after checking settings.
  * @param {import('discord.js').Guild} guild - The guild where the event occurred.
  * @param {string} eventType - The specific event type key from the database (e.g., 'log_message_delete').
@@ -48,7 +40,7 @@ function invalidateSettingsCache() {
  * @param {import('discord.js').TextChannel} [context.channel] - The channel where the event happened.
  * @param {import('discord.js').GuildMember} [context.member] - The member associated with the event.
  */
-async function postLog(guild, eventType, embed, context = {}) {
+module.exports.postLog = async function (guild, eventType, embed, context = {}) {
     const settings = await getActionLogSettings();
     const config = configManager.get();
 
@@ -80,10 +72,13 @@ async function postLog(guild, eventType, embed, context = {}) {
     } catch (error) {
         logger.error(`Failed to send to action log channel ${logChannelId}:`, error);
     }
-}
+};
 
-module.exports = {
-    postLog,
-    invalidateSettingsCache // Export the new function
+/**
+ * Clears the in-memory settings cache. Called after settings are updated.
+ */
+module.exports.invalidateSettingsCache = function () {
+    settingsCache = null;
+    logger.info('Action log settings cache has been invalidated.');
 };
 

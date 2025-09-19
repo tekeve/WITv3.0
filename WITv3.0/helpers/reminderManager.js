@@ -47,7 +47,7 @@ function scheduleReminder(client, reminder) {
                 .setDescription(reminder.reminder_text)
                 .setTimestamp(reminder.remind_at);
 
-            if (reminder.is_ephemeral) {
+            if (reminder.is_private) {
                 const user = await client.users.fetch(reminder.discord_id);
                 await user.send({
                     content: `Here is your reminder:`,
@@ -82,19 +82,19 @@ function scheduleReminder(client, reminder) {
  * @param {string} channelId The ID of the channel where the command was used.
  * @param {number} remindAt The timestamp (ms) to send the reminder.
  * @param {string} reminderText The text of the reminder.
- * @param {boolean} isEphemeral Whether the reminder should be a DM.
+ * @param {boolean} isPrivate Whether the reminder should be a DM.
  * @returns {Promise<object>} The newly created reminder object.
  */
-async function addReminder(discordId, channelId, remindAt, reminderText, isEphemeral) {
-    const sql = 'INSERT INTO reminders (discord_id, channel_id, remind_at, reminder_text, is_ephemeral) VALUES (?, ?, ?, ?, ?)';
-    const result = await db.query(sql, [discordId, channelId, remindAt, reminderText, isEphemeral]);
+async function addReminder(discordId, channelId, remindAt, reminderText, isPrivate) {
+    const sql = 'INSERT INTO reminders (discord_id, channel_id, remind_at, reminder_text, is_private) VALUES (?, ?, ?, ?, ?)';
+    const result = await db.query(sql, [discordId, channelId, remindAt, reminderText, isPrivate]);
     return {
         id: result.insertId,
         discord_id: discordId,
         channel_id: channelId,
         remind_at: remindAt,
         reminder_text: reminderText,
-        is_ephemeral: isEphemeral,
+        is_private: isPrivate,
     };
 }
 

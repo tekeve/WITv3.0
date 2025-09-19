@@ -5,11 +5,44 @@
 -- HeidiSQL Version:             12.11.0.7065
 -- --------------------------------------------------------
 
-DROP DATABASE IF EXISTS `wit-db`;
+-- Dumping database structure for wit-db
 CREATE DATABASE IF NOT EXISTS `wit-db`;
 USE `wit-db`;
 
-DROP TABLE IF EXISTS `bot_status`;
+-- Dumping structure for table wit-db.action_log_settings
+CREATE TABLE IF NOT EXISTS `action_log_settings` (
+  `id` int(11) NOT NULL DEFAULT 1,
+  `log_message_delete` tinyint(1) DEFAULT 0,
+  `log_message_edit` tinyint(1) DEFAULT 0,
+  `log_member_join` tinyint(1) DEFAULT 0,
+  `log_member_leave` tinyint(1) DEFAULT 0,
+  `log_member_role_update` tinyint(1) DEFAULT 0,
+  `log_voice_join` tinyint(1) DEFAULT 0,
+  `log_voice_leave` tinyint(1) DEFAULT 0,
+  `log_voice_move` tinyint(1) DEFAULT 0,
+  `log_image_delete` tinyint(1) DEFAULT 0,
+  `log_nickname_change` tinyint(1) DEFAULT 0,
+  `log_member_ban` tinyint(1) DEFAULT 0,
+  `log_member_unban` tinyint(1) DEFAULT 0,
+  `log_member_timeout` tinyint(1) DEFAULT 0,
+  `log_role_create` tinyint(1) DEFAULT 0,
+  `log_role_delete` tinyint(1) DEFAULT 0,
+  `log_role_update` tinyint(1) DEFAULT 0,
+  `log_channel_create` tinyint(1) DEFAULT 0,
+  `log_channel_delete` tinyint(1) DEFAULT 0,
+  `log_channel_update` tinyint(1) DEFAULT 0,
+  `log_invite_create` tinyint(1) DEFAULT 0,
+  `log_invite_delete` tinyint(1) DEFAULT 0,
+  `ignored_channels` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  `ignored_roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+-- Dumping data for table wit-db.action_log_settings: ~1 rows (approximately)
+REPLACE INTO `action_log_settings` (`id`, `log_message_delete`, `log_message_edit`, `log_member_join`, `log_member_leave`, `log_member_role_update`, `log_voice_join`, `log_voice_leave`, `log_voice_move`, `log_image_delete`, `log_nickname_change`, `log_member_ban`, `log_member_unban`, `log_member_timeout`, `log_role_create`, `log_role_delete`, `log_role_update`, `log_channel_create`, `log_channel_delete`, `log_channel_update`, `log_invite_create`, `log_invite_delete`, `ignored_channels`, `ignored_roles`) VALUES
+	(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, '[""]', '[""]');
+
+-- Dumping structure for table wit-db.bot_status
 CREATE TABLE IF NOT EXISTS `bot_status` (
   `id` int(11) NOT NULL DEFAULT 1,
   `activity` varchar(50) DEFAULT NULL,
@@ -17,48 +50,52 @@ CREATE TABLE IF NOT EXISTS `bot_status` (
   `url` varchar(255) DEFAULT NULL,
   `expiryTimestamp` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`id`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
-DROP TABLE IF EXISTS `config`;
+-- Dumping structure for table wit-db.config
 CREATE TABLE IF NOT EXISTS `config` (
   `key_name` varchar(255) NOT NULL,
   `value` longtext DEFAULT NULL,
   PRIMARY KEY (`key_name`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
-INSERT INTO `config` (`key_name`, `value`) VALUES
-	('adminRoles', '[\r\n  "1412546107975929917"\r\n]'),
-	('archiveChannelId', '[\r\n  "1411962451439652904"\r\n]'),
-	('auditLogChannelId', '[\r\n  "1413370040245555312"\r\n]'),
-	('authRoles', '[\r\n  "1412546107975929917",\r\n  "1412546080448712826"\r\n]'),
-	('commanderRoles', '[\r\n  "1412545597021622383"\r\n]'),
-	('councilRoles', '[\r\n  "1412546107975929917",\r\n  "1412546080448712826"\r\n]'),
-	('incursionChannelId', '[\r\n  "1364223029814759444"\r\n]'),
-	('requestChannelId', '[\r\n  "1411962383978725436"\r\n]'),
-	('setupLocked', '[\r\n  "true"\r\n]'),
-	('srpChannelId', '["1412210083135225866" ]'),
-	('srpMailingListId', '["145241588"]'),
-	('tradeHubs', '{\r\n  "Jita": "30000142",\r\n  "Amarr": "30002187",\r\n  "Dodixie": "30002659",\r\n  "Rens": "30002510",\r\n  "Hek": "30002053"\r\n}');
+-- Dumping data for table wit-db.config: ~17 rows (approximately)
+REPLACE INTO `config` (`key_name`, `value`) VALUES
+	('actionLogChannelId', '[""]'),
+	('adminRoles', '[""]'),
+	('archiveChannelId', ''),
+	('auditLogChannelId', ''),
+	('authRoles', ''),
+	('commanderRoles', '[""]'),
+	('councilRoles', '[""]'),
+	('githubBranch', '[""]'),
+	('githubChannelId', '[""]'),
+	('githubRepoUrl', '[""]'),
+	('incursionChannelId', '[""]'),
+	('lastCommitSha', '[""]'),
+	('requestChannelId', '[""]'),
+	('setupLocked', '[""]'),
+	('srpChannelId', '[""]'),
+	('srpMailingListId', '[""]'),
+	('tradeHubs', '{"Jita": "30000142","Amarr": "30002187","Dodixie": "30002659","Rens": "30002510","Hek": "30002053"}');
 
-DROP TABLE IF EXISTS `google_docs`;
+-- Dumping structure for table wit-db.google_docs
 CREATE TABLE IF NOT EXISTS `google_docs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `alias` varchar(50) NOT NULL,
   `doc_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
-
-DROP TABLE IF EXISTS `google_sheets`;
+-- Dumping structure for table wit-db.google_sheets
 CREATE TABLE IF NOT EXISTS `google_sheets` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `alias` varchar(50) NOT NULL,
   `sheet_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
-
-DROP TABLE IF EXISTS `incursion_state`;
+-- Dumping structure for table wit-db.incursion_state
 CREATE TABLE IF NOT EXISTS `incursion_state` (
   `id` int(11) NOT NULL DEFAULT 1,
   `lastIncursionState` varchar(50) DEFAULT NULL,
@@ -70,12 +107,9 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
   `endedTimestamp` bigint(20) DEFAULT NULL,
   `lastIncursionStats` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`lastIncursionStats`)),
   PRIMARY KEY (`id`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
-INSERT INTO `incursion_state` (`id`, `lastIncursionState`, `incursionMessageId`, `lastHqSystemId`, `spawnTimestamp`, `mobilizingTimestamp`, `withdrawingTimestamp`, `endedTimestamp`, `lastIncursionStats`) VALUES
-	(1, '20000777-established', '1417578751784390921', 30002252, 1758047510, NULL, NULL, NULL, NULL);
-
-DROP TABLE IF EXISTS `incursion_systems`;
+-- Dumping structure for table wit-db.incursion_systems
 CREATE TABLE IF NOT EXISTS `incursion_systems` (
   `Constellation_id` int(11) NOT NULL,
   `Constellation` varchar(255) DEFAULT NULL,
@@ -89,9 +123,10 @@ CREATE TABLE IF NOT EXISTS `incursion_systems` (
   `region` varchar(255) DEFAULT NULL,
   `region_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`Constellation_id`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
-INSERT INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard_systems`, `assault_systems`, `headquarters_system`, `dockup`, `dock_up_system_id`, `is_island`, `region_faction`, `region`, `region_id`) VALUES
+-- Dumping data for table wit-db.incursion_systems: ~105 rows (approximately)
+REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard_systems`, `assault_systems`, `headquarters_system`, `dockup`, `dock_up_system_id`, `is_island`, `region_faction`, `region`, `region_id`) VALUES
 	(20000001, 'San Matar', 'Akpivem, Nirbhi, Tanoo, Yuzier', 'Jark, Sasta', 'Lashesih (0.8)', 'Lisudeh IV - Moon 4 - Theology Council Tribunal', '30000005', 'NOTISLAND', '500007', 'Derelik', 10000003),
 	(20000004, 'Kalangin', 'Eshtah, Kasrasi, Ordize, Rashy', 'Fovihi, Psasa', 'Kiereend (0.8)', 'Kiereend VII - Moon 3 - DED Assembly Plant', '30000024', 'NOTISLAND', '500007', 'Derelik', 10000003),
 	(20000008, 'Mossas', 'Ibaria, Maspah, Zemalu', 'Juddi', 'Khankenirdia (0.6)', 'Khankenirdia V - Moon 17 - Ammatar Consulate Academy', '30000056', 'NOTISLAND', '500007', 'Derelik', 10000003),
@@ -198,25 +233,28 @@ INSERT INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard_
 	(20000784, 'Aokinen', 'Onnamon,Tsuruma, Uuhulanen', 'Astoh, Rohamaa, Samanuhi', 'Uchomida (0.5)', 'Samanuni VI - Caldari Navy Anchorage', '30045322', 'NOTISLAND', '500001', 'The Citadel', 10000033),
 	(30000154, 'Onirvura', '', '', '', '', '', 'NOTISLAND', '500001', 'Lonetrek', 10000016);
 
-DROP TABLE IF EXISTS `rolehierarchy`;
+-- Dumping structure for table wit-db.reminders
+CREATE TABLE IF NOT EXISTS `reminders` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `discord_id` varchar(50) NOT NULL,
+  `channel_id` varchar(50) NOT NULL,
+  `remind_at` bigint(20) NOT NULL,
+  `reminder_text` text NOT NULL,
+  `is_private` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `discord_id` (`discord_id`),
+  KEY `remind_at` (`remind_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- Dumping structure for table wit-db.rolehierarchy
 CREATE TABLE IF NOT EXISTS `rolehierarchy` (
   `roleName` varchar(50) NOT NULL,
   `promote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`promote`)),
   `demote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`demote`)),
   PRIMARY KEY (`roleName`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
-INSERT INTO `rolehierarchy` (`roleName`, `promote`, `demote`) VALUES
-	('certified_trainer', '{"add":["1412546024819392733"],"remove":["1412545985388871730"]}', '{"add":[],"remove":["1412546024819392733"]}'),
-	('fleet_commander', '{\r\n  "add": [\r\n    "1412545955106127983"\r\n  ],\r\n  "remove": [\r\n    "1412545912462512168"\r\n  ]\r\n}', '{\r\n  "add": [\r\n    "1412545912462512168"\r\n  ],\r\n  "remove": [\r\n    "1412545955106127983"\r\n  ]\r\n}'),
-	('leadership', '{\r\n  "add": [\r\n    "1412546107975929917"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412546107975929917"\r\n  ]\r\n}'),
-	('line_commander', '{\r\n  "add": [\r\n    "1412545877163118704"\r\n  ],\r\n  "remove": [\r\n    "1412545820015857724"\r\n  ]\r\n}', '{\r\n  "add": [\r\n    1412545820015857700\r\n  ],\r\n  "remove": [\r\n    1412545877163118600\r\n  ]\r\n}'),
-	('officer', '{\r\n  "add": [\r\n    "1412546080448712826"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412546080448712826"\r\n  ]\r\n}'),
-	('resident', '{\r\n  "add": [\r\n    "1412545597021622383",\r\n    "1412545820015857724"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412545597021622383",\r\n    "1412545820015857724"\r\n  ]\r\n}'),
-	('training_ct', '{\r\n  "add": [\r\n    "1412545985388871730"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412545985388871730"\r\n  ]\r\n}'),
-	('training_fc', '{\r\n  "add": [\r\n    "1412545912462512168"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412545912462512168"\r\n  ]\r\n}');
-
-DROP TABLE IF EXISTS `srp_history`;
+-- Dumping structure for table wit-db.srp_history
 CREATE TABLE IF NOT EXISTS `srp_history` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `pilot_name` varchar(255) NOT NULL,
@@ -230,22 +268,9 @@ CREATE TABLE IF NOT EXISTS `srp_history` (
   `loss_description` text NOT NULL,
   `loot_status` text NOT NULL,
   PRIMARY KEY (`id`)
-);
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
-INSERT INTO `srp_history` (`id`, `pilot_name`, `kill_report_link`, `fc_name`, `fc_status`, `backseat_details`, `ship_type`, `srpable`, `srp_paid`, `loss_description`, `loot_status`) VALUES
-	(1, 'Bella Cadelanne', 'https://esi.evetech.net/v1/killmails/129837062/0558be06c2551054b28bff08e56af6a7c9f15bdf/?datasource=tranquility', 'Bella Cadelanne', 'Full FC', NULL, 'Eris', 'Yes', 'Yes', 'xrthbxrthb', 'xrthbrthbthb'),
-	(2, 'e567', NULL, 'sty', 'Solo T-FC', NULL, 'srthbn', 'No', 'No', 'srtyb', 'srthb'),
-	(3, 'Ezabella', 'https://esi.evetech.net/v1/killmails/129918421/de8b584d30062edf9c542e037349d44c7be43871/?datasource=tranquility', 'Bella Cadelanne', 'Full FC', NULL, 'Vargur', 'No', 'No', 'guy just sucks, what you gonna do', 'Is Gay'),
-	(4, 'e567', 'https://esi.evetech.net/v1/killmails/129837062/0558be06c2551054b28bff08e56af6a7c9f15bdf/?datasource=tranquility', 'sty', 'Solo T-FC', NULL, 'srthbn', 'No', 'First Day', 'rthfghbgyukm', 'drthbdtynfyujkm'),
-	(5, 'Bella Cadelanne', NULL, 'Bella Cadelanne', 'Solo T-FC', NULL, 'Eris', 'No', 'First Day', 'dfghuyud', 'udtyutgyu'),
-	(6, 'Bella Cadelanne', NULL, 'sdf', 'Solo T-FC', NULL, 'asdfasd', 'No', 'No', 'asdf', 'sadf'),
-	(7, 'ertg', NULL, 'ergsdf', 'Solo T-FC', NULL, 'dfgj', 'No', 'No', 'asd', 'asdf'),
-	(8, 'Bella Cadelanne', 'https://esi.evetech.net/v1/killmails/129837062/0558be06c2551054b28bff08e56af6a7c9f15bdf/?datasource=tranquility', 'Bella Cadelanne', 'Solo T-FC', NULL, 'srthbn', 'No', 'No', 'fgdhfgh', 'fghdfg'),
-	(9, 'Bella Cadelanne', 'https://esi.evetech.net/v1/killmails/129837062/0558be06c2551054b28bff08e56af6a7c9f15bdf/?datasource=tranquility', 'Bella Cadelanne', 'Solo T-FC', NULL, 'srthbn', 'No', 'No', 'dfsb', 'df'),
-	(10, 'Bella Cadelanne', 'https://esi.evetech.net/v1/killmails/129837062/0558be06c2551054b28bff08e56af6a7c9f15bdf/?datasource=tranquility', 'Bella Cadelanne', 'Solo T-FC', NULL, 'Eris', 'No', 'No', 'gfhjndfg', 'dfghsdfg'),
-	(11, 'Skeltek', 'https://esi.evetech.net/v1/killmails/129837062/0558be06c2551054b28bff08e56af6a7c9f15bdf/?datasource=tranquility', 'Bella Cadelanne', 'Full FC', NULL, 'Fucked Up', 'No', 'No', 'sdafsdf', 'asdfasd');
-
-DROP TABLE IF EXISTS `users`;
+-- Dumping structure for table wit-db.users
 CREATE TABLE IF NOT EXISTS `users` (
   `character_id` int(11) NOT NULL,
   `discord_id` varchar(50) NOT NULL,
@@ -259,10 +284,4 @@ CREATE TABLE IF NOT EXISTS `users` (
   PRIMARY KEY (`character_id`),
   KEY `discord_id` (`discord_id`),
   CONSTRAINT `roles` CHECK (json_valid(`roles`))
-);
-
-INSERT INTO `users` (`character_id`, `discord_id`, `character_name`, `roles`, `access_token`, `refresh_token`, `token_expiry`, `is_main`, `is_mailing_char`) VALUES
-	(93220962, '368778318415265792', 'Bella Cadelanne', '["410301376162299906","1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwucmVhZF9tYWlsLnYxIiwiZXNpLW1haWwuc2VuZF9tYWlsLnYxIl0sImp0aSI6IjI3MTdmNTA4LTg0NzItNDNhNi05NzkwLWYzZWNiOTA3NjRiZiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5Iiwic3ViIjoiQ0hBUkFDVEVSOkVWRTo5MzIyMDk2MiIsImF6cCI6IjhkNTFlNmRjMDk0ZTQ5MWY5M2U4Y2RkMjEyNzQ0YTg1IiwidGVuYW50IjoidHJhbnF1aWxpdHkiLCJ0aWVyIjoibGl2ZSIsInJlZ2lvbiI6IndvcmxkIiwiYXVkIjpbIjhkNTFlNmRjMDk0ZTQ5MWY5M2U4Y2RkMjEyNzQ0YTg1IiwiRVZFIE9ubGluZSJdLCJuYW1lIjoiQmVsbGEgQ2FkZWxhbm5lIiwib3duZXIiOiJTWk5RWTNYWUJRSDVrMFM5R0dmeGZmNkJ3YkE9IiwiZXhwIjoxNzU4MDkzNTc1LCJpYXQiOjE3NTgwOTIzNzUsImlzcyI6Imh0dHBzOi8vbG9naW4uZXZlb25saW5lLmNvbSJ9.GNqOxRygXljDdF2FkOmwX9Xmbnd-Ennzo-UuU2tsEJgQG1On0yIIUChk3AIlTBNqcC_xjD0_4RKPiyVUSVS8lTN4Ua7my99umnvj85YuKa5N6b9sLq_wrJjf5jMIqJJ3zjjnTod8cdJmE8jV5vwPD2u8OhjlCgsRQXxm7pVQ0iZ6qrTTYLNc_cs2PBDluYUe0IZMuOZFg_e4AVRxih2lyHWIjniwxemIL7wQ_gWleRuirQcPmni1FTMsmYGLBqEhkbP96kCpcQGbksIka5PbRH-fZ85NCeUTikADKe5Y_zQWYz3TSTmYC065ElJNoTz3MTK0d0b66_6o5QNV0KIK7Q', 'dWTnyD8RCU+A9VPvFumayQ==', 1758093574902, 1, 1),
-	(95000233, '107396590653698048', 'Mirror Saisima', NULL, NULL, NULL, NULL, 0, 0),
-	(96566328, '107396590653698048', 'Ezabella', '["410301376162299906","1055468376866168853","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0);
-
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;

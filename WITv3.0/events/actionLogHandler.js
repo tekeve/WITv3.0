@@ -211,12 +211,12 @@ async function handleMemberRemove(member) {
 async function handleMemberUpdate(oldMember, newMember) {
     if (newMember.user.bot) return;
 
-    const executor = await getExecutor(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
-
     const oldTimeout = oldMember.communicationDisabledUntilTimestamp;
     const newTimeout = newMember.communicationDisabledUntilTimestamp;
 
+    // Check for Timeout changes
     if (oldTimeout !== newTimeout) {
+        const executor = await getExecutor(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
         if (newTimeout && newTimeout > Date.now()) {
             const embed = new EmbedBuilder()
                 .setColor(0xED4245)
@@ -233,10 +233,11 @@ async function handleMemberUpdate(oldMember, newMember) {
                 .setTimestamp();
             actionLog.postLog(newMember.guild, 'log_member_timeout', embed, { member: newMember });
         }
-        return;
     }
 
+    // Check for Nickname changes
     if (oldMember.nickname !== newMember.nickname) {
+        const executor = await getExecutor(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
             .setTitle('Nickname Changed')
@@ -252,6 +253,7 @@ async function handleMemberUpdate(oldMember, newMember) {
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;
 
+    // Check for Role changes
     if (oldRoles.size !== newRoles.size || !oldRoles.every((value, key) => newRoles.has(key))) {
         const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
         const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
