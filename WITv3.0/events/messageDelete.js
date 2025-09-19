@@ -1,20 +1,39 @@
-const { Events, EmbedBuilder } = require('discord.js');
-const { logAction } = require('@helpers/actionLog');
+const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
+const actionLog = require('@helpers/actionLog');
 
 module.exports = {
     name: Events.MessageDelete,
     async execute(message) {
-        // Ignore partial messages and messages from bots
-        if (message.partial || message.author.bot) return;
+        if (!message.guild || !message.author || message.author.bot) return;
+
+        // Fetch audit logs to see who deleted the message.
+        const fetchedLogs = await message.guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.MessageDelete,
+        });
+
+        const deleteLog = fetchedLogs.entries.first();
+        let executor = "Unknown";
+        if (deleteLog) {
+            const { executor: logExecutor, target } = deleteLog;
+            // Check if the log entry is for the deleted message's author
+            if (target.id === message.author.id && deleteLog.createdTimestamp > (Date.now() - 5000)) {
+                executor = logExecutor.tag;
+            }
+        }
 
         const embed = new EmbedBuilder()
             .setColor(0xED4245) // Red
-            .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL() })
-            .setDescription(`**Message sent by ${message.author} deleted in ${message.channel}**`)
-            .addFields({ name: 'Content', value: message.content ? message.content.substring(0, 1024) : '*No content available (e.g., an embed)*' })
-            .setFooter({ text: `User ID: ${message.author.id}` })
+            .setTitle('Message Deleted')
+            .addFields(
+                { name: 'Author', value: message.author.tag, inline: true },
+                { name: 'Channel', value: message.channel.toString(), inline: true },
+                { name: 'Deleted By', value: executor, inline: true },
+                { name: 'Content', value: message.content ? `\`\`\`${message.content}\`\`\`` : '*No content (e.g., an embed)*' }
+            )
             .setTimestamp();
 
-        logAction(message.client, embed);
+        actionLog.postLog(message.guild, 'log_message_delete', embed, { channel: message.channel, member: message.member });
     },
 };
+

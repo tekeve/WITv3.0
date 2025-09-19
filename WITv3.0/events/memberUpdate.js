@@ -1,71 +1,72 @@
 const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
-const { logAction } = require('@helpers/actionLog');
+const actionLog = require('@helpers/actionLog');
 const logger = require('@helpers/logger');
 
 module.exports = {
     name: Events.GuildMemberUpdate,
-    async execute(oldMember, newMember, client) { // Added client parameter for explicit access
-        // --- DIAGNOSTIC LOG ---
-        // This is the most important line. We need to see if this message appears in your console.
-        logger.warn(`EVENT FIRED: guildMemberUpdate for user ${newMember.user.tag}`);
+    async execute(oldMember, newMember) {
+        if (!newMember.guild) return;
 
-        // Fetch the roles from the cache. Using cache is fine here because the event provides the updated member object.
         const oldRoles = oldMember.roles.cache;
         const newRoles = newMember.roles.cache;
 
-        // If the role collections are identical, it wasn't a role change.
-        if (oldRoles.equals(newRoles)) {
-            return;
+        // Proceed only if the roles have actually changed.
+        if (oldRoles.size === newRoles.size && oldRoles.every((role, id) => newRoles.has(id))) {
+            return; // No role changes, exit early.
         }
 
         try {
-            // Delay to allow audit log to populate.
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // Fetch the most recent audit log entry for a member role update.
             const fetchedLogs = await newMember.guild.fetchAuditLogs({
                 limit: 1,
                 type: AuditLogEvent.MemberRoleUpdate,
             });
-
             const roleLog = fetchedLogs.entries.first();
 
-            // Validate the audit log entry
+            // Verify the audit log is recent and for the correct user.
             if (!roleLog || roleLog.target.id !== newMember.id || roleLog.createdTimestamp < (Date.now() - 5000)) {
-                logger.warn(`Could not find a recent and matching audit log for the role change on ${newMember.user.tag}.`);
+                logger.warn(`Could not find a recent audit log for a role change for ${newMember.user.tag}. This may be a self-role change.`);
                 return;
             }
 
             const { executor, changes } = roleLog;
 
-            const addedRoles = changes.filter(c => c.key === '$add').flatMap(c => c.new.map(r => `<@&${r.id}>`));
-            const removedRoles = changes.filter(c => c.key === '$remove').flatMap(c => c.new.map(r => `<@&${r.id}>`));
+            // Determine which roles were added and which were removed from the audit log entry.
+            const addedRoles = changes.filter(change => change.key === '$add').flatMap(change => change.new);
+            const removedRoles = changes.filter(change => change.key === '$remove').flatMap(change => change.new);
 
+            // If no roles were added or removed in the log, something is wrong, so we exit.
             if (addedRoles.length === 0 && removedRoles.length === 0) {
-                logger.info(`guildMemberUpdate fired for ${newMember.user.tag}, but audit log showed no role changes.`);
                 return;
             }
 
-            let description = '';
-            if (addedRoles.length > 0) {
-                description += `**Roles Added:** ${addedRoles.join(', ')}\n`;
-            }
-            if (removedRoles.length > 0) {
-                description += `**Roles Removed:** ${removedRoles.join(', ')}`;
-            }
-
+            // --- MODIFICATION START ---
+            // Combine added and removed roles into a single, comprehensive embed.
             const embed = new EmbedBuilder()
-                .setColor(0x5865F2) // Blue
-                .setAuthor({ name: `Roles updated by: ${executor.tag}`, iconURL: executor.displayAvatarURL() })
-                .setDescription(`**Roles for ${newMember.user} were updated**\n\n${description.trim()}`)
-                .setFooter({ text: `User ID: ${newMember.id}` })
+                .setColor(0x4E5D94) // Neutral blue color
+                .setTitle('Member Roles Updated')
+                .setDescription(`Roles for **${newMember.user.tag}** were updated by **${executor.tag}**.`)
                 .setTimestamp();
 
-            // Use the passed client object for logging
-            logAction(client, embed);
+            if (addedRoles.length > 0) {
+                const addedRolesString = addedRoles.map(role => `<@&${role.id}>`).join('\n');
+                embed.addFields({ name: 'Roles Added', value: addedRolesString, inline: true });
+                embed.setColor(0x43B581); // Green if roles were added
+            }
+
+            if (removedRoles.length > 0) {
+                const removedRolesString = removedRoles.map(role => `<@&${role.id}>`).join('\n');
+                embed.addFields({ name: 'Roles Removed', value: removedRolesString, inline: true });
+                embed.setColor(0xED4245); // Red if roles were removed
+            }
+
+            // If both were changed, the color will be red, which is fine as it indicates a change.
+
+            // Post the single, combined log entry.
+            actionLog.postLog(newMember.guild, 'log_member_role_add', embed, { member: newMember });
+            // --- MODIFICATION END ---
 
         } catch (error) {
-            logger.error(`Failed to process guildMemberUpdate. Does the bot have 'View Audit Log' permissions?`, error);
+            logger.error('Failed to process guildMemberUpdate event for role change:', error);
         }
     },
 };

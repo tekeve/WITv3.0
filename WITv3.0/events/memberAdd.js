@@ -1,19 +1,19 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const { logAction } = require('@helpers/actionLog');
+const actionLog = require('@helpers/actionLog');
 
 module.exports = {
     name: Events.GuildMemberAdd,
     async execute(member) {
-        const accountAge = Math.floor(member.user.createdTimestamp / 1000);
+        if (!member.guild) return;
 
         const embed = new EmbedBuilder()
-            .setColor(0x57F287) // Green
-            .setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL() })
-            .setDescription(`${member.user} **joined the server**`)
-            .addFields({ name: 'Account Created', value: `<t:${accountAge}:R>` })
-            .setFooter({ text: `User ID: ${member.user.id}` })
+            .setColor(0x43B581) // Green
+            .setTitle('Member Joined')
+            .setDescription(`${member.user.tag} (${member.id}) has joined the server.`)
+            .setThumbnail(member.user.displayAvatarURL())
             .setTimestamp();
 
-        logAction(member.client, embed);
+        actionLog.postLog(member.guild, 'log_member_join', embed, { member });
     },
 };
+

@@ -1,13 +1,14 @@
 const express = require('express');
-const path = require('path'); // Use the 'path' module for robust file paths
-const logger = require('@helpers/logger'); // Path updated
+const path = require('path');
+const logger = require('@helpers/logger');
 require('dotenv').config();
 
-// Import the router factory function from its new location
+// Import routers
 const authRoutes = require('./routes/authRoutes');
 const srpRoutes = require('./routes/srpRoutes');
 const setupRoutes = require('./routes/setupRoutes');
 const webeditRoutes = require('./routes/webeditRoutes');
+const actionlogRoutes = require('./routes/actionlogRoutes'); // Import the new router
 
 /**
  * Initializes and starts the Express web server.
@@ -17,30 +18,24 @@ function startServer(client) {
     const app = express();
     const port = process.env.PORT || 3000;
 
-    // Middleware to parse URL-encoded bodies (as sent by HTML forms)
     app.use(express.urlencoded({ extended: true }));
-    // Standard JSON middleware for other potential routes.
-    app.use(express.json());
 
-
-    // Set the view engine to EJS and tell Express where to find the templates
-    // Using path.join makes this path absolute and less prone to errors
     app.set('view engine', 'ejs');
     app.set('views', path.join(__dirname, 'views'));
 
-    // Load and use the router, passing the client object
+    // Load and use all the routers
     app.use('/', authRoutes(client));
     app.use('/', srpRoutes(client, client.activeSrpTokens));
     app.use('/', setupRoutes(client, client.activeSetupTokens));
     app.use('/', webeditRoutes(client, client.activeWebEditTokens));
+    app.use('/', actionlogRoutes(client)); // Use the new action log router
 
-    // Optional: Add a simple root route for health checks
     app.get('/', (req, res) => {
-        res.send('ESI Callback Server is running.');
+        res.send('Web server is running.');
     });
 
     app.listen(port, () => {
-        logger.info(`ESI auth callback server listening on port ${port}`);
+        logger.info(`Web server listening on port ${port}`);
     });
 }
 

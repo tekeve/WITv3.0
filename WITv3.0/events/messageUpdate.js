@@ -1,25 +1,25 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const { logAction } = require('@helpers/actionLog');
+const actionLog = require('@helpers/actionLog');
 
 module.exports = {
     name: Events.MessageUpdate,
     async execute(oldMessage, newMessage) {
-        // Ignore partials, bots, and non-content changes (e.g., embed loading)
-        if (oldMessage.partial || newMessage.partial || newMessage.author.bot || oldMessage.content === newMessage.content) {
-            return;
-        }
+        if (!newMessage.guild || !newMessage.author || newMessage.author.bot) return;
+        if (oldMessage.content === newMessage.content) return; // Ignore embed updates etc.
 
         const embed = new EmbedBuilder()
-            .setColor(0x5865F2) // Blue
-            .setAuthor({ name: newMessage.author.tag, iconURL: newMessage.author.displayAvatarURL() })
-            .setDescription(`**Message edited in ${newMessage.channel}** [Jump to Message](${newMessage.url})`)
+            .setColor(0xFAA61A) // Orange
+            .setTitle('Message Edited')
             .addFields(
-                { name: 'Before', value: oldMessage.content.substring(0, 1024) || '*Empty*' },
-                { name: 'After', value: newMessage.content.substring(0, 1024) || '*Empty*' }
+                { name: 'Author', value: newMessage.author.tag, inline: true },
+                { name: 'Channel', value: newMessage.channel.toString(), inline: true },
+                { name: 'Original Content', value: oldMessage.content ? `\`\`\`${oldMessage.content}\`\`\`` : '*No content*' },
+                { name: 'Updated Content', value: newMessage.content ? `\`\`\`${newMessage.content}\`\`\`` : '*No content*' }
             )
-            .setFooter({ text: `User ID: ${newMessage.author.id}` })
+            .setURL(newMessage.url)
             .setTimestamp();
 
-        logAction(newMessage.client, embed);
+        actionLog.postLog(newMessage.guild, 'log_message_edit', embed, { channel: newMessage.channel, member: newMessage.member });
     },
 };
+
