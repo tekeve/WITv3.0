@@ -40,7 +40,6 @@ exports.showSettingsForm = (client) => async (req, res) => {
 
     try {
         const guild = tokenData.guild;
-        // Fetch fresh data instead of relying on cache
         await guild.channels.fetch();
         await guild.roles.fetch();
 
@@ -84,7 +83,6 @@ exports.handleSettingsSubmission = (client) => async (req, res) => {
 
     try {
         const formData = req.body;
-
         const getArray = (value) => {
             if (Array.isArray(value)) return value;
             if (value) return [value];
@@ -93,42 +91,50 @@ exports.handleSettingsSubmission = (client) => async (req, res) => {
 
         const settings = {
             id: 1,
+            // Message Events
             log_message_delete: formData.log_message_delete === 'on',
             log_message_edit: formData.log_message_edit === 'on',
+            log_image_delete: formData.log_image_delete === 'on',
+            // Member Events
             log_member_join: formData.log_member_join === 'on',
             log_member_leave: formData.log_member_leave === 'on',
-            log_member_role_add: formData.log_member_role_add === 'on',
-            log_member_role_remove: formData.log_member_role_remove === 'on',
+            log_member_role_update: formData.log_member_role_update === 'on',
+            log_nickname_change: formData.log_nickname_change === 'on',
+            // Voice Events
             log_voice_join: formData.log_voice_join === 'on',
             log_voice_leave: formData.log_voice_leave === 'on',
             log_voice_move: formData.log_voice_move === 'on',
-            ignored_channels: JSON.stringify(getArray(formData['ignored_channels[]'])),
-            ignored_roles: JSON.stringify(getArray(formData['ignored_roles[]'])),
+            // Moderation Events
+            log_member_ban: formData.log_member_ban === 'on',
+            log_member_unban: formData.log_member_unban === 'on',
+            log_member_timeout: formData.log_member_timeout === 'on',
+            // Role & Channel Events
+            log_role_create: formData.log_role_create === 'on',
+            log_role_delete: formData.log_role_delete === 'on',
+            log_role_update: formData.log_role_update === 'on',
+            log_channel_create: formData.log_channel_create === 'on',
+            log_channel_delete: formData.log_channel_delete === 'on',
+            log_channel_update: formData.log_channel_update === 'on',
+            // Invite Events
+            log_invite_create: formData.log_invite_create === 'on',
+            log_invite_delete: formData.log_invite_delete === 'on',
+            // Ignored lists
+            ignored_channels: JSON.stringify(getArray(formData.ignored_channels)),
+            ignored_roles: JSON.stringify(getArray(formData.ignored_roles)),
         };
 
         const existingSettings = await db.query('SELECT id FROM action_log_settings WHERE id = 1');
 
         if (existingSettings.length > 0) {
-            // --- UPDATE EXISTING RECORD ---
-            const updateClauses = Object.keys(settings)
-                .filter(key => key !== 'id')
-                .map(key => `\`${key}\` = ?`)
-                .join(', ');
-
-            const values = Object.keys(settings)
-                .filter(key => key !== 'id')
-                .map(key => settings[key]);
-
+            const updateClauses = Object.keys(settings).filter(key => key !== 'id').map(key => `\`${key}\` = ?`).join(', ');
+            const values = Object.keys(settings).filter(key => key !== 'id').map(key => settings[key]);
             values.push(settings.id);
-
             const sql = `UPDATE action_log_settings SET ${updateClauses} WHERE id = ?`;
             await db.query(sql, values);
         } else {
-            // --- INSERT NEW RECORD ---
             const columns = Object.keys(settings);
             const placeholders = columns.map(() => '?').join(', ');
             const values = Object.values(settings);
-
             const sql = `INSERT INTO action_log_settings (\`${columns.join('`, `')}\`) VALUES (${placeholders})`;
             await db.query(sql, values);
         }

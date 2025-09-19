@@ -3,10 +3,7 @@ const path = require('path');
 const chalk = require('chalk');
 require('module-alias/register');
 const logger = require('@helpers/logger');
-// --- MODIFICATION START ---
-// We are importing Partials and expanding the list of GatewayIntentBits.
 const { Client, Collection, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
-// --- MODIFICATION END ---
 require('dotenv').config();
 
 const configManager = require('@helpers/configManager');
@@ -51,9 +48,6 @@ async function deployCommands() {
     }
 }
 
-// ================================================================= //
-// =================== MAIN APPLICATION LOGIC ====================== //
-// ================================================================= //
 async function initializeApp() {
     if (process.argv.includes('--db-setup')) {
         logger.info('Running database setup...');
@@ -75,23 +69,19 @@ async function initializeApp() {
     await incursionManager.loadIncursionSystems();
     await roleHierarchyManager.reloadHierarchy();
 
-    // --- MODIFICATION START ---
-    // This is the critical change. We are now telling the bot to subscribe to all the
-    // events required for the action log to function correctly.
     const client = new Client({
         intents: [
             GatewayIntentBits.Guilds,
             GatewayIntentBits.GuildMembers,
             GatewayIntentBits.GuildMessages,
             GatewayIntentBits.MessageContent,
-            GatewayIntentBits.GuildVoiceStates
+            GatewayIntentBits.GuildVoiceStates,
+            GatewayIntentBits.GuildInvites,
+            GatewayIntentBits.GuildModeration,
         ],
         partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
     });
-    // --- MODIFICATION END ---
 
-
-    // In-memory stores
     client.activeSrpTokens = new Map();
     client.activeSetupTokens = new Map();
     client.activeWebEditTokens = new Map();
@@ -99,10 +89,8 @@ async function initializeApp() {
     client.mailSubjects = new Map();
     client.mockOverride = null;
 
-    // Start the ESI authentication callback server
     startServer(client);
 
-    // ... (Command Loading Logic remains the same) ...
     client.commands = new Collection();
     const foldersPath = path.join(__dirname, 'commands');
     const commandFolders = fs.readdirSync(foldersPath);
@@ -116,34 +104,30 @@ async function initializeApp() {
             if ('data' in command && ('execute' in command || 'autocomplete' in command) && 'permission' in command) {
                 client.commands.set(command.data.name, command);
             } else {
-                logger.warn(`The command at ${filePath} is missing a required "data", "execute", "autocomplete", or "permission" property.`);
+                logger.warn(`The command at ${filePath} is missing a required property.`);
             }
         }
     }
 
-    // ================================================================= //
-    // ============ STATE MANAGEMENT & HELPER FUNCTIONS ================ //
-    // ================================================================= //
     const { updateIncursions } = require('@helpers/incursionController.js');
     client.updateIncursions = (options) => updateIncursions(client, options);
 
-    // ================================================================= //
-    // ================= DYNAMIC EVENT HANDLER LOADER ================== //
-    // ================================================================= //
-    const eventsPath = path.join(__dirname, 'events');
-    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+    // --- CONSOLIDATED EVENT HANDLER LOADING ---
+    // Load core, non-action-log event handlers
+    const clientReadyHandler = require('./events/clientReady');
+    const interactionCreateHandler = require('./events/interactionCreate');
+    const srpSubmissionHandler = require('./events/srpSubmission');
 
-    for (const file of eventFiles) {
-        const filePath = path.join(eventsPath, file);
-        const event = require(filePath);
-        // Pass the client instance to each event handler
-        if (event.once) {
-            client.once(event.name, (...args) => event.execute(...args, client));
-        } else {
-            client.on(event.name, (...args) => event.execute(...args, client));
-        }
-        logger.info(`Loaded event: ${event.name}`);
-    }
+    client.once(clientReadyHandler.name, (...args) => clientReadyHandler.execute(...args, client));
+    client.on(interactionCreateHandler.name, (...args) => interactionCreateHandler.execute(...args, client));
+    client.on(srpSubmissionHandler.name, (...args) => srpSubmissionHandler.execute(...args, client));
+
+    // Register all action log event listeners from the consolidated handler
+    const { registerActionLogEvents } = require('./events/actionLogHandler');
+    registerActionLogEvents(client);
+
+    logger.info('Loaded all event handlers.');
+    // --- END OF NEW LOADING LOGIC ---
 
     client.login(process.env.DISCORD_TOKEN);
 }
