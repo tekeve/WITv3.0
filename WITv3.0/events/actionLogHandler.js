@@ -13,14 +13,16 @@ const logger = require('@helpers/logger');
  */
 async function getExecutor(guild, eventType, targetId) {
     try {
+        // --- FIX: Fetch more than one log to avoid race conditions ---
         const fetchedLogs = await guild.fetchAuditLogs({
-            limit: 1,
+            limit: 5,
             type: eventType,
         });
-        const log = fetchedLogs.entries.first();
+        // Find the specific log entry for our target.
+        const log = fetchedLogs.entries.find(entry => entry.target?.id === targetId);
 
-        // Check if a log was found, it's recent, and it matches the target
-        if (log && log.target.id === targetId && log.createdTimestamp > (Date.now() - 5000)) {
+        // Check if a log was found and it's recent
+        if (log && log.createdTimestamp > (Date.now() - 5000)) {
             return log.executor;
         }
     } catch (error) {
@@ -65,7 +67,7 @@ async function handleChannelUpdate(oldChannel, newChannel) {
         changes.push(`**Topic:** \`${oldChannel.topic || 'None'}\` -> \`${newChannel.topic || 'None'}\``);
     }
 
-    // --- START: Detailed Permission Change Detection ---
+    // --- FIX: Reworked permission detection for reliability ---
     const oldPerms = oldChannel.permissionOverwrites.cache;
     const newPerms = newChannel.permissionOverwrites.cache;
     const permChanges = [];
@@ -77,45 +79,38 @@ async function handleChannelUpdate(oldChannel, newChannel) {
         const newO = newPerms.get(id);
 
         let target = null;
-        try {
-            target = await newChannel.guild.roles.fetch(id);
-        } catch {
-            try {
-                target = await newChannel.guild.members.fetch(id);
-            } catch { }
+        try { target = await newChannel.guild.roles.fetch(id); } catch {
+            try { target = await newChannel.guild.members.fetch(id); } catch { }
         }
 
         const targetName = target ? (target.name || target.user.tag) : `Unknown ID (${id})`;
 
-        if (!oldO && newO) { // Overwrite Added
+        if (!oldO && newO) {
             permChanges.push(`**+ ${targetName}** (Overwrite Created)`);
             continue;
         }
-
-        if (oldO && !newO) { // Overwrite Removed
+        if (oldO && !newO) {
             permChanges.push(`**- ${targetName}** (Overwrite Removed)`);
             continue;
         }
-
-        if (oldO && newO && (oldO.allow.bitfield !== newO.allow.bitfield || oldO.deny.bitfield !== newO.deny.bitfield)) { // Overwrite Modified
+        if (oldO && newO && (oldO.allow.bitfield !== newO.allow.bitfield || oldO.deny.bitfield !== newO.deny.bitfield)) {
             const changedPermissions = [];
             const allPermissionFlags = Object.keys(PermissionsBitField.Flags);
 
             for (const perm of allPermissionFlags) {
                 const flag = PermissionsBitField.Flags[perm];
-                const oldHas = oldO.allow.has(flag);
-                const newHas = newO.allow.has(flag);
+                const oldAllow = oldO.allow.has(flag);
+                const newAllow = newO.allow.has(flag);
                 const oldDeny = oldO.deny.has(flag);
                 const newDeny = newO.deny.has(flag);
 
-                if (oldHas !== newHas) {
-                    changedPermissions.push(newHas ? `✅ ${perm} (Allowed)` : `❌ ${perm} (Allowed)`);
+                if (oldAllow !== newAllow) {
+                    changedPermissions.push(newAllow ? `✅ ${perm} (Allowed)` : `❌ ${perm} (Not Allowed)`);
                 }
                 if (oldDeny !== newDeny) {
-                    changedPermissions.push(newDeny ? `🚫 ${perm} (Denied)` : `⚪ ${perm} (Denied)`);
+                    changedPermissions.push(newDeny ? `🚫 ${perm} (Denied)` : `⚪ ${perm} (Not Denied)`);
                 }
             }
-
             if (changedPermissions.length > 0) {
                 permChanges.push(`**~ ${targetName}**:\n    ${changedPermissions.join('\n    ')}`);
             }
@@ -125,7 +120,6 @@ async function handleChannelUpdate(oldChannel, newChannel) {
     if (permChanges.length > 0) {
         permissionChanges = permChanges.join('\n');
     }
-    // --- END: Detailed Permission Change Detection ---
 
     if (changes.length === 0 && permissionChanges.length === 0) return;
 
@@ -142,7 +136,6 @@ async function handleChannelUpdate(oldChannel, newChannel) {
     if (permissionChanges.length > 0) {
         embed.addFields({ name: 'Permission Changes', value: permissionChanges.substring(0, 1024) });
     }
-
     actionLog.postLog(newChannel.guild, 'log_channel_update', embed);
 }
 
@@ -346,58 +339,33 @@ async function handleMessageUpdate(oldMessage, newMessage) {
     actionLog.postLog(newMessage.guild, 'log_message_edit', embed, { channel: newMessage.channel, member: newMessage.member });
 }
 
-// --- FIX START: Robust role create/delete logging with delay ---
 async function handleRoleCreate(role) {
-    setTimeout(async () => {
-        try {
-            const fetchedLogs = await role.guild.fetchAuditLogs({
-                limit: 1,
-                type: AuditLogEvent.RoleCreate,
-            });
-            const log = fetchedLogs.entries.first();
-            let executor = null;
-            if (log && log.target.id === role.id && log.createdTimestamp > (Date.now() - 5000)) {
-                executor = log.executor;
-            }
-
-            const embed = new EmbedBuilder()
-                .setColor(0x43B581)
-                .setTitle('Role Created')
-                .setDescription(`Role **${role.name}** was created ${executor ? `by **${executor.tag}**` : ''}.`)
-                .setTimestamp();
-            actionLog.postLog(role.guild, 'log_role_create', embed);
-        } catch (error) {
-            logger.error('Failed to process roleCreate event:', error);
-        }
-    }, 500); // Wait 500ms for audit log to be available
+    try {
+        const executor = await getExecutor(role.guild, AuditLogEvent.RoleCreate, role.id);
+        const embed = new EmbedBuilder()
+            .setColor(0x43B581)
+            .setTitle('Role Created')
+            .setDescription(`Role **${role.name}** was created ${executor ? `by **${executor.tag}**` : ''}.`)
+            .setTimestamp();
+        actionLog.postLog(role.guild, 'log_role_create', embed);
+    } catch (error) {
+        logger.error('Failed to process roleCreate event:', error);
+    }
 }
 
 async function handleRoleDelete(role) {
-    setTimeout(async () => {
-        try {
-            const fetchedLogs = await role.guild.fetchAuditLogs({
-                limit: 1,
-                type: AuditLogEvent.RoleDelete,
-            });
-            const log = fetchedLogs.entries.first();
-            let executor = null;
-            if (log && log.target.id === role.id && log.createdTimestamp > (Date.now() - 5000)) {
-                executor = log.executor;
-            }
-
-            const embed = new EmbedBuilder()
-                .setColor(0xED4245)
-                .setTitle('Role Deleted')
-                .setDescription(`Role **${role.name}** was deleted ${executor ? `by **${executor.tag}**` : ''}.`)
-                .setTimestamp();
-            actionLog.postLog(role.guild, 'log_role_delete', embed);
-        } catch (error) {
-            logger.error('Failed to process roleDelete event:', error);
-        }
-    }, 500); // Wait 500ms for audit log to be available
+    try {
+        const executor = await getExecutor(role.guild, AuditLogEvent.RoleDelete, role.id);
+        const embed = new EmbedBuilder()
+            .setColor(0xED4245)
+            .setTitle('Role Deleted')
+            .setDescription(`Role **${role.name}** was deleted ${executor ? `by **${executor.tag}**` : ''}.`)
+            .setTimestamp();
+        actionLog.postLog(role.guild, 'log_role_delete', embed);
+    } catch (error) {
+        logger.error('Failed to process roleDelete event:', error);
+    }
 }
-// --- FIX END ---
-
 
 async function handleRoleUpdate(oldRole, newRole) {
     const executor = await getExecutor(newRole.guild, AuditLogEvent.RoleUpdate, newRole.id);
