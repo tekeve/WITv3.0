@@ -33,7 +33,7 @@ module.exports = {
             }
         }, EXPIRATION_MINUTES * 60 * 1000);
 
-        const formUrl = `http://${process.env.WEB_HOST_NAME || 'localhost:3000'}/actionlog/${token}`;
+        const formUrl = `http://${process.env.WEB_HOST_NAME}/actionlog/${token}`;
 
         await interaction.reply({
             content: `Click the button below to open the Action Log settings page. This link will expire in **${EXPIRATION_MINUTES} minutes**.`,

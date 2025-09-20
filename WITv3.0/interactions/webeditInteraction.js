@@ -27,7 +27,7 @@ async function handleTableSelect(interaction) {
     }, EXPIRATION_MINUTES * 60 * 1000);
 
     // Construct the URL and send it to the user.
-    const formUrl = `http://${process.env.WEB_HOST_NAME || 'localhost:3000'}/webedit/${token}`;
+    const formUrl = `http://${process.env.WEB_HOST_NAME}/webedit/${token}`;
 
     await interaction.update({ // Update the original message with the link.
         content: `Click the button below to open the web editor for the **${selectedTable}** table. This link will expire in **${EXPIRATION_MINUTES} minutes**.`,

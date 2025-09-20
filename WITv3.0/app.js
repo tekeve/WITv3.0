@@ -85,6 +85,7 @@ async function initializeApp() {
     client.activeSrpTokens = new Map();
     client.activeSetupTokens = new Map();
     client.activeWebEditTokens = new Map();
+    client.activeResidentAppTokens = new Map();
     client.esiStateMap = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null;
@@ -113,14 +114,15 @@ async function initializeApp() {
     client.updateIncursions = (options) => updateIncursions(client, options);
 
     // --- CONSOLIDATED EVENT HANDLER LOADING ---
-    // Load core, non-action-log event handlers
     const clientReadyHandler = require('./events/clientReady');
     const interactionCreateHandler = require('./events/interactionCreate');
     const srpSubmissionHandler = require('./events/srpSubmission');
+    const residentAppSubmissionHandler = require('./events/residentAppSubmission');
 
     client.once(clientReadyHandler.name, (...args) => clientReadyHandler.execute(...args, client));
     client.on(interactionCreateHandler.name, (...args) => interactionCreateHandler.execute(...args, client));
     client.on(srpSubmissionHandler.name, (...args) => srpSubmissionHandler.execute(...args, client));
+    client.on(residentAppSubmissionHandler.name, (...args) => residentAppSubmissionHandler.execute(...args, client));
 
     // Register all action log event listeners from the consolidated handler
     const { registerActionLogEvents } = require('./events/actionLogHandler');

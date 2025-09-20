@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resident Application Form</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #1e293b;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 2.5rem;
+            border-radius: 0.75rem;
+            background-color: #334155;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid #475569;
+        }
+        h1 {
+            text-align: center;
+            color: #f8fafc;
+            font-size: 1.875rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #cbd5e1;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 0.375rem;
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            color: #e2e8f0;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
+        }
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.375rem;
+            background-color: #0ea5e9;
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            margin-top: 1.5rem;
+        }
+        button:hover {
+            background-color: #38bdf8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WTM Commander Application</h1>
+        <form action="/residentapp/<%= token %>" method="POST">
+            <div class="form-group">
+                <label for="character_name">Character Name</label>
+                <input type="text" id="character_name" name="character_name" required>
+            </div>
+            <div class="form-group">
+                <label for="alts">List any alts you fly with</label>
+                <input type="text" id="alts" name="alts">
+            </div>
+            <div class="form-group">
+                <label for="forum_identity">Enter your Forum Identity</label>
+                <input type="text" id="forum_identity" name="forum_identity">
+            </div>
+            <div class="form-group">
+                <label for="discord_identity">Enter your Discord Identity</label>
+                <input type="text" id="discord_identity" name="discord_identity" required>
+            </div>
+            <div class="form-group">
+                <label for="wtm_time">How long have you flown with WTM?</label>
+                <input type="text" id="wtm_time" name="wtm_time">
+            </div>
+            <div class="form-group">
+                <label for="logistics_ships">What Logistics Ships can you fly?</label>
+                <textarea id="logistics_ships" name="logistics_ships" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="battleship_ships">What Battleships can you fly?</label>
+                <textarea id="battleship_ships" name="battleship_ships" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="t2_guns">Do you have T2 guns?</label>
+                <input type="text" id="t2_guns" name="t2_guns">
+            </div>
+            <div class="form-group">
+                <label for="command_time_estimate">How much time do you estimate you will be able to dedicate as a commander per week?</label>
+                <input type="text" id="command_time_estimate" name="command_time_estimate">
+            </div>
+            <div class="form-group">
+                <label for="why_commander">Why do you want to be a commander with WTM?</label>
+                <textarea id="why_commander" name="why_commander" rows="5"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="why_wtm">Why do you like Flying with WTM?</label>
+                <textarea id="why_wtm" name="why_wtm" rows="5"></textarea>
+            </div>
+            <button type="submit">Submit Application</button>
+        </form>
+    </div>
+</body>
+</html>
+

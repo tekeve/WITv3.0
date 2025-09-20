@@ -39,7 +39,7 @@ module.exports = {
         }, EXPIRATION_MINUTES * 60 * 1000); // 15 minutes in milliseconds
 
         // Construct the full URL for the setup form
-        const formUrl = `http://${process.env.WEB_HOST_NAME || 'localhost:3000'}/setup/${token}`;
+        const formUrl = `http://${process.env.WEB_HOST_NAME}/setup/${token}`;
 
         // Reply to the user with a button linking to the form
         await interaction.reply({

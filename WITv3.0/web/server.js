@@ -8,11 +8,12 @@ const authRoutes = require('./routes/authRoutes');
 const srpRoutes = require('./routes/srpRoutes');
 const setupRoutes = require('./routes/setupRoutes');
 const webeditRoutes = require('./routes/webeditRoutes');
-const actionlogRoutes = require('./routes/actionlogRoutes'); // Import the new router
+const actionlogRoutes = require('./routes/actionlogRoutes');
+const residentAppRoutes = require('./routes/residentAppRoutes');
 
 /**
  * Initializes and starts the Express web server.
- * @param {Client} client The Discord client instance.
+ * @param {import('discord.js').Client} client The Discord client instance.
  */
 function startServer(client) {
     const app = express();
@@ -28,7 +29,8 @@ function startServer(client) {
     app.use('/', srpRoutes(client, client.activeSrpTokens));
     app.use('/', setupRoutes(client, client.activeSetupTokens));
     app.use('/', webeditRoutes(client, client.activeWebEditTokens));
-    app.use('/', actionlogRoutes(client)); // Use the new action log router
+    app.use('/', actionlogRoutes(client));
+    app.use('/', residentAppRoutes(client, client.activeResidentAppTokens));
 
     app.get('/', (req, res) => {
         res.send('Web server is running.');
