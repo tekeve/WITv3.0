@@ -5,6 +5,7 @@
 -- HeidiSQL Version:             12.11.0.7065
 -- --------------------------------------------------------
 
+
 -- Dumping database structure for wit-db
 CREATE DATABASE IF NOT EXISTS `wit-db`;
 USE `wit-db`;
@@ -63,7 +64,7 @@ CREATE TABLE IF NOT EXISTS `config` (
   PRIMARY KEY (`key_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.config: ~17 rows (approximately)
+-- Dumping data for table wit-db.config: ~18 rows (approximately)
 REPLACE INTO `config` (`key_name`, `value`) VALUES
 	('actionLogChannelId', '["1418465802247475231"]'),
 	('adminRoles', '["1412546107975929917"]'),
@@ -76,8 +77,9 @@ REPLACE INTO `config` (`key_name`, `value`) VALUES
 	('githubChannelId', '["1418129590143942718"]'),
 	('githubRepoUrl', '["https://github.com/tekeve/WITv3.0"]'),
 	('incursionChannelId', '["1364223029814759444"]'),
-	('lastCommitSha', '["f8b54a7329dace7550552bea3e3173c94dc88fa8"]'),
+	('lastCommitSha', '["4154407a6c5d4e2d78ae76138b713342d7ed68e7"]'),
 	('requestChannelId', '[\r\n  "1411962383978725436"\r\n]'),
+	('residentAppChannelId', '["1418925872861155468"]'),
 	('setupLocked', '[\r\n  "true"\r\n]'),
 	('srpChannelId', '["1412210083135225866" ]'),
 	('srpMailingListId', '["145241588"]'),
@@ -91,6 +93,8 @@ CREATE TABLE IF NOT EXISTS `google_docs` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
+-- Dumping data for table wit-db.google_docs: ~0 rows (approximately)
+
 -- Dumping structure for table wit-db.google_sheets
 CREATE TABLE IF NOT EXISTS `google_sheets` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -98,6 +102,8 @@ CREATE TABLE IF NOT EXISTS `google_sheets` (
   `sheet_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- Dumping data for table wit-db.google_sheets: ~0 rows (approximately)
 
 -- Dumping structure for table wit-db.incursion_state
 CREATE TABLE IF NOT EXISTS `incursion_state` (
@@ -115,7 +121,7 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
 
 -- Dumping data for table wit-db.incursion_state: ~1 rows (approximately)
 REPLACE INTO `incursion_state` (`id`, `lastIncursionState`, `incursionMessageId`, `lastHqSystemId`, `spawnTimestamp`, `mobilizingTimestamp`, `withdrawingTimestamp`, `endedTimestamp`, `lastIncursionStats`) VALUES
-	(1, '20000777-mobilizing', '1417578751784390921', 30002252, 1757823480, 1758206040, NULL, NULL, NULL);
+	(1, '20000777-withdrawing', '1417578751784390921', 30002252, 1757823480, 1758206040, 1758378814, NULL, NULL);
 
 -- Dumping structure for table wit-db.incursion_systems
 CREATE TABLE IF NOT EXISTS `incursion_systems` (
@@ -254,6 +260,27 @@ CREATE TABLE IF NOT EXISTS `reminders` (
   KEY `remind_at` (`remind_at`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
+-- Dumping data for table wit-db.reminders: ~0 rows (approximately)
+
+-- Dumping structure for table wit-db.resident_applications
+CREATE TABLE IF NOT EXISTS `resident_applications` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `character_name` varchar(255) NOT NULL,
+  `alts` text DEFAULT NULL,
+  `forum_identity` varchar(255) NOT NULL,
+  `discord_identity` varchar(255) NOT NULL,
+  `wtm_time` varchar(255) NOT NULL,
+  `logistics_ships` text NOT NULL,
+  `battleship_ships` text NOT NULL,
+  `t2_guns` varchar(255) NOT NULL,
+  `command_time_estimate` varchar(255) NOT NULL,
+  `why_commander` text NOT NULL,
+  `why_wtm` text NOT NULL,
+  `discord_id` varchar(50) NOT NULL,
+  `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
 -- Dumping structure for table wit-db.rolehierarchy
 CREATE TABLE IF NOT EXISTS `rolehierarchy` (
   `roleName` varchar(50) NOT NULL,
@@ -287,7 +314,7 @@ CREATE TABLE IF NOT EXISTS `srp_history` (
   `loss_description` text NOT NULL,
   `loot_status` text NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- Dumping structure for table wit-db.users
 CREATE TABLE IF NOT EXISTS `users` (
@@ -305,9 +332,11 @@ CREATE TABLE IF NOT EXISTS `users` (
   CONSTRAINT `roles` CHECK (json_valid(`roles`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.users: ~4 rows (approximately)
+-- Dumping data for table wit-db.users: ~5 rows (approximately)
 REPLACE INTO `users` (`character_id`, `discord_id`, `character_name`, `roles`, `access_token`, `refresh_token`, `token_expiry`, `is_main`, `is_mailing_char`) VALUES
 	(93220962, '368778318415265792', 'Bella Cadelanne', '["410301376162299906","1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwucmVhZF9tYWlsLnYxIiwiZXNpLW1haWwuc2VuZF9tYWlsLnYxIl0sImp0aSI6IjI3MTdmNTA4LTg0NzItNDNhNi05NzkwLWYzZWNiOTA3NjRiZiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5Iiwic3ViIjoiQ0hBUkFDVEVSOkVWRTo5MzIyMDk2MiIsImF6cCI6IjhkNTFlNmRjMDk0ZTQ5MWY5M2U4Y2RkMjEyNzQ0YTg1IiwidGVuYW50IjoidHJhbnF1aWxpdHkiLCJ0aWVyIjoibGl2ZSIsInJlZ2lvbiI6IndvcmxkIiwiYXVkIjpbIjhkNTFlNmRjMDk0ZTQ5MWY5M2U4Y2RkMjEyNzQ0YTg1IiwiRVZFIE9ubGluZSJdLCJuYW1lIjoiQmVsbGEgQ2FkZWxhbm5lIiwib3duZXIiOiJTWk5RWTNYWUJRSDVrMFM5R0dmeGZmNkJ3YkE9IiwiZXhwIjoxNzU4MDkzNTc1LCJpYXQiOjE3NTgwOTIzNzUsImlzcyI6Imh0dHBzOi8vbG9naW4uZXZlb25saW5lLmNvbSJ9.GNqOxRygXljDdF2FkOmwX9Xmbnd-Ennzo-UuU2tsEJgQG1On0yIIUChk3AIlTBNqcC_xjD0_4RKPiyVUSVS8lTN4Ua7my99umnvj85YuKa5N6b9sLq_wrJjf5jMIqJJ3zjjnTod8cdJmE8jV5vwPD2u8OhjlCgsRQXxm7pVQ0iZ6qrTTYLNc_cs2PBDluYUe0IZMuOZFg_e4AVRxih2lyHWIjniwxemIL7wQ_gWleRuirQcPmni1FTMsmYGLBqEhkbP96kCpcQGbksIka5PbRH-fZ85NCeUTikADKe5Y_zQWYz3TSTmYC065ElJNoTz3MTK0d0b66_6o5QNV0KIK7Q', 'dWTnyD8RCU+A9VPvFumayQ==', 1758093574902, 1, 1),
 	(95000233, '107396590653698048', 'Mirror Saisima', NULL, NULL, NULL, NULL, 0, 0),
-	(96566328, '107396590653698048', 'Ezabella', '["410301376162299906","1055468376866168853","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
+	(95000238, '107396590653698048', 'Mirror Erata', NULL, NULL, NULL, NULL, 0, 0),
+	(96566328, '107396590653698048', 'Ezabella', '["410301376162299906","1055468376866168853","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwuc2VuZF9tYWlsLnYxIiwiZXNpLW1haWwucmVhZF9tYWlsLnYxIl0sImp0aSI6IjIxMjQ4ODc1LTg3Y2EtNDU2MS1iYTNhLTlhNjk2YzZiZGI3MyIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5Iiwic3ViIjoiQ0hBUkFDVEVSOkVWRTo5NjU2NjMyOCIsImF6cCI6IjhkNTFlNmRjMDk0ZTQ5MWY5M2U4Y2RkMjEyNzQ0YTg1IiwidGVuYW50IjoidHJhbnF1aWxpdHkiLCJ0aWVyIjoibGl2ZSIsInJlZ2lvbiI6IndvcmxkIiwiYXVkIjpbIjhkNTFlNmRjMDk0ZTQ5MWY5M2U4Y2RkMjEyNzQ0YTg1IiwiRVZFIE9ubGluZSJdLCJuYW1lIjoiRXphYmVsbGEiLCJvd25lciI6InhERm8vbDZOeVloeXdOTXRGN05id3FDK1FFZz0iLCJleHAiOjE3NTg0NDcwMDUsImlhdCI6MTc1ODQ0NTgwNSwiaXNzIjoiaHR0cHM6Ly9sb2dpbi5ldmVvbmxpbmUuY29tIn0.UQ5ooJfoYjdHWZOTuFZXO6zwhqGXJp_r5LANq_HsGkNB7ei7HYmmqauYT6sKntDtdvw7sA5vlZK1BkdnNaqhSIJymo3Sspgsi_FhoMvDOwPGsqm6WVbfnUHRXU8ntdN-7TrVunQc8JnqdMyrEdIZm8hpDDYoYljP5ZZBFOHrVj1yDehGJoLCbgJ7xO93DZMIJtDeoYJFcgbv327zpMe6ff_IM3JRMW3wy7z9-ybSugeQaY2aM2hmjgIlfdKlgIHB7d0MF7akEfUmFG1tfvD2j_zSWfeAzoQgxKvmzjGwU0Tac4F_3ax1mdaLgSPUGiPyViTeV5j1TZl58hsO54zDJg', 'Jv8Y65LiTU6+GOpz6FWKdw==', 1758447004411, 1, 1),
 	(163565361, '266657286355681280', 'Skeltek', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwuc2VuZF9tYWlsLnYxIiwiZXNpLW1haWwucmVhZF9tYWlsLnYxIl0sImp0aSI6IjM1ODY3NmQyLWQ4NzEtNDdiOS1iYjUzLWRiZWNiZDYzNGNhNiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5Iiwic3ViIjoiQ0hBUkFDVEVSOkVWRToxNjM1NjUzNjEiLCJhenAiOiI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsInRlbmFudCI6InRyYW5xdWlsaXR5IiwidGllciI6ImxpdmUiLCJyZWdpb24iOiJ3b3JsZCIsImF1ZCI6WyI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsIkVWRSBPbmxpbmUiXSwibmFtZSI6IlNrZWx0ZWsiLCJvd25lciI6IlNPN3F3dHpGOUY0eFE5c29kTEk1dVFjd0E3ST0iLCJleHAiOjE3NTgxNzA2ODEsImlhdCI6MTc1ODE2OTQ4MSwiaXNzIjoiaHR0cHM6Ly9sb2dpbi5ldmVvbmxpbmUuY29tIn0.W3DUD8CLjPaQNVXH-k1ddQ7lLRTjMVNWBX0Gtc33yGGUjKjkcjo5J203rzWhpXZsx49ySNoWI4NCL4ddeSmSrx2Bv-35uCpDhBSq65Z76O5YUrBGewDbM9Oxe3AXcPPNrN7sKxdvt7mu7eFyIgERwSF-RI4wRbeRKqxSIUmK3e93RwplPXiRl3dQf3xw2T3-MBb0j1byDXc07O6Y2Vppjh1ALVfIf10DJcjmg9NQrjoCAfaEGP77ABVbXK6IVR_NwFG0XDg-PQniQFszVu1pcA8cLsQpp4gVpQWg0e-X52PrWWnBKWsjS1l89raTJ10ZkHlZWIyZ_cDrThGukNYGWg', '4sVwNTj7ykOtLjBvPcTTtg==', 1758170679890, 1, 1);
+
