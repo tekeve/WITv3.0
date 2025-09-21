@@ -17,7 +17,9 @@ const residentAppRoutes = require('./routes/residentAppRoutes');
  */
 function startServer(client) {
     const app = express();
-    const port = process.env.PORT || 3000;
+    const port = process.env.PORT;
+    const host = process.env.WEB_HOST_NAME;
+
 
     app.use(express.urlencoded({ extended: true }));
 
@@ -36,7 +38,7 @@ function startServer(client) {
         res.send('Web server is running.');
     });
 
-    app.listen(port, () => {
+    app.listen(port, host,  () => {
         logger.info(`Web server listening on port ${port}`);
     });
 }
