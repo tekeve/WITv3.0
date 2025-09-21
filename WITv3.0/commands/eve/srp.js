@@ -37,7 +37,7 @@ module.exports = {
         }, EXPIRATION_MINUTES * 60 * 1000); // Convert minutes to milliseconds
 
         // 4. Construct the URL (make sure to use your actual domain)
-        const formUrl = `http://${process.env.WEB_HOST_NAME}/srp/${token}`;
+        const formUrl = `http://${process.env.HOST_NAME}/srp/${token}`;
 
         // 5. Reply to the user with the link
         await interaction.reply({

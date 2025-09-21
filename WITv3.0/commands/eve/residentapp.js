@@ -28,7 +28,7 @@ module.exports = {
             }
         }, EXPIRATION_MINUTES * 60 * 1000);
 
-        const formUrl = `http://${process.env.WEB_HOST_NAME}/residentapp/${token}`;
+        const formUrl = `http://${process.env.HOST_NAME}/residentapp/${token}`;
 
         await interaction.reply({
             content: `Click the button below to open the Resident Application form. This link will expire in **${EXPIRATION_MINUTES} minutes**.`,
