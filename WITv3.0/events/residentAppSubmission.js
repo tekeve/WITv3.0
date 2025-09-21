@@ -6,9 +6,9 @@ const db = require('@helpers/database');
 const charManager = require('@helpers/characterManager');
 
 /**
- * Splits a string into chunks of a specified maximum length.
+ * Splits a string into chunks of a specified maximum length, handling oversized lines.
  * @param {string} text The text to split.
- * @param {number} maxLength The maximum length of each chunk.
+ * @param {number} [maxLength=2000] The maximum length of each chunk.
  * @returns {string[]} An array of text chunks.
  */
 function splitMessage(text, maxLength = 2000) {
@@ -17,15 +17,35 @@ function splitMessage(text, maxLength = 2000) {
 
     const lines = text.split('\n');
     for (const line of lines) {
+        // If a single line by itself is too long, we must split it.
+        if (line.length > maxLength) {
+            // First, send off whatever we have in the current chunk.
+            if (currentChunk.length > 0) {
+                chunks.push(currentChunk);
+                currentChunk = '';
+            }
+            // Now, split the long line into smaller pieces.
+            const lineChunks = line.match(new RegExp(`.{1,${maxLength}}`, 'g')) || [];
+            chunks.push(...lineChunks);
+            continue; // Continue to the next line in the original text
+        }
+
+        // If adding the next line would make the current chunk too long...
         if (currentChunk.length + line.length + 1 > maxLength) {
+            // ...send the current chunk and start a new one.
             chunks.push(currentChunk);
             currentChunk = '';
         }
+
+        // Add the line to the current chunk.
         currentChunk += (currentChunk.length > 0 ? '\n' : '') + line;
     }
+
+    // Add the final chunk if it has any content.
     if (currentChunk.length > 0) {
         chunks.push(currentChunk);
     }
+
     return chunks;
 }
 
@@ -163,4 +183,3 @@ module.exports = {
         }
     }
 };
-

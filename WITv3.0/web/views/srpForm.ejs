@@ -34,6 +34,7 @@
         }
         .form-group {
             margin-bottom: 1.5rem;
+            position: relative; /* Added for character counter positioning */
         }
         label {
             display: block;
@@ -51,6 +52,18 @@
             color: #e2e8f0;
             font-size: 1rem;
             box-sizing: border-box;
+        }
+        textarea {
+            resize: none; /* Disable textarea resizing */
+        }
+        /* Hide number input arrows */
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
         }
         input:focus, textarea:focus {
             outline: none;
@@ -93,12 +106,20 @@
             margin-top: 1.5rem;
         }
         button:hover { background-color: #38bdf8; }
+        .char-counter {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            pointer-events: none; /* Prevent counter from blocking text input */
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Ship Replacement Program Request</h1>
-        <form action="/srp/<%= token %>" method="POST">
+        <form action="#" method="POST">
             <!-- Pilot Name -->
             <div class="form-group">
                 <label for="pilot_name">Pilot's Name (in-game)</label>
@@ -174,13 +195,15 @@
             <!-- Loss Description -->
             <div class="form-group">
                 <label for="loss_description">Loss Description (AAR)</label>
-                <textarea id="loss_description" name="loss_description" rows="5" placeholder="Provide a brief After-Action Report..."></textarea>
+                <textarea id="loss_description" name="loss_description" rows="5" maxlength="2000" placeholder="Provide a brief After-Action Report..."></textarea>
+                <div class="char-counter"></div>
             </div>
 
             <!-- Loot Status -->
              <div class="form-group">
                 <label for="loot_status">Loot Status</label>
-                <textarea id="loot_status" name="loot_status" rows="3" placeholder="Who grabbed the loot? Was it returned?"></textarea>
+                <textarea id="loot_status" name="loot_status" rows="3" maxlength="500" placeholder="Who grabbed the loot? Was it returned?"></textarea>
+                <div class="char-counter"></div>
             </div>
 
             <button type="submit">Submit SRP Request</button>
@@ -220,7 +243,25 @@
                 }
             });
         });
+
+        // JS for character counters
+        function setupCharCounter(textarea) {
+            const counter = textarea.nextElementSibling;
+            if (!counter || !counter.classList.contains('char-counter')) return;
+
+            const maxLength = textarea.maxLength;
+
+            const updateCounter = () => {
+                const remaining = maxLength - textarea.value.length;
+                counter.textContent = `${remaining} characters remaining`;
+            };
+
+            textarea.addEventListener('input', updateCounter);
+            updateCounter(); // Initial call
+        }
+
+        setupCharCounter(document.getElementById('loss_description'));
+        setupCharCounter(document.getElementById('loot_status'));
     </script>
 </body>
 </html>
-

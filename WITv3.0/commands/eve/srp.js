@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('@helpers/logger');
+const authManager = require('@helpers/authManager');
 
 module.exports = {
     permission: 'commander',
@@ -8,6 +9,15 @@ module.exports = {
         .setName('srp')
         .setDescription('Generates a unique link to file a Ship Replacement Program (SRP) request.'),
     async execute(interaction) {
+        // Auth Check: Ensure the user has an authenticated ESI character.
+        const authData = await authManager.getUserAuthData(interaction.user.id);
+        if (!authData) {
+            return interaction.reply({
+                content: 'You must have an authenticated ESI character to submit an SRP request, as it is sent via EVE Mail. Please use `/auth login` and try again.',
+                flags: [MessageFlags.Ephemeral]
+            });
+        }
+
         // 1. Generate a unique token
         const token = uuidv4();
 

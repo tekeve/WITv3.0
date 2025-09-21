@@ -13,7 +13,7 @@ async function buildSrpEmbed(payload) {
 
     // Determine who submitted the request
     const submitterCharData = await charManager.getChars(user.id);
-    
+
     // --- START FIX ---
     // Safely access the character name using optional chaining and provide a fallback.
     const submitterName = submitterCharData?.main?.character_name || user.tag;
