@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const path = require('path');
 const logger = require('@helpers/logger');
 require('dotenv').config();
@@ -39,7 +39,7 @@ function startServer(client) {
     });
 
     app.listen(port, host,  () => {
-        logger.info(`Web server listening on port ${port}`);
+        logger.log(`✅ Server is running and listening on http://${HOST}:${PORT}`);
     });
 }
 
