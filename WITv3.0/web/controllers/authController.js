@@ -1,14 +1,15 @@
 const axios = require('axios');
 const authManager = require('@helpers/authManager.js');
+const charManager = require('@helpers/characterManager.js'); // Added characterManager
 const logger = require('@helpers/logger');
-const db = require('@helpers/database'); // Import db for direct queries
+const db = require('@helpers/database');
 
 const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
 const ESI_SECRET_KEY = process.env.ESI_SECRET_KEY;
 
 /**
  * Creates the callback handler middleware for Express.
- * @param {Client} client The Discord client instance.
+ * @param {import('discord.js').Client} client The Discord client instance.
  * @returns An async function that handles the request and response.
  */
 exports.handleCallback = (client) => async (req, res) => {
@@ -41,17 +42,55 @@ exports.handleCallback = (client) => async (req, res) => {
 
         const { CharacterID, CharacterName } = verifyResponse.data;
 
-        // Check if the authenticated character is registered in our system
-        const userCheckSql = 'SELECT character_id FROM users WHERE character_id = ? AND discord_id = ?';
-        const userRows = await db.query(userCheckSql, [CharacterID, discordId]);
+        // --- NEW LOGIC START ---
+        // Check if this character is registered to ANY user.
+        const charCheckSql = 'SELECT discord_id FROM users WHERE character_id = ?';
+        const charRows = await db.query(charCheckSql, [CharacterID]);
 
-        if (userRows.length === 0) {
-            logger.warn(`User ${discordId} tried to authenticate with unregistered character ${CharacterName} (${CharacterID}).`);
-            return res.status(403).render('error', {
-                title: 'Character Not Registered',
-                message: `The character ${CharacterName} is not registered to your Discord account. Please add the character using the /addchar command before authenticating.`,
-            });
+        if (charRows.length > 0) {
+            // Character is already registered.
+            if (charRows[0].discord_id !== discordId) {
+                // It's registered to someone else. Deny.
+                logger.warn(`User ${discordId} tried to auth with character ${CharacterName} (${CharacterID}), but it's already registered to user ${charRows[0].discord_id}.`);
+                return res.status(403).render('error', {
+                    title: 'Character Already Registered',
+                    message: `The character **${CharacterName}** is already registered to another Discord user. Please contact an admin if you believe this is an error.`,
+                });
+            }
+            // If it is registered to the current user, we just proceed to save tokens.
+        } else {
+            // Character is not registered at all. Let's add it.
+            logger.info(`Character ${CharacterName} is not registered. Attempting to auto-register for user ${discordId}.`);
+
+            // Get the user's roles for registration
+            const guild = client.guilds.cache.get(process.env.GUILD_ID);
+            const member = await guild.members.fetch(discordId);
+            const userRoles = member.roles.cache.map(role => role.id);
+
+            // Check if the user already has a main character
+            const existingChars = await charManager.getChars(discordId);
+            let registrationResult;
+
+            if (!existingChars || !existingChars.main) {
+                // No main character exists, register this one as the main.
+                logger.info(`No main character found for ${discordId}. Registering ${CharacterName} as main.`);
+                registrationResult = await charManager.addMain(discordId, CharacterName, userRoles);
+            } else {
+                // A main character already exists, register this one as an alt.
+                logger.info(`Main character found for ${discordId}. Registering ${CharacterName} as alt.`);
+                registrationResult = await charManager.addAlt(discordId, CharacterName);
+            }
+
+            if (!registrationResult.success) {
+                // If for some reason adding the character failed, inform the user.
+                logger.error(`Auto-registration failed for ${CharacterName}: ${registrationResult.message}`);
+                return res.status(500).render('error', {
+                    title: 'Registration Failed',
+                    message: `There was an issue automatically registering your character: ${registrationResult.message}`,
+                });
+            }
         }
+        // --- NEW LOGIC END ---
 
         const token_expiry = Date.now() + expires_in * 1000;
 
@@ -66,7 +105,7 @@ exports.handleCallback = (client) => async (req, res) => {
         logger.success(`Successfully authenticated character ${CharacterName} for Discord user ${discordId}.`);
         res.render('success', {
             title: 'Authentication Successful!',
-            message: `You have successfully linked the character ${CharacterName}.`,
+            message: `You have successfully linked and authenticated the character **${CharacterName}**.`,
         });
 
     } catch (error) {
@@ -78,4 +117,3 @@ exports.handleCallback = (client) => async (req, res) => {
         });
     }
 };
-

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resident Application Form</title>
+    <title>WTM Resident Application</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -30,10 +30,24 @@
             color: #f8fafc;
             font-size: 1.875rem;
             font-weight: 600;
-            margin-bottom: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        @media (min-width: 768px) {
+            .form-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
         .form-group {
-            margin-bottom: 1.5rem;
+            position: relative;
+            margin-bottom: 1rem;
+        }
+        .full-width {
+            grid-column: 1 / -1;
         }
         label {
             display: block;
@@ -42,7 +56,7 @@
             font-weight: 500;
             color: #cbd5e1;
         }
-        input[type="text"], textarea {
+        input[type="text"], input[type="url"], select, textarea {
             width: 100%;
             padding: 0.75rem 1rem;
             border-radius: 0.375rem;
@@ -52,17 +66,15 @@
             font-size: 1rem;
             box-sizing: border-box;
         }
-        input:focus, textarea:focus {
+        input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: #38bdf8;
             box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
         }
         textarea {
             min-height: 120px;
-            resize: vertical;
         }
-        button {
-            width: 100%;
+        button, .add-alt-btn {
             padding: 0.75rem 1.5rem;
             border: none;
             border-radius: 0.375rem;
@@ -72,64 +84,279 @@
             font-weight: 600;
             cursor: pointer;
             transition: background-color 0.2s ease-in-out;
-            margin-top: 1.5rem;
         }
-        button:hover {
-            background-color: #38bdf8;
+        button:hover, .add-alt-btn:hover { background-color: #38bdf8; }
+        .submit-btn {
+            width: 100%;
+            margin-top: 2.5rem;
+        }
+        .warning {
+            background-color: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+            color: #f87171;
+            padding: 0.75rem 1rem;
+            margin-top: 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+        }
+        .radio-group, .checkbox-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            background-color: #1e293b;
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid #475569;
+        }
+        .radio-group label, .checkbox-container label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            color: #cbd5e1;
+            font-weight: normal;
+            margin-bottom: 0;
+        }
+        .char-counter {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            background-color: #1e293b;
+            padding: 0 4px;
+        }
+        .alt-input-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .alt-input-group input {
+            flex-grow: 1;
+        }
+        #alts-list-container {
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+            min-height: 48px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-content: flex-start;
+        }
+        .alt-tag {
+            background-color: #4f46e5;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .alt-tag .remove-alt {
+            margin-left: 0.5rem;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>WTM Commander Application</h1>
-        <form action="/residentapp/<%= token %>" method="POST">
+        <h1>WTM Resident Application</h1>
+        <form action="/residentapp/<%= token %>" method="POST" id="resident-form">
             <div class="form-group">
                 <label for="character_name">Character Name</label>
                 <input type="text" id="character_name" name="character_name" required>
+                 <div class="warning">
+                    <strong>Important:</strong> This must match your main character's name in-game exactly for automatic registration.
+                </div>
             </div>
-            <div class="form-group">
-                <label for="alts">List any alts you fly with</label>
-                <input type="text" id="alts" name="alts">
+
+            <!-- New Alts Section -->
+            <div class="form-group full-width">
+                <label for="alt-input">List any alts you fly with</label>
+                <div class="form-grid">
+                    <div>
+                        <div class="alt-input-group">
+                            <input type="text" id="alt-input" placeholder="Enter alt name and click Add">
+                            <button type="button" id="add-alt-btn" class="add-alt-btn">Add</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div id="alts-list-container">
+                            <!-- JS will populate this -->
+                        </div>
+                        <div id="alts-hidden-inputs">
+                            <!-- JS will populate this with hidden inputs for the form -->
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="forum_identity">Enter your Forum Identity</label>
-                <input type="text" id="forum_identity" name="forum_identity">
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="forum_identity">Enter your Forum Identity</label>
+                    <input type="text" id="forum_identity" name="forum_identity" required>
+                </div>
+                <div class="form-group">
+                    <label for="discord_identity">Enter your Discord Identity</label>
+                    <input type="text" id="discord_identity" name="discord_identity" required>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="discord_identity">Enter your Discord Identity</label>
-                <input type="text" id="discord_identity" name="discord_identity" required>
-            </div>
+
             <div class="form-group">
                 <label for="wtm_time">How long have you flown with WTM?</label>
-                <input type="text" id="wtm_time" name="wtm_time">
+                <select id="wtm_time" name="wtm_time" required>
+                    <option value="<1 Month">&lt;1 Month</option>
+                    <option value="1-3 Months">1-3 Months</option>
+                    <option value="4-7 Months">4-7 Months</option>
+                    <option value="8+ Months">8+ Months</option>
+                </select>
             </div>
-            <div class="form-group">
-                <label for="logistics_ships">What Logistics Ships can you fly?</label>
-                <textarea id="logistics_ships" name="logistics_ships" rows="3"></textarea>
+            
+            <div class="form-grid">
+                 <div class="form-group">
+                    <label>What Logistics Ships can you fly?</label>
+                    <div class="checkbox-container" id="logi-ships">
+                        <label><input type="checkbox" name="logistics_ships" value="Basilisk"> Basilisk</label>
+                        <label><input type="checkbox" name="logistics_ships" value="Scimitar"> Scimitar</label>
+                        <label><input type="checkbox" name="logistics_ships" value="Loki"> Loki</label>
+                        <label><input type="checkbox" name="logistics_ships" value="None"> None</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>What Battleships can you fly?</label>
+                     <div class="checkbox-container" id="bs-ships">
+                        <label><input type="checkbox" name="battleship_ships" value="Marauder"> Marauder</label>
+                        <label><input type="checkbox" name="battleship_ships" value="Intermediate Battleship"> Intermediate Battleship</label>
+                        <label><input type="checkbox" name="battleship_ships" value="None"> None</label>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="battleship_ships">What Battleships can you fly?</label>
-                <textarea id="battleship_ships" name="battleship_ships" rows="3"></textarea>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Do you have T2 guns?</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="t2_guns" value="Yes" required> Yes</label>
+                        <label><input type="radio" name="t2_guns" value="No"> No</label>
+                    </div>
+                </div>
+                 <div class="form-group">
+                    <label>How much time can you dedicate per week?</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="command_time_estimate" value="1-3 Hours" required> 1-3 Hours</label>
+                        <label><input type="radio" name="command_time_estimate" value="4-7 Hours"> 4-7 Hours</label>
+                        <label><input type="radio" name="command_time_estimate" value="8+ Hours"> 8+ Hours</label>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="t2_guns">Do you have T2 guns?</label>
-                <input type="text" id="t2_guns" name="t2_guns">
-            </div>
-            <div class="form-group">
-                <label for="command_time_estimate">How much time do you estimate you will be able to dedicate as a commander per week?</label>
-                <input type="text" id="command_time_estimate" name="command_time_estimate">
-            </div>
-            <div class="form-group">
+
+            <div class="form-group full-width">
                 <label for="why_commander">Why do you want to be a commander with WTM?</label>
-                <textarea id="why_commander" name="why_commander" rows="5"></textarea>
+                <textarea id="why_commander" name="why_commander" rows="6" required maxlength="2000"></textarea>
+                <div class="char-counter"></div>
             </div>
-            <div class="form-group">
+
+            <div class="form-group full-width">
                 <label for="why_wtm">Why do you like Flying with WTM?</label>
-                <textarea id="why_wtm" name="why_wtm" rows="5"></textarea>
+                <textarea id="why_wtm" name="why_wtm" rows="6" required maxlength="2000"></textarea>
+                <div class="char-counter"></div>
             </div>
-            <button type="submit">Submit Application</button>
+
+            <button type="submit" class="submit-btn">Submit Application</button>
         </form>
     </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Alts Input Logic ---
+            const altInput = document.getElementById('alt-input');
+            const addAltBtn = document.getElementById('add-alt-btn');
+            const altsListContainer = document.getElementById('alts-list-container');
+            const hiddenInputsContainer = document.getElementById('alts-hidden-inputs');
+
+            const addAlt = () => {
+                const altName = altInput.value.trim();
+                if (altName) {
+                    // Create visible tag
+                    const tag = document.createElement('div');
+                    tag.className = 'alt-tag';
+                    tag.textContent = altName;
+                    
+                    const removeSpan = document.createElement('span');
+                    removeSpan.className = 'remove-alt';
+                    removeSpan.innerHTML = '&nbsp;&times;';
+                    tag.appendChild(removeSpan);
+
+                    // Create hidden input for form submission
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'alts[]'; // Use array syntax for the name
+                    hiddenInput.value = altName;
+
+                    tag.addEventListener('click', () => {
+                        tag.remove();
+                        hiddenInput.remove();
+                    });
+
+                    altsListContainer.appendChild(tag);
+                    hiddenInputsContainer.appendChild(hiddenInput);
+
+                    altInput.value = '';
+                    altInput.focus();
+                }
+            };
+
+            addAltBtn.addEventListener('click', addAlt);
+            altInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addAlt();
+                }
+            });
+
+
+            // --- Exclusive Checkboxes Logic ---
+            function setupExclusiveCheckboxes(containerId) {
+                const container = document.getElementById(containerId);
+                const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+                const noneCheckbox = container.querySelector('input[value="None"]');
+
+                checkboxes.forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        if (cb.value === 'None' && cb.checked) {
+                            checkboxes.forEach(otherCb => {
+                                if (otherCb !== noneCheckbox) otherCb.checked = false;
+                            });
+                        } else if (cb.checked && noneCheckbox.checked) {
+                            noneCheckbox.checked = false;
+                        }
+                    });
+                });
+            }
+            setupExclusiveCheckboxes('logi-ships');
+            setupExclusiveCheckboxes('bs-ships');
+
+            // --- Character Counter Logic ---
+            function setupCharCounter(textareaId) {
+                const textarea = document.getElementById(textareaId);
+                const counter = textarea.nextElementSibling;
+                const maxLength = textarea.maxLength;
+
+                const updateCounter = () => {
+                    const remaining = maxLength - textarea.value.length;
+                    counter.textContent = `${remaining} characters remaining`;
+                };
+
+                textarea.addEventListener('input', updateCounter);
+                updateCounter();
+            }
+            setupCharCounter('why_commander');
+            setupCharCounter('why_wtm');
+        });
+    </script>
 </body>
 </html>
 

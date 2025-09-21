@@ -2,7 +2,7 @@ const logger = require('@helpers/logger');
 const db = require('@helpers/database');
 
 /**
- * Renders the resident application form if the token is valid.
+ * Renders the Resident Application form if the token is valid.
  * @param {Map<string, any>} activeResidentAppTokens - The map storing valid tokens.
  * @returns An async function to handle the GET request.
  */
@@ -10,17 +10,18 @@ exports.showResidentAppForm = (activeResidentAppTokens) => async (req, res) => {
     const { token } = req.params;
 
     if (!activeResidentAppTokens.has(token)) {
-        logger.warn(`Invalid or expired Resident App token used: ${token}`);
+        logger.warn(`Invalid or expired resident app token used: ${token}`);
         return res.status(404).render('error', {
             title: 'Link Invalid or Expired',
-            message: 'This application form link is no longer valid. Please generate a new one.',
+            message: 'This application form link is no longer valid. Please generate a new one using the /residentapp command in Discord.',
         });
     }
+
     res.render('residentAppForm', { token });
 };
 
 /**
- * Handles the submission of the resident application form.
+ * Handles the submission of the Resident Application form.
  * @param {import('discord.js').Client} client - The Discord client instance.
  * @param {Map<string, any>} activeResidentAppTokens - The map storing valid tokens.
  * @returns An async function to handle the POST request.
@@ -29,46 +30,25 @@ exports.handleResidentAppSubmission = (client, activeResidentAppTokens) => async
     const { token } = req.params;
     const appData = activeResidentAppTokens.get(token);
 
+    // --- FIX START ---
+    // Add a check to ensure the token is valid before proceeding.
+    // This prevents a crash if the form is submitted after the token expires.
     if (!appData) {
-        logger.warn(`Attempted submission with invalid or expired Resident App token: ${token}`);
+        logger.warn(`Attempted submission with invalid or expired resident app token: ${token}`);
         return res.status(404).render('error', {
             title: 'Link Invalid or Expired',
             message: 'This application form link has expired and cannot be submitted. Please generate a new one.',
         });
     }
+    // --- FIX END ---
 
+    // Invalidate the token immediately to prevent double submissions
     activeResidentAppTokens.delete(token);
 
     try {
-        const formData = req.body;
         const { interaction, user } = appData;
+        const formData = req.body;
 
-        // --- DATABASE INSERTION ---
-        const sql = `
-            INSERT INTO resident_applications 
-            (character_name, alts, forum_identity, discord_identity, wtm_time, logistics_ships, battleship_ships, t2_guns, command_time_estimate, why_commander, why_wtm, discord_id, discord_tag) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-        const values = [
-            formData.character_name,
-            formData.alts,
-            formData.forum_identity,
-            formData.discord_identity,
-            formData.wtm_time,
-            formData.logistics_ships,
-            formData.battleship_ships,
-            formData.t2_guns,
-            formData.command_time_estimate,
-            formData.why_commander,
-            formData.why_wtm,
-            user.id,
-            user.tag
-        ];
-
-        await db.query(sql, values);
-        logger.success(`Resident application for ${formData.character_name} has been successfully saved to the database.`);
-
-        // --- EMIT EVENT FOR DISCORD PROCESSING ---
         client.emit('residentAppSubmission', {
             interaction,
             user,
@@ -77,7 +57,7 @@ exports.handleResidentAppSubmission = (client, activeResidentAppTokens) => async
 
         res.render('success', {
             title: 'Application Submitted!',
-            message: 'Your application has been received. You can now close this window.',
+            message: 'Your application has been received and will be processed shortly. You can now close this window.',
         });
 
     } catch (error) {
@@ -88,4 +68,3 @@ exports.handleResidentAppSubmission = (client, activeResidentAppTokens) => async
         });
     }
 };
-
