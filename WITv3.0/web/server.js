@@ -39,7 +39,7 @@ function startServer(client) {
     });
 
     app.listen(port, host,  () => {
-        logger.log(`✅ Server is running and listening on http://${host}:${port}`);
+        logger.success(`✅ Server is running and listening on http://${host}:${port}`);
     });
 }
 
