@@ -4,7 +4,7 @@ const chalk = require('chalk');
 require('module-alias/register');
 const logger = require('@helpers/logger');
 const { Client, Collection, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
-require('dotenv').config();
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 const configManager = require('@helpers/configManager');
 const incursionManager = require('@helpers/incursionManager');

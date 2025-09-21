@@ -9,7 +9,7 @@ let hierarchyCache = null;
 async function loadHierarchy() {
     try {
         const newHierarchy = {};
-        const rows = await db.query('SELECT roleName, promote, demote FROM roleHierarchy');
+        const rows = await db.query('SELECT roleName, promote, demote FROM role_hierarchy');
 
         for (const row of rows) {
             try {
