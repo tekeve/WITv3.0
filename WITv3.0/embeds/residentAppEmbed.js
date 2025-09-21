@@ -16,7 +16,7 @@ function buildResidentAppEmbed(payload) {
     };
 
     // Handle the alts array from the new form input
-    const submittedAlts = formData['alts[]'];
+    const submittedAlts = formData.alts;
     const altsValue = (submittedAlts && Array.isArray(submittedAlts) && submittedAlts.length > 0)
         ? submittedAlts.join('\n')
         : 'None';

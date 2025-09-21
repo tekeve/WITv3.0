@@ -32,6 +32,14 @@
             font-weight: 600;
             margin-bottom: 2.5rem;
         }
+        .welcome-back {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 1.125rem;
+            font-weight: 500;
+            margin-top: -1.5rem;
+            margin-bottom: 2.5rem;
+        }
         .form-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -73,6 +81,7 @@
         }
         textarea {
             min-height: 120px;
+            resize: none;
         }
         button, .add-alt-btn {
             padding: 0.75rem 1.5rem;
@@ -90,7 +99,7 @@
             width: 100%;
             margin-top: 2.5rem;
         }
-        .warning {
+        .warning-box {
             background-color: rgba(239, 68, 68, 0.1);
             border-left: 4px solid #ef4444;
             color: #f87171;
@@ -123,8 +132,6 @@
             right: 12px;
             font-size: 0.75rem;
             color: #94a3b8;
-            background-color: #1e293b;
-            padding: 0 4px;
         }
         .alt-input-group {
             display: flex;
@@ -158,21 +165,45 @@
             margin-left: 0.5rem;
             font-weight: bold;
         }
+        .readonly-input {
+             background-color: #334155;
+            cursor: not-allowed;
+            border-color: #475569;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>WTM Resident Application</h1>
+        <% if (mainChar) { %>
+            <h2 class="welcome-back">Welcome back returning Commander.</h2>
+        <% } %>
         <form action="/residentapp/<%= token %>" method="POST" id="resident-form">
+            <% if (alts && alts.length > 0) { %>
+                <% alts.forEach(alt => { %>
+                    <input type="hidden" name="initial_alts" value="<%= alt.character_name %>">
+                <% }); %>
+            <% } %>
+
             <div class="form-group">
                 <label for="character_name">Character Name</label>
-                <input type="text" id="character_name" name="character_name" required>
-                 <div class="warning">
+                <input type="text" id="character_name" name="character_name" value="<%= mainChar ? mainChar.character_name : '' %>" required>
+                 <div class="warning-box">
                     <strong>Important:</strong> This must match your main character's name in-game exactly for automatic registration.
                 </div>
             </div>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="forum_identity">Enter your Forum Identity</label>
+                    <input type="text" id="forum_identity" name="forum_identity" value="<%= forumIdentity ? forumIdentity : '' %>" required>
+                </div>
+                <div class="form-group">
+                    <label for="discord_identity">Your Discord Identity</label>
+                    <input type="text" id="discord_identity" name="discord_identity" value="<%= discordTag %>" readonly class="readonly-input">
+                </div>
+            </div>
 
-            <!-- New Alts Section -->
             <div class="form-group full-width">
                 <label for="alt-input">List any alts you fly with</label>
                 <div class="form-grid">
@@ -191,19 +222,11 @@
                         </div>
                     </div>
                 </div>
+                <div class="warning-box" style="margin-top: 1rem;">
+                    <strong>Important:</strong> Each alt name must match the in-game name exactly for automatic registration.
+                </div>
             </div>
             
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="forum_identity">Enter your Forum Identity</label>
-                    <input type="text" id="forum_identity" name="forum_identity" required>
-                </div>
-                <div class="form-group">
-                    <label for="discord_identity">Enter your Discord Identity</label>
-                    <input type="text" id="discord_identity" name="discord_identity" required>
-                </div>
-            </div>
-
             <div class="form-group">
                 <label for="wtm_time">How long have you flown with WTM?</label>
                 <select id="wtm_time" name="wtm_time" required>
@@ -221,7 +244,7 @@
                         <label><input type="checkbox" name="logistics_ships" value="Basilisk"> Basilisk</label>
                         <label><input type="checkbox" name="logistics_ships" value="Scimitar"> Scimitar</label>
                         <label><input type="checkbox" name="logistics_ships" value="Loki"> Loki</label>
-                        <label><input type="checkbox" name="logistics_ships" value="None"> None</label>
+                        <label><input type="checkbox" name="logistics_ships" value="None" class="none-option"> None</label>
                     </div>
                 </div>
 
@@ -230,7 +253,7 @@
                      <div class="checkbox-container" id="bs-ships">
                         <label><input type="checkbox" name="battleship_ships" value="Marauder"> Marauder</label>
                         <label><input type="checkbox" name="battleship_ships" value="Intermediate Battleship"> Intermediate Battleship</label>
-                        <label><input type="checkbox" name="battleship_ships" value="None"> None</label>
+                        <label><input type="checkbox" name="battleship_ships" value="None" class="none-option"> None</label>
                     </div>
                 </div>
             </div>
@@ -271,77 +294,7 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Alts Input Logic ---
-            const altInput = document.getElementById('alt-input');
-            const addAltBtn = document.getElementById('add-alt-btn');
-            const altsListContainer = document.getElementById('alts-list-container');
-            const hiddenInputsContainer = document.getElementById('alts-hidden-inputs');
-
-            const addAlt = () => {
-                const altName = altInput.value.trim();
-                if (altName) {
-                    // Create visible tag
-                    const tag = document.createElement('div');
-                    tag.className = 'alt-tag';
-                    tag.textContent = altName;
-                    
-                    const removeSpan = document.createElement('span');
-                    removeSpan.className = 'remove-alt';
-                    removeSpan.innerHTML = '&nbsp;&times;';
-                    tag.appendChild(removeSpan);
-
-                    // Create hidden input for form submission
-                    const hiddenInput = document.createElement('input');
-                    hiddenInput.type = 'hidden';
-                    hiddenInput.name = 'alts[]'; // Use array syntax for the name
-                    hiddenInput.value = altName;
-
-                    tag.addEventListener('click', () => {
-                        tag.remove();
-                        hiddenInput.remove();
-                    });
-
-                    altsListContainer.appendChild(tag);
-                    hiddenInputsContainer.appendChild(hiddenInput);
-
-                    altInput.value = '';
-                    altInput.focus();
-                }
-            };
-
-            addAltBtn.addEventListener('click', addAlt);
-            altInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addAlt();
-                }
-            });
-
-
-            // --- Exclusive Checkboxes Logic ---
-            function setupExclusiveCheckboxes(containerId) {
-                const container = document.getElementById(containerId);
-                const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-                const noneCheckbox = container.querySelector('input[value="None"]');
-
-                checkboxes.forEach(cb => {
-                    cb.addEventListener('change', () => {
-                        if (cb.value === 'None' && cb.checked) {
-                            checkboxes.forEach(otherCb => {
-                                if (otherCb !== noneCheckbox) otherCb.checked = false;
-                            });
-                        } else if (cb.checked && noneCheckbox.checked) {
-                            noneCheckbox.checked = false;
-                        }
-                    });
-                });
-            }
-            setupExclusiveCheckboxes('logi-ships');
-            setupExclusiveCheckboxes('bs-ships');
-
-            // --- Character Counter Logic ---
-            function setupCharCounter(textareaId) {
-                const textarea = document.getElementById(textareaId);
+            function setupCharCounter(textarea) {
                 const counter = textarea.nextElementSibling;
                 const maxLength = textarea.maxLength;
 
@@ -351,10 +304,96 @@
                 };
 
                 textarea.addEventListener('input', updateCounter);
-                updateCounter();
+                updateCounter(); 
             }
-            setupCharCounter('why_commander');
-            setupCharCounter('why_wtm');
+            
+            setupCharCounter(document.getElementById('why_commander'));
+            setupCharCounter(document.getElementById('why_wtm'));
+            
+            const addAltBtn = document.getElementById('add-alt-btn');
+            const altInput = document.getElementById('alt-input');
+            const altsListContainer = document.getElementById('alts-list-container');
+            const hiddenInputsContainer = document.getElementById('alts-hidden-inputs');
+            
+            const addAltTag = (altName) => {
+                if (!altName) return;
+
+                const existingAlts = Array.from(hiddenInputsContainer.querySelectorAll('input')).map(input => input.value);
+                if (existingAlts.includes(altName)) {
+                    return; 
+                }
+
+                const tag = document.createElement('div');
+                tag.className = 'alt-tag';
+                tag.textContent = altName;
+                
+                const removeSpan = document.createElement('span');
+                removeSpan.className = 'remove-alt';
+                removeSpan.innerHTML = '&nbsp;&times;';
+                tag.appendChild(removeSpan);
+
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'alts'; 
+                hiddenInput.value = altName;
+
+                tag.addEventListener('click', () => {
+                    tag.remove();
+                    hiddenInput.remove();
+                });
+
+                altsListContainer.appendChild(tag);
+                hiddenInputsContainer.appendChild(hiddenInput);
+            };
+
+            const handleAddAltClick = () => {
+                const altName = altInput.value.trim();
+                if (altName) {
+                    const existingAlts = Array.from(hiddenInputsContainer.querySelectorAll('input')).map(input => input.value);
+                    if (existingAlts.includes(altName)) {
+                        alert('This alt has already been added.');
+                        return;
+                    }
+                    addAltTag(altName);
+                    altInput.value = '';
+                    altInput.focus();
+                }
+            };
+
+            addAltBtn.addEventListener('click', handleAddAltClick);
+            altInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddAltClick();
+                }
+            });
+
+            const existingAltsData = <%- JSON.stringify(alts.map(alt => alt.character_name)) %>;
+            if (existingAltsData && existingAltsData.length > 0) {
+                existingAltsData.forEach(altName => {
+                    addAltTag(altName);
+                });
+            }
+
+            function setupExclusiveCheckboxes(containerId) {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+                const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+                const noneCheckbox = container.querySelector('.none-option');
+                checkboxes.forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        if (cb === noneCheckbox && cb.checked) {
+                            checkboxes.forEach(otherCb => {
+                                if (otherCb !== noneCheckbox) otherCb.checked = false;
+                            });
+                        } else if (cb.checked) {
+                            if (noneCheckbox) noneCheckbox.checked = false;
+                        }
+                    });
+                });
+            }
+            setupExclusiveCheckboxes('logi-ships');
+            setupExclusiveCheckboxes('bs-ships');
         });
     </script>
 </body>

@@ -3,21 +3,21 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('@helpers/logger');
 
 module.exports = {
-    permission: 'public', // Or any other permission level
+    permission: 'public',
     data: new SlashCommandBuilder()
         .setName('residentapp')
-        .setDescription('Generates a unique link to the resident application form.'),
+        .setDescription('Generates a unique link to file a WTM Resident Application.'),
     async execute(interaction) {
         const token = uuidv4();
 
-        // Ensure the token map exists on the client
         if (!interaction.client.activeResidentAppTokens) {
             interaction.client.activeResidentAppTokens = new Map();
         }
 
+        // Store user and guild ID instead of the full objects
         interaction.client.activeResidentAppTokens.set(token, {
-            interaction: interaction,
-            user: interaction.user
+            user: interaction.user,
+            guildId: interaction.guild.id
         });
 
         const EXPIRATION_MINUTES = 60;
