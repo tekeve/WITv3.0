@@ -5,11 +5,72 @@ const incursionManager = require('@helpers/incursionManager');
 const esiService = require('@helpers/esiService');
 const { buildActiveIncursionEmbed, buildNoIncursionEmbed, formatDuration } = require('@embeds/incursionEmbed');
 
+/**
+ * Calculates the statistics for the last completed incursion based on stored timestamps.
+ * @param {object} state - The incursion state object from the database.
+ * @returns {object|null} An object with formatted stat strings, or null if stats can't be calculated.
+ */
+function calculateLastIncursionStats(state) {
+    if (!state.spawnTimestamp || !state.endedTimestamp) {
+        return null; // Can't calculate without start and end times
+    }
+
+    const stats = {};
+    const ended = state.endedTimestamp;
+
+    // --- Total Duration ---
+    const totalDurSeconds = ended - state.spawnTimestamp;
+    const maxTotalDurationSeconds = 8 * 24 * 3600; // 8 days max lifecycle
+    const totalDurationPercentage = (totalDurSeconds / maxTotalDurationSeconds) * 100;
+    stats.totalDuration = `${formatDuration(totalDurSeconds)} (${parseFloat(totalDurationPercentage.toFixed(2))}% of max)`;
+
+    // --- Established Phase Duration ---
+    // This phase occurs if a mobilizing timestamp exists. Its duration is from spawn to mobilizing.
+    if (state.mobilizingTimestamp) {
+        const establishedDurSeconds = state.mobilizingTimestamp - state.spawnTimestamp;
+        const maxEstablishedSeconds = 5 * 24 * 3600; // Max duration is ~5 days
+        const percentage = (establishedDurSeconds / maxEstablishedSeconds) * 100;
+        stats.establishedPhase = `${formatDuration(establishedDurSeconds)} (${parseFloat(percentage.toFixed(2))}% of max)`;
+    }
+
+    // --- Mobilizing Phase Duration ---
+    // This phase occurs if a mobilizing timestamp exists. Its duration is from mobilizing to withdrawing (or end).
+    if (state.mobilizingTimestamp) {
+        const mobilizingEnd = state.withdrawingTimestamp || ended;
+        const mobilizingDurSeconds = mobilizingEnd - state.mobilizingTimestamp;
+        const maxMobilizingSeconds = 2 * 24 * 3600; // 48 hours
+        const percentage = (mobilizingDurSeconds / maxMobilizingSeconds) * 100;
+        stats.mobilizingPhase = `${formatDuration(mobilizingDurSeconds)} (${parseFloat(percentage.toFixed(2))}% used)`;
+    }
+
+    // --- Withdrawing Period Used ---
+    // This phase occurs if a withdrawing timestamp exists.
+    if (state.withdrawingTimestamp) {
+        const withdrawingDurSeconds = ended - state.withdrawingTimestamp;
+        if (withdrawingDurSeconds > 0) {
+            const maxWithdrawingSeconds = 24 * 3600; // 24 hours max
+            const percentage = (withdrawingDurSeconds / maxWithdrawingSeconds) * 100;
+            stats.withdrawingPeriodUsed = `${formatDuration(withdrawingDurSeconds)} (${parseFloat(percentage.toFixed(2))}% used)`;
+        }
+    }
+
+    return stats;
+}
+
+
 async function readState() {
     try {
         const rows = await db.query('SELECT * FROM incursion_state WHERE id = 1');
         if (rows.length > 0) {
             const state = rows[0];
+
+            // Ensure all timestamps are treated as numbers, handling nulls gracefully.
+            state.spawnTimestamp = state.spawnTimestamp ? Number(state.spawnTimestamp) : null;
+            state.mobilizingTimestamp = state.mobilizingTimestamp ? Number(state.mobilizingTimestamp) : null;
+            state.withdrawingTimestamp = state.withdrawingTimestamp ? Number(state.withdrawingTimestamp) : null;
+            state.endedTimestamp = state.endedTimestamp ? Number(state.endedTimestamp) : null;
+            state.lastHqSystemId = state.lastHqSystemId ? Number(state.lastHqSystemId) : null;
+
             if (state.lastIncursionStats && typeof state.lastIncursionStats === 'string') {
                 try {
                     state.lastIncursionStats = JSON.parse(state.lastIncursionStats);
@@ -130,7 +191,7 @@ async function updateIncursions(client, options = {}) {
         const currentConstellationId = highSecIncursion ? highSecIncursion.constellation_id : null;
         let lastSimpleState = 'none';
         let lastConstellationId = null;
-        let isNewSpawn = false;
+        let isNewSpawn = false; // This ensures the variable always exists.
 
         if (state.lastIncursionState && state.lastIncursionState !== 'none') {
             const parts = state.lastIncursionState.split('-');
@@ -154,32 +215,13 @@ async function updateIncursions(client, options = {}) {
                 state.endedTimestamp = now;
                 const lastSpawnData = incursionSystems.find(c => c.Constellation_id === lastConstellationId);
                 if (lastSpawnData) state.lastHqSystemId = lastSpawnData.dock_up_system_id;
+                // The calculation will now happen in the block below.
+            }
 
-                if (state.spawnTimestamp) {
-                    const totalDur = state.endedTimestamp - state.spawnTimestamp;
-                    const establishedDur = (state.mobilizingTimestamp || state.endedTimestamp) - state.spawnTimestamp;
-
-                    let withdrawingDur = null;
-                    let withdrawingUsagePercentage = 0;
-
-                    // Explicitly check for both timestamps before calculating the withdrawing duration and percentage.
-                    if (state.withdrawingTimestamp && state.endedTimestamp) {
-                        withdrawingDur = state.endedTimestamp - state.withdrawingTimestamp;
-                        const maxWithdrawingSeconds = 24 * 3600; // Max withdrawing period is 24 hours
-                        withdrawingUsagePercentage = Math.round((withdrawingDur / maxWithdrawingSeconds) * 100);
-                    }
-
-                    const totalPossibleSpawnTime = 8 * 24 * 3600; // 8 days in seconds
-                    const totalSpawnTimePercentage = Math.round((totalDur / totalPossibleSpawnTime) * 100);
-                    const establishedUsage = Math.round((establishedDur / (5 * 24 * 3600)) * 100);
-
-                    state.lastIncursionStats = {
-                        totalDuration: `${formatDuration(totalDur)} (${totalSpawnTimePercentage}%)`,
-                        establishedDuration: `${formatDuration(establishedDur)}`,
-                        establishedUsagePercentage: `${establishedUsage}%`,
-                        withdrawingPeriodUsed: `${withdrawingUsagePercentage}%`,
-                    };
-                }
+            // Recalculate stats if the incursion is over.
+            // This runs when an incursion ends, AND on manual refreshes if the last incursion is over.
+            if (currentSimpleState === 'none' && state.endedTimestamp) {
+                state.lastIncursionStats = calculateLastIncursionStats(state);
             }
         }
         state.lastIncursionState = currentStateKey;
@@ -256,4 +298,3 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
-

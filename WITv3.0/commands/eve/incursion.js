@@ -101,7 +101,7 @@ module.exports = {
         if (subcommand === 'refresh') {
             interaction.client.mockOverride = null;
             await interaction.client.updateIncursions({ isManualRefresh: true });
-            await interaction.editReply({ content: 'Mock state cleared. Incursion data has been manually refreshed from ESI!' });
+            await interaction.editReply({ content: 'Mock state cleared. Incursion data has been refreshed from ESI and last incursion stats have been recalculated!' });
 
         } else if (subcommand === 'setstate') {
             const state = interaction.options.getString('state');

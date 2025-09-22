@@ -174,16 +174,31 @@ function buildNoIncursionEmbed(state) {
         const windowClose = windowOpen + (24 * 3600);
         embed.addFields({ name: 'Next Spawn Window', value: `Opens: <t:${windowOpen}:R>\nCloses: <t:${windowClose}:R>` });
     }
+
     if (state.lastIncursionStats) {
         const stats = state.lastIncursionStats;
+        const statsFields = [];
 
-        const statsString = `**Total Duration**: ${stats.totalDuration}\n` +
-            `**Established Phase**: ${stats.establishedDuration} (${stats.establishedUsagePercentage} used)\n` +
-            `**Withdrawing Period Used**: ${stats.withdrawingPeriodUsed}`;
+        // Dynamically add fields only if they exist in the calculated stats object
+        if (stats.totalDuration) {
+            statsFields.push(`**Total Duration**: ${stats.totalDuration}`);
+        }
+        if (stats.establishedPhase) {
+            statsFields.push(`**Established Phase**: ${stats.establishedPhase}`);
+        }
+        if (stats.mobilizingPhase) {
+            statsFields.push(`**Mobilizing Phase**: ${stats.mobilizingPhase}`);
+        }
+        if (stats.withdrawingPeriodUsed) {
+            statsFields.push(`**Withdrawing Period Used**: ${stats.withdrawingPeriodUsed}`);
+        }
 
-        embed.addFields({ name: 'Last Incursion Stats', value: statsString });
+        if (statsFields.length > 0) {
+            embed.addFields({ name: 'Last Incursion Stats', value: statsFields.join('\n') });
+        }
     }
     return embed;
 }
 
 module.exports = { buildActiveIncursionEmbed, buildNoIncursionEmbed, formatDuration };
+

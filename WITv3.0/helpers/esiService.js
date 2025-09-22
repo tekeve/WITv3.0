@@ -25,7 +25,13 @@ async function requestWithRetries(requestFunc, retries = 3, delay = 1000) {
                 }
                 await new Promise(res => setTimeout(res, waitTime));
             } else {
-                const errorMessage = error.response ? `Status ${error.response.status}: ${JSON.stringify(error.response.data)}` : error.message;
+                let errorMessage = error.message;
+                if (error.response) {
+                    const status = error.response.status;
+                    const headers = JSON.stringify(error.response.headers, null, 2);
+                    const data = JSON.stringify(error.response.data, null, 2);
+                    errorMessage = `Status ${status}\nHeaders: ${headers}\nData: ${data}`;
+                }
                 logger.error(`ESI request failed after all retries: ${errorMessage}`);
                 throw error; // Re-throw the error after all retries have failed
             }
