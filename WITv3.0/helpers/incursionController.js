@@ -209,8 +209,15 @@ async function updateIncursions(client, options = {}) {
         await writeState(state);
 
     } catch (error) {
-        const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-        logger.error(`Error during incursion update: ${errorMessage}`, error.stack);
+        const status = error.response?.status;
+        if (status && [502, 503, 504].includes(status)) {
+            // This is an expected downtime error, so we log it gently and exit.
+            logger.info(`ESI appears to be offline (Status ${status}). Skipping incursion check.`);
+        } else {
+            // This is an unexpected error, so we log it fully.
+            const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
+            logger.error(`Error during incursion update: ${errorMessage}`, error.stack);
+        }
     } finally {
         isUpdating = false;
         logger.info('Update check finished.');

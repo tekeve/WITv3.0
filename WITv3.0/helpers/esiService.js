@@ -14,14 +14,20 @@ async function requestWithRetries(requestFunc, retries = 3, delay = 1000) {
             const response = await requestFunc();
             return response.data;
         } catch (error) {
-            if (error.response && error.response.status === 420 && i < retries - 1) {
+            const status = error.response?.status;
+            // Check for common temporary ESI errors (rate limiting, downtime) and retry
+            if (status && [420, 502, 503, 504].includes(status) && i < retries - 1) {
                 const waitTime = delay * Math.pow(2, i);
-                logger.warn(`ESI rate limit hit (420). Retrying in ${waitTime / 1000}s...`);
+                if (status === 420) {
+                    logger.warn(`ESI rate limit hit (420). Retrying in ${waitTime / 1000}s...`);
+                } else {
+                    logger.info(`ESI service unavailable (Status ${status}). Retrying in ${waitTime / 1000}s...`);
+                }
                 await new Promise(res => setTimeout(res, waitTime));
             } else {
                 const errorMessage = error.response ? `Status ${error.response.status}: ${JSON.stringify(error.response.data)}` : error.message;
                 logger.error(`ESI request failed after all retries: ${errorMessage}`);
-                throw error;
+                throw error; // Re-throw the error after all retries have failed
             }
         }
     }
@@ -37,4 +43,3 @@ module.exports = {
         return requestWithRetries(() => esi.post(endpoint, data, { headers }));
     },
 };
-
