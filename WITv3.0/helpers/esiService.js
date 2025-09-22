@@ -105,18 +105,22 @@ module.exports = {
      * @returns {Promise<{data: any, expires: number|null}>} The data and expiry timestamp from the ESI response.
      */
     get: async ({ endpoint, params, headers, caller }) => {
+        // Create a unique key for the request based on endpoint and params
         const cacheKey = `${endpoint}?${JSON.stringify(params || {})}`;
         const cachedItem = esiCache.get(cacheKey);
         const callerName = caller ? path.basename(caller) : 'Unknown';
 
+        // Check if a valid, non-expired item is in the cache
         if (cachedItem && cachedItem.expires > Date.now()) {
             logger.info(`ESI Cache HIT for ${endpoint} from ${callerName}.`);
-            return { data: cachedItem.data, expires: cachedItem.expires };
+            return { data: cachedItem.data, expires: cachedItem.expires }; // Return cached data
         }
 
-        logger.info(`ESI Cache MISS for ${endpoint} from ${callerName}. Fetching from ESI.`);
+        // If not in cache or expired, make the request
+        logger.info(`ESI Cache MISS for ${endpoint} from ${callerName}. Making a real ESI call...`);
         const response = await requestWithRetries(() => esi.get(endpoint, { params, headers }), endpoint, caller);
 
+        // After a successful request, update the cache if an expires header is present
         let expiryTimestamp = null;
         if (response && response.headers && response.headers.expires) {
             const expiryDate = new Date(response.headers.expires);
@@ -140,7 +144,10 @@ module.exports = {
      * @returns {Promise<any>} The data from the ESI response.
      */
     post: async ({ endpoint, data, headers, caller }) => {
+        const callerName = caller ? path.basename(caller) : 'Unknown';
+        logger.info(`Making a real ESI POST call to ${endpoint} from ${callerName}...`);
         const response = await requestWithRetries(() => esi.post(endpoint, data, { headers }), endpoint, caller);
         return response.data;
     },
 };
+
