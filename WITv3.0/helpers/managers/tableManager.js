@@ -11,7 +11,7 @@ const editableTables = [
     'google_sheets',
     'incursion_state',
     'incursion_systems',
-    'roleHierarchy',
+    'role_hierarchy',
     'users'
 ];
 

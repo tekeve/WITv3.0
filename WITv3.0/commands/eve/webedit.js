@@ -12,7 +12,7 @@ module.exports = {
         const tableChoices = tableManager.editableTables.map(table => {
             // Format the table name for display in the dropdown.
             let label = table.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            if (table === 'roleHierarchy') label = 'Role Hierarchy'; // Specific label for readability
+            if (table === 'role_hierarchy') label = 'Role Hierarchy'; // Specific label for readability
             return { label, value: table };
         });
 
