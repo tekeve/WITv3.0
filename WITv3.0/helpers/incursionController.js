@@ -157,13 +157,17 @@ async function updateIncursions(client, options = {}) {
                 if (state.spawnTimestamp) {
                     const establishedDur = (state.mobilizingTimestamp || now) - state.spawnTimestamp;
                     const mobilizingDur = state.mobilizingTimestamp ? (state.withdrawingTimestamp || now) - state.mobilizingTimestamp : null;
+                    const withdrawingDur = state.withdrawingTimestamp ? now - state.withdrawingTimestamp : null;
                     const establishedUsage = Math.round((establishedDur / (5 * 24 * 3600)) * 100);
+                    const withdrawingUsage = withdrawingDur ? Math.round((withdrawingDur / (24 * 3600)) * 100) : 0;
+
                     state.lastIncursionStats = {
                         totalDuration: formatDuration(now - state.spawnTimestamp),
                         establishedDuration: formatDuration(establishedDur),
                         mobilizingDuration: formatDuration(mobilizingDur),
-                        withdrawingDuration: formatDuration(state.withdrawingTimestamp ? now - state.withdrawingTimestamp : null),
-                        establishedUsagePercentage: `${establishedUsage}%`
+                        withdrawingDuration: formatDuration(withdrawingDur),
+                        establishedUsagePercentage: `${establishedUsage}%`,
+                        withdrawingUsagePercentage: `${withdrawingUsage}%`
                     };
                 }
             }
@@ -177,7 +181,8 @@ async function updateIncursions(client, options = {}) {
             embed = buildNoIncursionEmbed(state);
         }
 
-        const channel = await client.channels.fetch(config.incursionChannelId);
+        const channelId = config.incursionChannelId[0]; // Extract ID for clarity
+        const channel = await client.channels.fetch(channelId);
 
         if (isNewSpawn) {
             if (state.incursionMessageId) {
@@ -209,6 +214,22 @@ async function updateIncursions(client, options = {}) {
         await writeState(state);
 
     } catch (error) {
+        const channelId = config.incursionChannelId ? config.incursionChannelId[0] : 'NOT CONFIGURED';
+        if (error.code === 50001) { // Missing Access
+            logger.error(`FATAL: Bot is missing access to the configured incursion channel (ID: ${channelId}).\n` +
+                'Troubleshooting Steps:\n' +
+                "1. Verify this Channel ID is correct in your 'config' database table.\n" +
+                "2. Ensure the bot is a member of the server where this channel exists.\n" +
+                "3. Check the bot's permissions for the channel itself. It needs 'View Channel', 'Send Messages', and 'Embed Links'.\n" +
+                "4. Check the permissions for the category the channel is in. A 'deny' permission on the category can override channel settings.\n" +
+                "5. Check all of the bot's roles. A role with a 'deny' permission can override another role that grants permission.");
+            return; // Stop execution if we can't post
+        }
+        if (error.code === 10003) { // Unknown Channel
+            logger.error(`FATAL: The configured incursion channel (ID: ${channelId}) does not exist. Please check the channel ID in your config.`);
+            return;
+        }
+
         const status = error.response?.status;
         if (status && [502, 503, 504].includes(status)) {
             // This is an expected downtime error, so we log it gently and exit.
@@ -225,3 +246,7 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
+
+
+
+

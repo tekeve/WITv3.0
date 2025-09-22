@@ -80,7 +80,7 @@ REPLACE INTO `config` (`key_name`, `value`) VALUES
 	('lastCommitSha', '[""]'),
 	('requestChannelId', '["1419556470491582615"]'),
 	('residentAppChannelId', '["706631842702295100"]'),
-	('setupLocked', '["true"]'),
+	('setupLocked', '["false"]'),
 	('srpChannelId', '["713455850458447932"]'),
 	('srpMailingListId', '["145153119"]'),
 	('tradeHubs', '{"Jita":"30000142","Amarr":"30002187","Dodixie":"30002659","Rens":"30002510","Hek":"30002053"}');

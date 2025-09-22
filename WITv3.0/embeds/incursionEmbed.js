@@ -175,11 +175,14 @@ function buildNoIncursionEmbed(state) {
         embed.addFields({ name: 'Next Spawn Window', value: `Opens: <t:${windowOpen}:R>\nCloses: <t:${windowClose}:R>` });
     }
     if (state.lastIncursionStats) {
-        embed.addFields({ name: 'Last Incursion Report', value: '\u200b' });
-        embed.addFields(
-            { name: 'Total Duration', value: state.lastIncursionStats.totalDuration, inline: true },
-            { name: 'Established Phase', value: `${state.lastIncursionStats.establishedDuration} (${state.lastIncursionStats.establishedUsagePercentage} used)`, inline: true },
-        );
+        const stats = state.lastIncursionStats;
+        const withdrawingStat = stats.withdrawingDuration && stats.withdrawingUsagePercentage
+            ? `\n**Withdrawing Phase**: ${stats.withdrawingDuration} (${stats.withdrawingUsagePercentage} used)`
+            : '';
+
+        const statsString = `**Total Duration**: ${stats.totalDuration}\n**Established Phase**: ${stats.establishedDuration} (${stats.establishedUsagePercentage} used)${withdrawingStat}`;
+
+        embed.addFields({ name: 'Last Incursion Stats', value: statsString });
     }
     return embed;
 }

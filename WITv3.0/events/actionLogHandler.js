@@ -1,29 +1,37 @@
 ﻿const { Events, EmbedBuilder, AuditLogEvent, PermissionsBitField } = require('discord.js');
 const actionLog = require('@helpers/actionLog');
 const logger = require('@helpers/logger');
+const characterManager = require('@helpers/characterManager');
 
 // --- Utility Functions ---
 
 /**
- * Fetches the audit log executor for a specific action and target.
+ * Fetches the audit log entry for a specific action and target.
  * @param {import('discord.js').Guild} guild - The guild to fetch logs from.
  * @param {import('discord.js').AuditLogEvent} eventType - The type of audit log to fetch.
  * @param {string} targetId - The ID of the object that was actioned upon.
- * @returns {Promise<import('discord.js').User|null>} The user who performed the action, or null.
+ * @param {Function|null} [changeFilter=null] - An optional function to further filter the log entry based on its `changes` array.
+ * @returns {Promise<import('discord.js').GuildAuditLogsEntry|null>} The full audit log entry, or null.
  */
-async function getExecutor(guild, eventType, targetId) {
+async function getAuditLogEntry(guild, eventType, targetId, changeFilter = null) {
     try {
-        // --- FIX: Fetch more than one log to avoid race conditions ---
-        const fetchedLogs = await guild.fetchAuditLogs({
-            limit: 5,
-            type: eventType,
-        });
-        // Find the specific log entry for our target.
-        const log = fetchedLogs.entries.find(entry => entry.target?.id === targetId);
+        for (let i = 0; i < 5; i++) {
+            const fetchedLogs = await guild.fetchAuditLogs({
+                limit: 10,
+                type: eventType,
+            });
 
-        // Check if a log was found and it's recent
-        if (log && log.createdTimestamp > (Date.now() - 5000)) {
-            return log.executor;
+            const log = fetchedLogs.entries.find(entry =>
+                entry.target?.id === targetId &&
+                entry.createdTimestamp > (Date.now() - 5000) &&
+                (!changeFilter || (entry.changes && changeFilter(entry.changes)))
+            );
+
+            if (log) {
+                return log; // Return the entire log entry
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
     } catch (error) {
         logger.warn(`Could not fetch audit logs for event type ${eventType}, likely missing permissions.`);
@@ -31,11 +39,13 @@ async function getExecutor(guild, eventType, targetId) {
     return null;
 }
 
+
 // --- Event Handler Logic ---
 
 async function handleChannelCreate(channel) {
     if (!channel.guild) return;
-    const executor = await getExecutor(channel.guild, AuditLogEvent.ChannelCreate, channel.id);
+    const logEntry = await getAuditLogEntry(channel.guild, AuditLogEvent.ChannelCreate, channel.id);
+    const executor = logEntry ? logEntry.executor : null;
     const embed = new EmbedBuilder()
         .setColor(0x43B581)
         .setTitle('Channel Created')
@@ -46,7 +56,8 @@ async function handleChannelCreate(channel) {
 
 async function handleChannelDelete(channel) {
     if (!channel.guild) return;
-    const executor = await getExecutor(channel.guild, AuditLogEvent.ChannelDelete, channel.id);
+    const logEntry = await getAuditLogEntry(channel.guild, AuditLogEvent.ChannelDelete, channel.id);
+    const executor = logEntry ? logEntry.executor : null;
     const embed = new EmbedBuilder()
         .setColor(0xED4245)
         .setTitle('Channel Deleted')
@@ -67,7 +78,6 @@ async function handleChannelUpdate(oldChannel, newChannel) {
         changes.push(`**Topic:** \`${oldChannel.topic || 'None'}\` -> \`${newChannel.topic || 'None'}\``);
     }
 
-    // --- FIX: Reworked permission detection for reliability ---
     const oldPerms = oldChannel.permissionOverwrites.cache;
     const newPerms = newChannel.permissionOverwrites.cache;
     const permChanges = [];
@@ -123,7 +133,8 @@ async function handleChannelUpdate(oldChannel, newChannel) {
 
     if (changes.length === 0 && permissionChanges.length === 0) return;
 
-    const executor = await getExecutor(newChannel.guild, AuditLogEvent.ChannelUpdate, newChannel.id);
+    const logEntry = await getAuditLogEntry(newChannel.guild, AuditLogEvent.ChannelUpdate, newChannel.id);
+    const executor = logEntry ? logEntry.executor : null;
     const embed = new EmbedBuilder()
         .setColor(0x5865F2)
         .setTitle('Channel Updated')
@@ -141,7 +152,8 @@ async function handleChannelUpdate(oldChannel, newChannel) {
 
 
 async function handleGuildBanAdd(ban) {
-    const executor = await getExecutor(ban.guild, AuditLogEvent.MemberBanAdd, ban.user.id);
+    const logEntry = await getAuditLogEntry(ban.guild, AuditLogEvent.MemberBanAdd, ban.user.id);
+    const executor = logEntry ? logEntry.executor : null;
     const embed = new EmbedBuilder()
         .setColor(0xED4245)
         .setTitle('Member Banned')
@@ -152,7 +164,8 @@ async function handleGuildBanAdd(ban) {
 }
 
 async function handleGuildBanRemove(ban) {
-    const executor = await getExecutor(ban.guild, AuditLogEvent.MemberBanRemove, ban.user.id);
+    const logEntry = await getAuditLogEntry(ban.guild, AuditLogEvent.MemberBanRemove, ban.user.id);
+    const executor = logEntry ? logEntry.executor : null;
     const embed = new EmbedBuilder()
         .setColor(0x43B581)
         .setTitle('Member Unbanned')
@@ -197,7 +210,8 @@ async function handleMemberAdd(member) {
 }
 
 async function handleMemberRemove(member) {
-    const executor = await getExecutor(member.guild, AuditLogEvent.MemberKick, member.id);
+    const logEntry = await getAuditLogEntry(member.guild, AuditLogEvent.MemberKick, member.id);
+    const executor = logEntry ? logEntry.executor : null;
     const action = executor ? 'kicked' : 'left';
     const embed = new EmbedBuilder()
         .setColor(0xED4245)
@@ -206,7 +220,6 @@ async function handleMemberRemove(member) {
         .setThumbnail(member.user.displayAvatarURL())
         .setTimestamp();
 
-    // New logic to clear roles from the database
     try {
         const userInDb = await charManager.getChars(member.id);
         if (userInDb) {
@@ -226,15 +239,22 @@ async function handleMemberRemove(member) {
     actionLog.postLog(member.guild, 'log_member_leave', embed, { member });
 }
 
+
 async function handleMemberUpdate(oldMember, newMember) {
     if (newMember.user.bot) return;
 
     const oldTimeout = oldMember.communicationDisabledUntilTimestamp;
     const newTimeout = newMember.communicationDisabledUntilTimestamp;
 
-    // Check for Timeout changes
-    if (oldTimeout !== newTimeout) {
-        const executor = await getExecutor(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
+    if ((oldTimeout || null) !== (newTimeout || null)) {
+        const logEntry = await getAuditLogEntry(
+            newMember.guild,
+            AuditLogEvent.MemberUpdate,
+            newMember.id,
+            (changes) => changes.some(c => c.key === 'communication_disabled_until')
+        );
+        const executor = logEntry ? logEntry.executor : null;
+
         if (newTimeout && newTimeout > Date.now()) {
             const embed = new EmbedBuilder()
                 .setColor(0xED4245)
@@ -253,9 +273,14 @@ async function handleMemberUpdate(oldMember, newMember) {
         }
     }
 
-    // Check for Nickname changes
     if (oldMember.nickname !== newMember.nickname) {
-        const executor = await getExecutor(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
+        const logEntry = await getAuditLogEntry(
+            newMember.guild,
+            AuditLogEvent.MemberUpdate,
+            newMember.id,
+            (changes) => changes.some(c => c.key === 'nick')
+        );
+        const executor = logEntry ? logEntry.executor : null;
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
             .setTitle('Nickname Changed')
@@ -271,27 +296,40 @@ async function handleMemberUpdate(oldMember, newMember) {
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;
 
-    // Check for Role changes
     if (oldRoles.size !== newRoles.size || !oldRoles.every((value, key) => newRoles.has(key))) {
-        const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
-        const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
+        let addedRoles = [];
+        let removedRoles = [];
+        let executor = null;
 
-        if (addedRoles.size > 0 || removedRoles.size > 0) {
-            const roleExecutor = await getExecutor(newMember.guild, AuditLogEvent.MemberRoleUpdate, newMember.id);
+        const logEntry = await getAuditLogEntry(newMember.guild, AuditLogEvent.MemberRoleUpdate, newMember.id);
+
+        if (logEntry) {
+            executor = logEntry.executor;
+            const roleChanges = logEntry.changes;
+            const added = roleChanges.find(c => c.key === '$add');
+            const removed = roleChanges.find(c => c.key === '$remove');
+            if (added) addedRoles = added.new.map(r => `<@&${r.id}>`);
+            if (removed) removedRoles = removed.new.map(r => `<@&${r.id}>`);
+        } else {
+            addedRoles = newRoles.filter(role => !oldRoles.has(role.id)).map(r => r.toString());
+            removedRoles = oldRoles.filter(role => !newRoles.has(role.id)).map(r => r.toString());
+        }
+
+        if (addedRoles.length > 0 || removedRoles.length > 0) {
             const embed = new EmbedBuilder()
                 .setTitle('Member Roles Updated')
-                .setDescription(`Roles for **${newMember.user.tag}** were updated ${roleExecutor ? `by **${roleExecutor.tag}**` : ''}.`)
+                .setDescription(`Roles for **${newMember.user.tag}** were updated ${executor ? `by **${executor.tag}**` : ''}.`)
                 .setTimestamp();
 
-            if (addedRoles.size > 0) {
-                embed.addFields({ name: 'Roles Added', value: addedRoles.map(r => r.toString()).join('\n'), inline: true });
+            if (addedRoles.length > 0) {
+                embed.addFields({ name: 'Roles Added', value: addedRoles.join('\n'), inline: true });
                 embed.setColor(0x43B581);
             }
-            if (removedRoles.size > 0) {
-                embed.addFields({ name: 'Roles Removed', value: removedRoles.map(r => r.toString()).join('\n'), inline: true });
+            if (removedRoles.length > 0) {
+                embed.addFields({ name: 'Roles Removed', value: removedRoles.join('\n'), inline: true });
                 embed.setColor(0xED4245);
             }
-            if (addedRoles.size > 0 && removedRoles.size > 0) {
+            if (addedRoles.length > 0 && removedRoles.length > 0) {
                 embed.setColor(0x4E5D94);
             }
             actionLog.postLog(newMember.guild, 'log_member_role_update', embed, { member: newMember });
@@ -302,7 +340,9 @@ async function handleMemberUpdate(oldMember, newMember) {
 async function handleMessageDelete(message) {
     if (message.partial || !message.guild || !message.author || message.author.bot) return;
 
-    const executor = await getExecutor(message.guild, AuditLogEvent.MessageDelete, message.author.id);
+    const logEntry = await getAuditLogEntry(message.guild, AuditLogEvent.MessageDelete, message.author.id);
+    const executor = logEntry ? logEntry.executor : null;
+
     let deletedBy = `Author (${message.author.tag})`;
     if (executor && executor.id !== message.author.id) {
         deletedBy = `Moderator (${executor.tag})`;
@@ -361,7 +401,8 @@ async function handleMessageUpdate(oldMessage, newMessage) {
 
 async function handleRoleCreate(role) {
     try {
-        const executor = await getExecutor(role.guild, AuditLogEvent.RoleCreate, role.id);
+        const logEntry = await getAuditLogEntry(role.guild, AuditLogEvent.RoleCreate, role.id);
+        const executor = logEntry ? logEntry.executor : null;
         const embed = new EmbedBuilder()
             .setColor(0x43B581)
             .setTitle('Role Created')
@@ -375,7 +416,8 @@ async function handleRoleCreate(role) {
 
 async function handleRoleDelete(role) {
     try {
-        const executor = await getExecutor(role.guild, AuditLogEvent.RoleDelete, role.id);
+        const logEntry = await getAuditLogEntry(role.guild, AuditLogEvent.RoleDelete, role.id);
+        const executor = logEntry ? logEntry.executor : null;
         const embed = new EmbedBuilder()
             .setColor(0xED4245)
             .setTitle('Role Deleted')
@@ -388,7 +430,8 @@ async function handleRoleDelete(role) {
 }
 
 async function handleRoleUpdate(oldRole, newRole) {
-    const executor = await getExecutor(newRole.guild, AuditLogEvent.RoleUpdate, newRole.id);
+    const logEntry = await getAuditLogEntry(newRole.guild, AuditLogEvent.RoleUpdate, newRole.id);
+    const executor = logEntry ? logEntry.executor : null;
     const changes = [];
 
     if (oldRole.name !== newRole.name) {
