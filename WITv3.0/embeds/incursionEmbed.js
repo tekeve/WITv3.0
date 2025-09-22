@@ -176,11 +176,10 @@ function buildNoIncursionEmbed(state) {
     }
     if (state.lastIncursionStats) {
         const stats = state.lastIncursionStats;
-        const withdrawingStat = stats.withdrawingDuration && stats.withdrawingUsagePercentage
-            ? `\n**Withdrawing Phase**: ${stats.withdrawingDuration} (${stats.withdrawingUsagePercentage} used)`
-            : '';
 
-        const statsString = `**Total Duration**: ${stats.totalDuration}\n**Established Phase**: ${stats.establishedDuration} (${stats.establishedUsagePercentage} used)${withdrawingStat}`;
+        const statsString = `**Total Duration**: ${stats.totalDuration}\n` +
+            `**Established Phase**: ${stats.establishedDuration} (${stats.establishedUsagePercentage} used)\n` +
+            `**Withdrawing Period Used**: ${stats.withdrawingPeriodUsed}`;
 
         embed.addFields({ name: 'Last Incursion Stats', value: statsString });
     }

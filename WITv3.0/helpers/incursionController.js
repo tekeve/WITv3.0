@@ -154,20 +154,30 @@ async function updateIncursions(client, options = {}) {
                 state.endedTimestamp = now;
                 const lastSpawnData = incursionSystems.find(c => c.Constellation_id === lastConstellationId);
                 if (lastSpawnData) state.lastHqSystemId = lastSpawnData.dock_up_system_id;
+
                 if (state.spawnTimestamp) {
-                    const establishedDur = (state.mobilizingTimestamp || now) - state.spawnTimestamp;
-                    const mobilizingDur = state.mobilizingTimestamp ? (state.withdrawingTimestamp || now) - state.mobilizingTimestamp : null;
-                    const withdrawingDur = state.withdrawingTimestamp ? now - state.withdrawingTimestamp : null;
+                    const totalDur = state.endedTimestamp - state.spawnTimestamp;
+                    const establishedDur = (state.mobilizingTimestamp || state.endedTimestamp) - state.spawnTimestamp;
+
+                    let withdrawingDur = null;
+                    let withdrawingUsagePercentage = 0;
+
+                    // Explicitly check for both timestamps before calculating the withdrawing duration and percentage.
+                    if (state.withdrawingTimestamp && state.endedTimestamp) {
+                        withdrawingDur = state.endedTimestamp - state.withdrawingTimestamp;
+                        const maxWithdrawingSeconds = 24 * 3600; // Max withdrawing period is 24 hours
+                        withdrawingUsagePercentage = Math.round((withdrawingDur / maxWithdrawingSeconds) * 100);
+                    }
+
+                    const totalPossibleSpawnTime = 8 * 24 * 3600; // 8 days in seconds
+                    const totalSpawnTimePercentage = Math.round((totalDur / totalPossibleSpawnTime) * 100);
                     const establishedUsage = Math.round((establishedDur / (5 * 24 * 3600)) * 100);
-                    const withdrawingUsage = withdrawingDur ? Math.round((withdrawingDur / (24 * 3600)) * 100) : 0;
 
                     state.lastIncursionStats = {
-                        totalDuration: formatDuration(now - state.spawnTimestamp),
-                        establishedDuration: formatDuration(establishedDur),
-                        mobilizingDuration: formatDuration(mobilizingDur),
-                        withdrawingDuration: formatDuration(withdrawingDur),
+                        totalDuration: `${formatDuration(totalDur)} (${totalSpawnTimePercentage}%)`,
+                        establishedDuration: `${formatDuration(establishedDur)}`,
                         establishedUsagePercentage: `${establishedUsage}%`,
-                        withdrawingUsagePercentage: `${withdrawingUsage}%`
+                        withdrawingPeriodUsed: `${withdrawingUsagePercentage}%`,
                     };
                 }
             }
@@ -246,7 +256,4 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
-
-
-
 
