@@ -9,7 +9,11 @@ const esiService = require('@helpers/esiService');
  */
 async function getCharacterDetails(characterName) {
     try {
-        const idResponse = await esiService.post('/universe/ids/', [characterName]);
+        const idResponse = await esiService.post({
+            endpoint: '/universe/ids/',
+            data: [characterName],
+            caller: __filename
+        });
         if (!idResponse || !idResponse.characters || idResponse.characters.length === 0) {
             return null;
         }

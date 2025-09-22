@@ -40,19 +40,20 @@ async function handleModal(interaction) {
         };
 
         // Send the mail via ESI
-        await esi.post(
-            `/characters/${authData.character_id}/mail/`,
-            {
+        await esi.post({
+            endpoint: `/characters/${authData.character_id}/mail/`,
+            data: {
                 approved_cost: 0,
                 body: mailBody,
                 recipients: [recipient],
                 subject: mailData.subject,
             },
-            {
+            headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json'
-            }
-        );
+            },
+            caller: __filename
+        });
         await interaction.editReply({ content: 'EVE Mail has been sent successfully!' });
     } catch (error) {
         const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;

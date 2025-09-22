@@ -48,8 +48,8 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
         const shortestEsiUrl = `/route/${id}/${currentHqId}/?flag=shortest`;
         try {
             const [secureRes, shortestRes] = await Promise.all([
-                esiService.get(secureEsiUrl),
-                esiService.get(shortestEsiUrl)
+                esiService.get({ endpoint: secureEsiUrl, caller: __filename }),
+                esiService.get({ endpoint: shortestEsiUrl, caller: __filename })
             ]);
             const secureJumps = secureRes.length - 1;
             const shortestJumps = shortestRes.length - 1;
@@ -113,8 +113,8 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
             try {
                 // Use Promise.allSettled to ensure that even if one route fails, the other can be processed.
                 const results = await Promise.allSettled([
-                    esiService.get(secureEsiUrl),
-                    esiService.get(shortestEsiUrl)
+                    esiService.get({ endpoint: secureEsiUrl, caller: __filename }),
+                    esiService.get({ endpoint: shortestEsiUrl, caller: __filename })
                 ]);
 
                 const secureRes = results[0].status === 'fulfilled' ? results[0].value : null;

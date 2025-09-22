@@ -159,7 +159,7 @@ async function updateIncursions(client, options = {}) {
                 logger.info('Mock override has expired. Resuming ESI updates.');
                 client.mockOverride = null;
             }
-            const allIncursions = await esiService.get('/incursions/');
+            const allIncursions = await esiService.get({ endpoint: '/incursions/', caller: __filename });
             if (!Array.isArray(allIncursions)) {
                 logger.error(`ESI /incursions/ endpoint did not return an array. Response:`, allIncursions);
                 isUpdating = false;
@@ -169,7 +169,10 @@ async function updateIncursions(client, options = {}) {
             const enrichedIncursions = [];
             for (const incursion of allIncursions) {
                 try {
-                    const systemData = await esiService.get(`/universe/systems/${incursion.staging_solar_system_id}/`);
+                    const systemData = await esiService.get({
+                        endpoint: `/universe/systems/${incursion.staging_solar_system_id}/`,
+                        caller: __filename
+                    });
                     enrichedIncursions.push({ ...incursion, systemData });
                 } catch (e) {
                     logger.warn(`Could not resolve system ID ${incursion.staging_solar_system_id}. Error: ${e.message}`);

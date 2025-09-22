@@ -29,7 +29,11 @@ module.exports = {
             try {
                 const accessToken = await authManager.getAccessToken(interaction.user.id);
                 const headers = { 'Authorization': `Bearer ${accessToken}` };
-                const mailingLists = await esiService.get(`/characters/${authData.character_id}/mail/lists/`, null, headers);
+                const mailingLists = await esiService.get({
+                    endpoint: `/characters/${authData.character_id}/mail/lists/`,
+                    headers: headers,
+                    caller: __filename
+                });
 
                 // With the esiService fix, we can be more confident mailingLists is an array if the call succeeds.
                 if (mailingLists.length === 0) {
