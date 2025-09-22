@@ -102,34 +102,32 @@ module.exports = {
      * @param {object} [options.params] - The URL parameters for the request.
      * @param {object} [options.headers] - The request headers.
      * @param {string} [options.caller] - The file path of the calling module.
-     * @returns {Promise<any>} The data from the ESI response.
+     * @returns {Promise<{data: any, expires: number|null}>} The data and expiry timestamp from the ESI response.
      */
     get: async ({ endpoint, params, headers, caller }) => {
-        // Create a unique key for the request based on endpoint and params
         const cacheKey = `${endpoint}?${JSON.stringify(params || {})}`;
         const cachedItem = esiCache.get(cacheKey);
         const callerName = caller ? path.basename(caller) : 'Unknown';
 
-        // Check if a valid, non-expired item is in the cache
         if (cachedItem && cachedItem.expires > Date.now()) {
             logger.info(`ESI Cache HIT for ${endpoint} from ${callerName}.`);
-            return cachedItem.data; // Return cached data
+            return { data: cachedItem.data, expires: cachedItem.expires };
         }
 
-        // If not in cache or expired, make the request
         logger.info(`ESI Cache MISS for ${endpoint} from ${callerName}. Fetching from ESI.`);
         const response = await requestWithRetries(() => esi.get(endpoint, { params, headers }), endpoint, caller);
 
-        // After a successful request, update the cache if an expires header is present
+        let expiryTimestamp = null;
         if (response && response.headers && response.headers.expires) {
             const expiryDate = new Date(response.headers.expires);
+            expiryTimestamp = expiryDate.getTime();
             esiCache.set(cacheKey, {
                 data: response.data,
-                expires: expiryDate.getTime()
+                expires: expiryTimestamp
             });
         }
 
-        return response.data;
+        return { data: response.data, expires: expiryTimestamp };
     },
 
     /**
@@ -146,4 +144,3 @@ module.exports = {
         return response.data;
     },
 };
-

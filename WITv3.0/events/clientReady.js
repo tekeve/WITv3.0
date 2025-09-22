@@ -16,12 +16,10 @@ module.exports = {
 		// Load and schedule reminders from DB
 		await reminderManager.loadReminders(client);
 
-		// Initial call to update incursions
+		// Initial call to update incursions, which will then schedule the next call itself.
 		client.updateIncursions();
-		// Set interval for subsequent updates
-		setInterval(() => client.updateIncursions(), 1 * 60 * 1000); // Check every 1 minute
 
-		// Initialize and start GitHub watcher
+		// Initialize and start GitHub watcher with a standard interval
 		await githubWatcher.initializeLastSha();
 		setInterval(() => githubWatcher.checkGithubForUpdates(client), 5 * 60 * 1000); // Check every 5 minutes
 	},

@@ -5,6 +5,9 @@ const incursionManager = require('@helpers/incursionManager');
 const esiService = require('@helpers/esiService');
 const { buildActiveIncursionEmbed, buildNoIncursionEmbed, formatDuration } = require('@embeds/incursionEmbed');
 
+// A map to hold the timers for different dynamic ESI calls
+const esiTimers = new Map();
+
 /**
  * Calculates the statistics for the last completed incursion based on stored timestamps.
  * @param {object} state - The incursion state object from the database.
@@ -120,6 +123,12 @@ async function updateIncursions(client, options = {}) {
     isUpdating = true;
     logger.info('Checking for incursion updates...');
 
+    // Clear any existing timer before starting a new check
+    if (esiTimers.has('incursions')) {
+        clearTimeout(esiTimers.get('incursions'));
+        esiTimers.delete('incursions');
+    }
+
     const state = await readState();
     const config = configManager.get();
     const incursionSystems = incursionManager.get();
@@ -133,6 +142,7 @@ async function updateIncursions(client, options = {}) {
 
     try {
         let highSecIncursion;
+        let nextCheckDelay = 60 * 1000; // Default to 60 seconds
         const mockOverride = client.mockOverride;
         const isUsingMock = mockOverride && mockOverride.expires > Date.now();
 
@@ -159,17 +169,29 @@ async function updateIncursions(client, options = {}) {
                 logger.info('Mock override has expired. Resuming ESI updates.');
                 client.mockOverride = null;
             }
-            const allIncursions = await esiService.get({ endpoint: '/incursions/', caller: __filename });
+            const { data: allIncursions, expires: incursionsExpiry } = await esiService.get({ endpoint: '/incursions/', caller: __filename });
+
+            if (incursionsExpiry) {
+                const buffer = 5000; // 5 second buffer
+                nextCheckDelay = (incursionsExpiry - Date.now()) + buffer;
+                if (nextCheckDelay < 10000) { // Ensure at least 10 seconds delay
+                    nextCheckDelay = 10000;
+                }
+            }
+
             if (!Array.isArray(allIncursions)) {
                 logger.error(`ESI /incursions/ endpoint did not return an array. Response:`, allIncursions);
                 isUpdating = false;
+                // Schedule next check even on error
+                const timer = setTimeout(() => updateIncursions(client), nextCheckDelay);
+                esiTimers.set('incursions', timer);
                 return;
             }
 
             const enrichedIncursions = [];
             for (const incursion of allIncursions) {
                 try {
-                    const systemData = await esiService.get({
+                    const { data: systemData } = await esiService.get({
                         endpoint: `/universe/systems/${incursion.staging_solar_system_id}/`,
                         caller: __filename
                     });
@@ -186,6 +208,10 @@ async function updateIncursions(client, options = {}) {
         if (currentStateKey === state.lastIncursionState && !isManualRefresh && !isUsingMock) {
             logger.info('No change in high-sec incursion state.');
             isUpdating = false;
+            // Schedule the next check
+            const timer = setTimeout(() => updateIncursions(client), nextCheckDelay);
+            esiTimers.set('incursions', timer);
+            logger.info(`Next incursion check scheduled in ${Math.round(nextCheckDelay / 1000)}s.`);
             return;
         }
         logger.info('High-sec incursion state has changed or manual/mock update triggered. Updating...');
@@ -267,6 +293,11 @@ async function updateIncursions(client, options = {}) {
         }
 
         await writeState(state);
+
+        // Schedule the next check after a successful update
+        const timer = setTimeout(() => updateIncursions(client), nextCheckDelay);
+        esiTimers.set('incursions', timer);
+        logger.info(`Next incursion check scheduled in ${Math.round(nextCheckDelay / 1000)}s.`);
 
     } catch (error) {
         const channelId = config.incursionChannelId ? config.incursionChannelId[0] : 'NOT CONFIGURED';
