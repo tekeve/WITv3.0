@@ -205,6 +205,24 @@ async function handleMemberRemove(member) {
         .setDescription(`${member.user.tag} has ${action} the server ${executor ? `(Kicked by ${executor.tag})` : ''}.`)
         .setThumbnail(member.user.displayAvatarURL())
         .setTimestamp();
+
+    // New logic to clear roles from the database
+    try {
+        const userInDb = await charManager.getChars(member.id);
+        if (userInDb) {
+            const success = await charManager.clearUserRoles(member.id);
+            if (success) {
+                logger.info(`Cleared database roles for ${member.user.tag} (${member.id}) who left the server.`);
+                embed.addFields({ name: 'Database Roles', value: 'Cleared successfully.' });
+            } else {
+                logger.warn(`Attempted to clear database roles for ${member.user.tag} (${member.id}), but the database operation failed.`);
+                embed.addFields({ name: 'Database Roles', value: 'Failed to clear.' });
+            }
+        }
+    } catch (error) {
+        logger.error(`Error clearing roles for leaving member ${member.id}:`, error);
+    }
+
     actionLog.postLog(member.guild, 'log_member_leave', embed, { member });
 }
 

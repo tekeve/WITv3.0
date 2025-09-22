@@ -25,7 +25,7 @@ const tableKeyMap = {
     google_sheets: 'alias',
     incursion_state: 'id',
     incursion_systems: 'Constellation_id',
-    roleHierarchy: 'roleName',
+    role_hierarchy: 'roleName',
     users: 'discord_id',
 };
 

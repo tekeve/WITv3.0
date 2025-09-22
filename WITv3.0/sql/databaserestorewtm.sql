@@ -285,7 +285,7 @@ CREATE TABLE IF NOT EXISTS `role_hierarchy` (
   PRIMARY KEY (`roleName`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dumping data for table wit-db.rolehierarchy: ~8 rows (approximately)
+-- Dumping data for table wit-db.role_hierarchy: ~8 rows (approximately)
 REPLACE INTO `role_hierarchy` (`roleName`, `promote`, `demote`) VALUES
 	('certified_trainer', '{"add":["720833761142636544"],"remove":["795384597339963413"]}', '{"add":[],"remove":["720833761142636544"]}'),
 	('fleet_commander', '{"add": ["692978016632045579"],"remove": ["692978146101952543"]}', '{"add": ["692978146101952543"],"remove": ["692978016632045579"]}'),

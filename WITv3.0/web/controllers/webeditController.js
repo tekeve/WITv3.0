@@ -93,7 +93,7 @@ exports.handleUpdate = (client) => async (req, res) => {
             await configManager.reloadConfig();
             logger.success('Live configuration has been reloaded after web edit.');
         }
-        if (tableName === 'roleHierarchy') {
+        if (tableName === 'role_Hierarchy') {
             const roleHierarchyManager = require('@helpers/roleHierarchyManager');
             await roleHierarchyManager.reloadHierarchy();
             logger.success('Role hierarchy has been reloaded after web edit.');

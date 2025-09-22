@@ -178,6 +178,23 @@ module.exports = {
     },
 
     /**
+     * Clears the stored Discord roles for a user.
+     * @param {string} discordId - The user's Discord ID.
+     * @returns {Promise<boolean>}
+     */
+    clearUserRoles: async (discordId) => {
+        try {
+            const rolesJson = JSON.stringify([]);
+            const sql = 'UPDATE users SET roles = ? WHERE discord_id = ?';
+            await db.query(sql, [rolesJson, discordId]);
+            return true;
+        } catch (error) {
+            logger.error(`Failed to clear roles for ${discordId}:`, error);
+            return false;
+        }
+    },
+
+    /**
      * Gets all registered users with a main character.
      * @returns {Promise<Array<{discord_id: string}>>}
      */
@@ -186,4 +203,3 @@ module.exports = {
         return await db.query(sql);
     },
 };
-

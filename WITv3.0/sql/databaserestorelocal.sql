@@ -281,7 +281,7 @@ CREATE TABLE IF NOT EXISTS `resident_applications` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4;
 
--- Dumping structure for table wit-db.rolehierarchy
+-- Dumping structure for table wit-db.role_hierarchy
 CREATE TABLE IF NOT EXISTS `role_hierarchy` (
   `roleName` varchar(50) NOT NULL,
   `promote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`promote`)),
@@ -289,7 +289,7 @@ CREATE TABLE IF NOT EXISTS `role_hierarchy` (
   PRIMARY KEY (`roleName`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dumping data for table wit-db.rolehierarchy: ~8 rows (approximately)
+-- Dumping data for table wit-db.role_hierarchy: ~8 rows (approximately)
 REPLACE INTO `role_hierarchy` (`roleName`, `promote`, `demote`) VALUES
 	('certified_trainer', '{"add":["1412546024819392733"],"remove":["1412545985388871730"]}', '{"add":[],"remove":["1412546024819392733"]}'),
 	('fleet_commander', '{\r\n  "add": [\r\n    "1412545955106127983"\r\n  ],\r\n  "remove": [\r\n    "1412545912462512168"\r\n  ]\r\n}', '{\r\n  "add": [\r\n    "1412545912462512168"\r\n  ],\r\n  "remove": [\r\n    "1412545955106127983"\r\n  ]\r\n}'),

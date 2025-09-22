@@ -246,8 +246,8 @@ CREATE TABLE IF NOT EXISTS `reminders` (
   KEY `remind_at` (`remind_at`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping structure for table wit-db.rolehierarchy
-CREATE TABLE IF NOT EXISTS `rolehierarchy` (
+-- Dumping structure for table wit-db.role_hierarchy
+CREATE TABLE IF NOT EXISTS `role_hierarchy` (
   `roleName` varchar(50) NOT NULL,
   `promote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`promote`)),
   `demote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`demote`)),
