@@ -133,7 +133,7 @@ function scheduleNextIncursionCheck(client, delay) {
 async function fetchHighSecIncursion() {
     let nextCheckDelay = 60 * 1000; // Default to 60 seconds
 
-    // This will now throw an error on ESI failure after retries, instead of returning null.
+    // This will throw an error on ESI failure after retries, which is caught by the main updateIncursions function.
     const { data: allIncursions, expires: incursionsExpiry } = await esiService.get({ endpoint: '/incursions/', caller: __filename });
 
     if (incursionsExpiry) {
@@ -142,8 +142,8 @@ async function fetchHighSecIncursion() {
     }
 
     if (!Array.isArray(allIncursions)) {
-        logger.error(`ESI /incursions/ endpoint did not return an array. Response:`, allIncursions);
-        return { highSecIncursion: null, nextCheckDelay };
+        // This is an unexpected ESI response format, not a standard HTTP error.
+        throw new Error(`ESI /incursions/ endpoint did not return an array. Response: ${JSON.stringify(allIncursions)}`);
     }
 
     const incursionSystems = incursionManager.get();
@@ -151,6 +151,8 @@ async function fetchHighSecIncursion() {
 
     for (const incursion of allIncursions) {
         if (highSecConstellationIds.has(incursion.constellation_id)) {
+            // This inner try/catch remains to handle cases where a single system lookup fails,
+            // which shouldn't halt the entire process.
             try {
                 const { data: systemData } = await esiService.get({
                     endpoint: `/universe/systems/${incursion.staging_solar_system_id}/`,
@@ -308,27 +310,30 @@ async function updateIncursions(client, options = {}) {
         await writeState(state);
 
     } catch (error) {
-        const status = error.response?.status;
-        if (status && [420, 502, 503, 504].includes(status)) {
-            // This is a temporary ESI error.
-            logger.info(`ESI service unavailable during update (Status ${status}). Aborting this update cycle, state will not be changed.`);
-            // CRUCIAL: Don't change the state. Just schedule the next check using the last known delay.
+        // --- NEW CATCH BLOCK LOGIC ---
+        // Check if the error is from an ESI/HTTP response. Any non-200 status will have this.
+        if (error.response) {
+            const status = error.response.status;
+            const data = JSON.stringify(error.response.data);
+            logger.info(`ESI request failed with status ${status}. Aborting this update cycle, state will not be changed. Details: ${data}`);
+            // Just reschedule and do nothing else. The state remains untouched.
             scheduleNextIncursionCheck(client, 60 * 1000);
         } else {
-            // This is a different, more serious error. Log it fully.
+            // This is a non-ESI error (e.g., Discord API, database, internal logic).
             const channelId = config.incursionChannelId ? config.incursionChannelId[0] : 'NOT CONFIGURED';
-            if (error.code === 50001) {
-                logger.error(`FATAL: Bot is missing access to the configured incursion channel (ID: ${channelId}).`);
-                isUpdating = false;
-                return;
+            if (error.code === 50001) { // Missing Access
+                logger.error(`FATAL: Bot is missing access to the configured incursion channel (ID: ${channelId}). The incursion updater will stop.`);
+                isUpdating = false; // Stop the loop
+                return; // Do not reschedule
             }
-            if (error.code === 10003) {
-                logger.error(`FATAL: The configured incursion channel (ID: ${channelId}) does not exist.`);
-                isUpdating = false;
-                return;
+            if (error.code === 10003) { // Unknown Channel
+                logger.error(`FATAL: The configured incursion channel (ID: ${channelId}) does not exist. The incursion updater will stop.`);
+                isUpdating = false; // Stop the loop
+                return; // Do not reschedule
             }
-            const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-            logger.error(`An unexpected error occurred during incursion update: ${errorMessage}`, error.stack);
+
+            // For other unexpected errors, log them fully and try again later.
+            logger.error(`An unexpected, non-ESI error occurred during incursion update: ${error.message}`, error.stack);
             scheduleNextIncursionCheck(client, 60 * 1000);
         }
     } finally {
@@ -338,3 +343,4 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
+
