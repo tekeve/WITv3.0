@@ -133,50 +133,40 @@ function scheduleNextIncursionCheck(client, delay) {
 async function fetchHighSecIncursion() {
     let nextCheckDelay = 60 * 1000; // Default to 60 seconds
 
-    try {
-        const { data: allIncursions, expires: incursionsExpiry } = await esiService.get({ endpoint: '/incursions/', caller: __filename });
+    // This will now throw an error on ESI failure after retries, instead of returning null.
+    const { data: allIncursions, expires: incursionsExpiry } = await esiService.get({ endpoint: '/incursions/', caller: __filename });
 
-        if (incursionsExpiry) {
-            const buffer = 5000; // 5-second buffer
-            nextCheckDelay = (incursionsExpiry - Date.now()) + buffer;
-        }
+    if (incursionsExpiry) {
+        const buffer = 5000; // 5-second buffer
+        nextCheckDelay = (incursionsExpiry - Date.now()) + buffer;
+    }
 
-        if (!Array.isArray(allIncursions)) {
-            logger.error(`ESI /incursions/ endpoint did not return an array. Response:`, allIncursions);
-            return { highSecIncursion: null, nextCheckDelay };
-        }
-
-        const incursionSystems = incursionManager.get();
-        const highSecConstellationIds = new Set(incursionSystems.map(s => s.Constellation_id));
-
-        for (const incursion of allIncursions) {
-            if (highSecConstellationIds.has(incursion.constellation_id)) {
-                try {
-                    const { data: systemData } = await esiService.get({
-                        endpoint: `/universe/systems/${incursion.staging_solar_system_id}/`,
-                        caller: __filename
-                    });
-
-                    if (systemData && systemData.security_status > 0.45) {
-                        const highSecIncursion = { ...incursion, systemData };
-                        return { highSecIncursion, nextCheckDelay };
-                    }
-                } catch (e) {
-                    logger.warn(`Could not resolve system ID ${incursion.staging_solar_system_id} for potential HS incursion. Error: ${e.message}`);
-                }
-            }
-        }
-        return { highSecIncursion: null, nextCheckDelay };
-    } catch (error) {
-        const status = error.response?.status;
-        if (status && [420, 502, 503, 504].includes(status)) {
-            logger.info(`ESI service unavailable (Status ${status}). Will retry after default delay.`);
-        } else {
-            const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-            logger.error(`Error fetching high-sec incursion data: ${errorMessage}`, error.stack);
-        }
+    if (!Array.isArray(allIncursions)) {
+        logger.error(`ESI /incursions/ endpoint did not return an array. Response:`, allIncursions);
         return { highSecIncursion: null, nextCheckDelay };
     }
+
+    const incursionSystems = incursionManager.get();
+    const highSecConstellationIds = new Set(incursionSystems.map(s => s.Constellation_id));
+
+    for (const incursion of allIncursions) {
+        if (highSecConstellationIds.has(incursion.constellation_id)) {
+            try {
+                const { data: systemData } = await esiService.get({
+                    endpoint: `/universe/systems/${incursion.staging_solar_system_id}/`,
+                    caller: __filename
+                });
+
+                if (systemData && systemData.security_status > 0.45) {
+                    const highSecIncursion = { ...incursion, systemData };
+                    return { highSecIncursion, nextCheckDelay };
+                }
+            } catch (e) {
+                logger.warn(`Could not resolve system ID ${incursion.staging_solar_system_id} for potential HS incursion. Error: ${e.message}`);
+            }
+        }
+    }
+    return { highSecIncursion: null, nextCheckDelay };
 }
 
 async function updateIncursions(client, options = {}) {
@@ -199,7 +189,7 @@ async function updateIncursions(client, options = {}) {
 
     try {
         let highSecIncursion;
-        let nextCheckDelay = 60 * 1000;
+        let nextCheckDelay = 60 * 1000; // Default delay
         const mockOverride = client.mockOverride;
         const isUsingMock = mockOverride && mockOverride.expires > Date.now();
 
@@ -220,7 +210,6 @@ async function updateIncursions(client, options = {}) {
                     };
                 }
             }
-            scheduleNextIncursionCheck(client, nextCheckDelay);
         } else {
             if (mockOverride) {
                 logger.info('Mock override has expired. Resuming ESI updates.');
@@ -229,8 +218,9 @@ async function updateIncursions(client, options = {}) {
             const result = await fetchHighSecIncursion();
             highSecIncursion = result.highSecIncursion;
             nextCheckDelay = result.nextCheckDelay;
-            scheduleNextIncursionCheck(client, nextCheckDelay);
         }
+
+        scheduleNextIncursionCheck(client, nextCheckDelay);
 
         const currentStateKey = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
 
@@ -318,21 +308,28 @@ async function updateIncursions(client, options = {}) {
         await writeState(state);
 
     } catch (error) {
-        const channelId = config.incursionChannelId ? config.incursionChannelId[0] : 'NOT CONFIGURED';
-        if (error.code === 50001) {
-            logger.error(`FATAL: Bot is missing access to the configured incursion channel (ID: ${channelId}).`);
-            return;
-        }
-        if (error.code === 10003) {
-            logger.error(`FATAL: The configured incursion channel (ID: ${channelId}) does not exist.`);
-            return;
-        }
         const status = error.response?.status;
-        if (status && [502, 503, 504].includes(status)) {
-            logger.info(`ESI appears to be offline (Status ${status}). Skipping incursion check.`);
+        if (status && [420, 502, 503, 504].includes(status)) {
+            // This is a temporary ESI error.
+            logger.info(`ESI service unavailable during update (Status ${status}). Aborting this update cycle, state will not be changed.`);
+            // CRUCIAL: Don't change the state. Just schedule the next check using the last known delay.
+            scheduleNextIncursionCheck(client, 60 * 1000);
         } else {
+            // This is a different, more serious error. Log it fully.
+            const channelId = config.incursionChannelId ? config.incursionChannelId[0] : 'NOT CONFIGURED';
+            if (error.code === 50001) {
+                logger.error(`FATAL: Bot is missing access to the configured incursion channel (ID: ${channelId}).`);
+                isUpdating = false;
+                return;
+            }
+            if (error.code === 10003) {
+                logger.error(`FATAL: The configured incursion channel (ID: ${channelId}) does not exist.`);
+                isUpdating = false;
+                return;
+            }
             const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-            logger.error(`Error during incursion update: ${errorMessage}`, error.stack);
+            logger.error(`An unexpected error occurred during incursion update: ${errorMessage}`, error.stack);
+            scheduleNextIncursionCheck(client, 60 * 1000);
         }
     } finally {
         isUpdating = false;

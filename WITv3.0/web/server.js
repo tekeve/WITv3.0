@@ -10,6 +10,7 @@ const setupRoutes = require('./routes/setupRoutes');
 const webeditRoutes = require('./routes/webeditRoutes');
 const actionlogRoutes = require('./routes/actionlogRoutes');
 const residentAppRoutes = require('./routes/residentAppRoutes');
+const embedRoutes = require('./routes/embedRoutes');
 
 /**
  * Initializes and starts the Express web server.
@@ -19,8 +20,9 @@ function startServer(client) {
     const app = express();
     const host = process.env.HOST_NAME;
 
-
     app.use(express.urlencoded({ extended: true }));
+    // Added express.json() to handle JSON payloads from the web editor.
+    app.use(express.json());
 
     app.set('view engine', 'ejs');
     app.set('views', path.join(__dirname, 'views'));
@@ -32,12 +34,13 @@ function startServer(client) {
     app.use('/', webeditRoutes(client, client.activeWebEditTokens));
     app.use('/', actionlogRoutes(client));
     app.use('/', residentAppRoutes(client, client.activeResidentAppTokens));
+    app.use('/', embedRoutes(client));
 
     app.get('/', (req, res) => {
         res.send('Web server is running.');
     });
 
-    app.listen(3000,  () => {
+    app.listen(3000, () => {
         logger.success(`✅ Server is running and listening on http://${host}`);
     });
 }

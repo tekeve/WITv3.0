@@ -73,7 +73,7 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
 
     if (spawnTimestamp) {
         timelineParts.push(`Spawned: <t:${spawnTimestamp}:R>`);
-        timelineParts.push(`Mothership: <t:${spawnTimestamp + (3 * 24 * 3600)}:R>`);
+        timelineParts.push(`Kundi Spawn: <t:${spawnTimestamp + (3 * 24 * 3600)}:R>`);
     }
     if (mobilizingTimestamp) {
         timelineParts.push(`Mobilizing: <t:${mobilizingTimestamp}:R>`);

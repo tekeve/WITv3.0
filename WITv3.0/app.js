@@ -86,6 +86,7 @@ async function initializeApp() {
     client.activeSetupTokens = new Map();
     client.activeWebEditTokens = new Map();
     client.activeResidentAppTokens = new Map();
+    client.activeEmbedTokens = new Map(); // Add this line
     client.esiStateMap = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null;
@@ -118,11 +119,13 @@ async function initializeApp() {
     const interactionCreateHandler = require('./events/interactionCreate');
     const srpSubmissionHandler = require('./events/srpSubmission');
     const residentAppSubmissionHandler = require('./events/residentAppSubmission');
+    const embedSubmissionHandler = require('./events/embedSubmission'); // Add this line
 
     client.once(clientReadyHandler.name, (...args) => clientReadyHandler.execute(...args, client));
     client.on(interactionCreateHandler.name, (...args) => interactionCreateHandler.execute(...args, client));
     client.on(srpSubmissionHandler.name, (...args) => srpSubmissionHandler.execute(...args, client));
     client.on(residentAppSubmissionHandler.name, (...args) => residentAppSubmissionHandler.execute(...args, client));
+    client.on(embedSubmissionHandler.name, (...args) => embedSubmissionHandler.execute(...args, client)); // Add this line
 
     // Register all action log event listeners from the consolidated handler
     const { registerActionLogEvents } = require('./events/actionLogHandler');
@@ -135,4 +138,3 @@ async function initializeApp() {
 }
 
 initializeApp();
-

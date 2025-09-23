@@ -3,30 +3,36 @@ const logger = require('@helpers/logger');
 
 // A safelist of tables that the /config command is allowed to edit.
 const editableTables = [
-    'auth',
+    'action_log_settings',
     'bot_status',
-    'characters',
     'config',
     'google_docs',
     'google_sheets',
     'incursion_state',
     'incursion_systems',
+    'reminders',
+    'resident_applications',
     'role_hierarchy',
+    'saved_embeds',
+    'srp_history',
     'users'
 ];
 
 // Maps table names to their respective primary key column names.
 const tableKeyMap = {
-    auth: 'discord_id',
+    action_log_settings: 'id',
     bot_status: 'id',
-    characters: 'character_id',
     config: 'key_name',
     google_docs: 'alias',
     google_sheets: 'alias',
     incursion_state: 'id',
     incursion_systems: 'Constellation_id',
+    reminders: 'id',
+    resident_applications: 'id',
     role_hierarchy: 'roleName',
-    users: 'discord_id',
+    saved_embeds: 'embed_name',
+    srp_history: 'id',
+    users: 'character_id',
 };
 
 /**
@@ -49,7 +55,7 @@ function getKeyColumnForTable(tableName) {
 
 module.exports = {
     editableTables,
-    getKeyColumnForTable, // Added this function to the exports
+    getKeyColumnForTable,
 
     /**
      * Fetches keys from a table for autocomplete suggestions.
@@ -97,7 +103,12 @@ module.exports = {
 
         const columns = Object.keys(rowData);
         const values = columns.map(col => {
-            const value = rowData[col];
+            let value = rowData[col];
+            // If the value from the form is an empty string, treat it as SQL NULL.
+            if (value === '') {
+                value = null;
+            }
+            // If the value is still an object (e.g., from a JSON field), stringify it.
             return typeof value === 'object' && value !== null ? JSON.stringify(value) : value;
         });
 
@@ -141,3 +152,4 @@ module.exports = {
         }
     },
 };
+
