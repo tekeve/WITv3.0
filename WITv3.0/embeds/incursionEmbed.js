@@ -47,12 +47,14 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
         const secureEsiUrl = `/route/${id}/${currentHqId}/?flag=secure`;
         const shortestEsiUrl = `/route/${id}/${currentHqId}/?flag=shortest`;
         try {
-            const [secureRes, shortestRes] = await Promise.all([
+            const [secureResObj, shortestResObj] = await Promise.all([
                 esiService.get({ endpoint: secureEsiUrl, caller: __filename }),
                 esiService.get({ endpoint: shortestEsiUrl, caller: __filename })
             ]);
-            const secureJumps = secureRes.length - 1;
-            const shortestJumps = shortestRes.length - 1;
+            const secureJumps = Array.isArray(secureResObj.data) ? secureResObj.data.length - 1 : NaN;
+            const shortestJumps = Array.isArray(shortestResObj.data) ? shortestResObj.data.length - 1 : NaN;
+            if (isNaN(secureJumps) || isNaN(shortestJumps)) return { name, jumps: 'N/A' };
+
             if (secureJumps === shortestJumps) {
                 return { name, jumps: `[${secureJumps}j (safest)](${secureGatecheckUrl})` };
             }
@@ -100,7 +102,6 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
 
     if (state.lastHqSystemId && state.lastHqSystemId !== currentHqId) {
         let routeString = 'N/A';
-        // FIX: Convert the dock_up_system_id from a string to a number for comparison.
         const lastHqNameData = incursionSystems.find(sys => Number(sys.dock_up_system_id) === state.lastHqSystemId);
 
         if (lastHqNameData) {
@@ -111,20 +112,18 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
             const shortestEsiUrl = `/route/${state.lastHqSystemId}/${currentHqId}/?flag=shortest`;
 
             try {
-                // Use Promise.allSettled to ensure that even if one route fails, the other can be processed.
                 const results = await Promise.allSettled([
                     esiService.get({ endpoint: secureEsiUrl, caller: __filename }),
                     esiService.get({ endpoint: shortestEsiUrl, caller: __filename })
                 ]);
 
-                const secureRes = results[0].status === 'fulfilled' ? results[0].value : null;
-                const shortestRes = results[1].status === 'fulfilled' ? results[1].value : null;
+                const secureRes = results[0].status === 'fulfilled' ? results[0].value.data : null;
+                const shortestRes = results[1].status === 'fulfilled' ? results[1].value.data : null;
 
-                const secureJumps = secureRes ? secureRes.length - 1 : null;
-                const shortestJumps = shortestRes ? shortestRes.length - 1 : null;
+                const secureJumps = Array.isArray(secureRes) ? secureRes.length - 1 : null;
+                const shortestJumps = Array.isArray(shortestRes) ? shortestRes.length - 1 : null;
 
                 if (secureJumps !== null && secureJumps === shortestJumps) {
-                    // If both routes are the same, just show one.
                     routeString = `**${lastHqName}**: [${secureJumps}j (safest)](${secureGatecheckUrl})`;
                 } else {
                     const parts = [];
@@ -142,12 +141,11 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
                     }
                 }
             } catch (error) {
-                // This will now only catch unexpected errors, not failed route lookups.
                 logger.error(`Unexpected error in route calculation: ${error.message}`);
                 routeString = `**${lastHqName}**: Error`;
             }
         }
-        fields.push({ name: '\u200b', value: '\u200b', inline: true }); // Spacer
+        fields.push({ name: '\u200B', value: '\u200B', inline: true }); // Spacer
         fields.push({ name: 'Route from Last HQ', value: routeString, inline: true });
     }
 
@@ -201,4 +199,3 @@ function buildNoIncursionEmbed(state) {
 }
 
 module.exports = { buildActiveIncursionEmbed, buildNoIncursionEmbed, formatDuration };
-
