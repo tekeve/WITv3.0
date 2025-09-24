@@ -297,6 +297,18 @@ async function handleMemberUpdate(oldMember, newMember) {
     const newRoles = newMember.roles.cache;
 
     if (oldRoles.size !== newRoles.size || !oldRoles.every((value, key) => newRoles.has(key))) {
+        // --- START OF NEW CODE ---
+        // Automatically update the user's roles in the database to keep it in sync
+        try {
+            const userInDb = await characterManager.getChars(newMember.id);
+            if (userInDb) {
+                const newRoleIds = newRoles.map(role => role.id);
+                await characterManager.updateUserRoles(newMember.id, newRoleIds);
+                logger.info(`Automatically updated database roles for ${newMember.user.tag} due to a role change event.`);
+            }
+        } catch (error) {
+            logger.error(`Error auto-updating roles in DB for ${newMember.id}:`, error);
+        }
         let addedRoles = [];
         let removedRoles = [];
         let executor = null;
