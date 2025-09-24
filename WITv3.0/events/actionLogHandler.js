@@ -2,6 +2,8 @@
 const actionLog = require('@helpers/actionLog');
 const logger = require('@helpers/logger');
 const characterManager = require('@helpers/characterManager');
+const roleManager = require('@helpers/roleManager');
+const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 
 // --- Utility Functions ---
 
@@ -297,18 +299,41 @@ async function handleMemberUpdate(oldMember, newMember) {
     const newRoles = newMember.roles.cache;
 
     if (oldRoles.size !== newRoles.size || !oldRoles.every((value, key) => newRoles.has(key))) {
-        // --- START OF NEW CODE ---
-        // Automatically update the user's roles in the database to keep it in sync
+        const addedRolesCollection = newRoles.filter(role => !oldRoles.has(role.id));
+        const removedRolesCollection = oldRoles.filter(role => !oldRoles.has(role.id));
+        const changedRoleIds = new Set([...addedRolesCollection.keys(), ...removedRolesCollection.keys()]);
+
+        let wasReverted = false;
+
         try {
             const userInDb = await characterManager.getChars(newMember.id);
+            // Only interfere if the user is registered in the bot's database.
             if (userInDb) {
-                const newRoleIds = newRoles.map(role => role.id);
-                await characterManager.updateUserRoles(newMember.id, newRoleIds);
-                logger.info(`Automatically updated database roles for ${newMember.user.tag} due to a role change event.`);
+                const manageableRoleIds = await roleHierarchyManager.getAllManageableRoleIds();
+                const wasManageableRoleChanged = [...changedRoleIds].some(id => manageableRoleIds.has(id));
+
+                if (wasManageableRoleChanged) {
+                    wasReverted = true;
+                    logger.warn(`Manual override of manageable roles detected for ${newMember.user.tag}. Reverting to database state.`);
+
+                    // Delay the revert to allow the audit log to populate.
+                    // The sync function will trigger another memberUpdate, but since roles will then match the DB, it won't loop.
+                    setTimeout(() => {
+                        roleManager.syncRolesFromDb(newMember).catch(err => {
+                            logger.error(`Error during async role reversion for ${newMember.user.tag}:`, err);
+                        });
+                    }, 2000); // 2-second delay
+                } else {
+                    // A non-manageable role was changed. Sync this change to the database.
+                    const newRoleIds = newRoles.map(role => role.id);
+                    await characterManager.updateUserRoles(newMember.id, newRoleIds);
+                    logger.info(`Automatically updated database with non-manageable role change for ${newMember.user.tag}.`);
+                }
             }
         } catch (error) {
-            logger.error(`Error auto-updating roles in DB for ${newMember.id}:`, error);
+            logger.error(`Error during role change sync logic for ${newMember.id}:`, error);
         }
+
         let addedRoles = [];
         let removedRoles = [];
         let executor = null;
@@ -323,8 +348,8 @@ async function handleMemberUpdate(oldMember, newMember) {
             if (added) addedRoles = added.new.map(r => `<@&${r.id}>`);
             if (removed) removedRoles = removed.new.map(r => `<@&${r.id}>`);
         } else {
-            addedRoles = newRoles.filter(role => !oldRoles.has(role.id)).map(r => r.toString());
-            removedRoles = oldRoles.filter(role => !newRoles.has(role.id)).map(r => r.toString());
+            addedRoles = addedRolesCollection.map(r => r.toString());
+            removedRoles = removedRolesCollection.map(r => r.toString());
         }
 
         if (addedRoles.length > 0 || removedRoles.length > 0) {
@@ -333,17 +358,27 @@ async function handleMemberUpdate(oldMember, newMember) {
                 .setDescription(`Roles for **${newMember.user.tag}** were updated ${executor ? `by **${executor.tag}**` : ''}.`)
                 .setTimestamp();
 
+            if (wasReverted) {
+                embed.setFooter({ text: '⚠️ This change involved a managed role and was automatically reverted.' });
+            }
+
             if (addedRoles.length > 0) {
                 embed.addFields({ name: 'Roles Added', value: addedRoles.join('\n'), inline: true });
-                embed.setColor(0x43B581);
             }
             if (removedRoles.length > 0) {
                 embed.addFields({ name: 'Roles Removed', value: removedRoles.join('\n'), inline: true });
-                embed.setColor(0xED4245);
             }
-            if (addedRoles.length > 0 && removedRoles.length > 0) {
-                embed.setColor(0x4E5D94);
+
+            if (wasReverted) {
+                embed.setColor(0xFFA500); // Orange for warning/reverted
+            } else if (addedRoles.length > 0 && removedRoles.length === 0) {
+                embed.setColor(0x43B581); // Green for added
+            } else if (removedRoles.length > 0 && addedRoles.length === 0) {
+                embed.setColor(0xED4245); // Red for removed
+            } else {
+                embed.setColor(0x4E5D94); // Blue-ish for mixed
             }
+
             actionLog.postLog(newMember.guild, 'log_member_role_update', embed, { member: newMember });
         }
     }
@@ -524,4 +559,3 @@ function registerActionLogEvents(client) {
 }
 
 module.exports = { registerActionLogEvents };
-
