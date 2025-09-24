@@ -1,9 +1,10 @@
-const { MessageFlags } = require('discord.js');
+﻿const { MessageFlags } = require('discord.js');
 const configManager = require('@helpers/configManager');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 const logger = require('@helpers/logger');
 const auditLogger = require('@helpers/auditLogger');
 const { buildPromotionEmbed } = require('@embeds/promoteEmbed');
+const charManager = require('@helpers/characterManager');
 
 /**
  * Finds a role in a guild by its ID.
@@ -16,6 +17,69 @@ const findRoleById = (guild, roleId) => {
 };
 
 /**
+ * Synchronizes a Discord member's roles to match the state stored in the database.
+ * This function now includes a verification step.
+ * @param {import('discord.js').GuildMember} member - The guild member to sync.
+ * @returns {Promise<{
+ * added: string[],
+ * removed: string[],
+ * discrepancies: { missing: string[], extra: string[] } | null
+ * }>} An object containing the names of attempted role changes and any found discrepancies.
+ */
+async function syncRolesFromDb(member) {
+    logger.info(`Syncing roles for ${member.user.tag} from database to Discord.`);
+    const guild = member.guild;
+    const intendedAdd = [];
+    const intendedRemove = [];
+
+    // 1. Get the desired state from the database
+    const userData = await charManager.getChars(member.id);
+    const targetRoleIds = new Set(userData && userData.main && userData.main.roles ? userData.main.roles : []);
+
+    // 2. Get the current state from Discord
+    const currentRoleIds = new Set(member.roles.cache.map(r => r.id));
+
+    // 3. Calculate the difference
+    const allManageableRoleIds = await roleHierarchyManager.getAllManageableRoleIds();
+    const rolesToAddIds = [...targetRoleIds].filter(id => !currentRoleIds.has(id));
+    const rolesToRemoveIds = [...currentRoleIds].filter(id => !targetRoleIds.has(id) && allManageableRoleIds.has(id));
+
+    // 4. Apply the changes
+    if (rolesToAddIds.length > 0) {
+        const roles = rolesToAddIds.map(id => findRoleById(guild, id)).filter(Boolean);
+        intendedAdd.push(...roles.map(r => r.name));
+        await member.roles.add(roles).catch(err => logger.error(`Failed to add roles to ${member.user.tag}:`, err));
+    }
+
+    if (rolesToRemoveIds.length > 0) {
+        const roles = rolesToRemoveIds.map(id => findRoleById(guild, id)).filter(Boolean);
+        intendedRemove.push(...roles.map(r => r.name));
+        await member.roles.remove(roles).catch(err => logger.error(`Failed to remove roles from ${member.user.tag}:`, err));
+    }
+
+    // --- VERIFICATION STEP ---
+    // 5. Re-fetch the member to get the most up-to-date roles from the API
+    const freshMember = await guild.members.fetch({ user: member.id, force: true });
+    const finalRoleIds = new Set(freshMember.roles.cache.map(r => r.id));
+
+    // 6. Compare final state with target state
+    const missingRoleIds = [...targetRoleIds].filter(id => !finalRoleIds.has(id));
+    const extraRoleIds = [...finalRoleIds].filter(id => !targetRoleIds.has(id) && allManageableRoleIds.has(id));
+
+    let discrepancies = null;
+    if (missingRoleIds.length > 0 || extraRoleIds.length > 0) {
+        discrepancies = {
+            missing: missingRoleIds.map(id => findRoleById(guild, id)?.name || `Unknown Role ID: ${id}`),
+            extra: extraRoleIds.map(id => findRoleById(guild, id)?.name || `Unknown Role ID: ${id}`)
+        };
+        logger.warn(`Role discrepancy found for ${member.user.tag}:`, discrepancies);
+    }
+
+    return { added: intendedAdd, removed: intendedRemove, discrepancies };
+}
+
+
+/**
  * Manages role changes for a user based on the defined hierarchy.
  * @param {import('discord.js').Interaction} interaction - The interaction object.
  * @param {'promote' | 'demote'} action - The action to perform.
@@ -23,15 +87,12 @@ const findRoleById = (guild, roleId) => {
 async function manageRoles(interaction, action) {
     const targetUser = interaction.options.getUser('user');
     const targetRankName = interaction.options.getString('rank');
-    let dmSendFailed = false; // Flag to track DM status
+    let dmSendFailed = false;
 
-    // New permission check logic
     const isLeadershipAction = targetRankName.toLowerCase() === 'leadership';
-    // The "Remove All Roles" option is specific to the demote command.
     const isRemoveAllAction = action === 'demote' && targetRankName === 'Remove All Roles';
 
     if (isLeadershipAction || isRemoveAllAction) {
-        // Admin is required for leadership changes or removing all roles
         if (!isAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You must be an Admin to manage the Leadership rank or remove all roles.',
@@ -39,7 +100,6 @@ async function manageRoles(interaction, action) {
             });
         }
     } else {
-        // Council is sufficient for all other promotions/demotions
         if (!isCouncilOrAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You must have the Council role to use this command.',
@@ -54,7 +114,6 @@ async function manageRoles(interaction, action) {
     const hierarchy = await roleHierarchyManager.get();
     const config = configManager.get();
 
-    // --- Send DM on Promotion ---
     if (action === 'promote') {
         const promotionDMs = config.promotionDMs || {};
         const dmData = promotionDMs[targetRankName];
@@ -70,79 +129,59 @@ async function manageRoles(interaction, action) {
         }
     }
 
-    // Handle the special "Remove All" case for demotion
-    if (action === 'demote' && targetRankName === 'Remove All Roles') {
-        const removedRoles = [];
-        const allManageableRoleIds = new Set();
-        Object.values(hierarchy).forEach(rank => {
-            rank.promote?.add?.forEach(id => allManageableRoleIds.add(id));
-            rank.demote?.add?.forEach(id => allManageableRoleIds.add(id));
-        });
-
-        for (const roleId of allManageableRoleIds) {
-            const role = findRoleById(interaction.guild, roleId);
-            if (role && member.roles.cache.has(role.id)) {
-                await member.roles.remove(role);
-                removedRoles.push(role.name);
-            }
-        }
-        const reply = removedRoles.length > 0
-            ? `Removed the following roles from ${targetUser.tag}: ${removedRoles.join(', ')}.`
-            : `${targetUser.tag} did not have any of the manageable roles to remove.`;
-        return interaction.editReply({ content: reply });
-    }
-
-    const rankConfig = hierarchy[targetRankName];
-    if (!rankConfig) {
-        return interaction.editReply({ content: `The rank "${targetRankName}" is not defined in the role hierarchy.` });
-    }
-
-    const actionConfig = rankConfig[action];
-    if (!actionConfig) {
-        return interaction.editReply({ content: `No configuration found for the "${action}" action on the "${targetRankName}" rank.` });
-    }
-
-    const addedRoles = [];
-    const removedRoles = [];
-
     try {
-        // Process roles to add
-        if (actionConfig.add) {
-            for (const roleId of actionConfig.add) {
-                const role = findRoleById(interaction.guild, roleId);
-                if (role && !member.roles.cache.has(role.id)) {
-                    await member.roles.add(role);
-                    addedRoles.push(role.name);
-                }
+        const userData = await charManager.getChars(member.id);
+        if (!userData || !userData.main) {
+            return interaction.editReply({ content: `Error: ${targetUser.tag} is not registered with a main character. Cannot manage roles.` });
+        }
+        let newRoleIds = new Set(userData.main.roles || []);
+
+        if (action === 'demote' && targetRankName === 'Remove All Roles') {
+            const allManageableRoleIds = await roleHierarchyManager.getAllManageableRoleIds();
+            newRoleIds = new Set([...newRoleIds].filter(id => !allManageableRoleIds.has(id)));
+        } else {
+            const rankConfig = hierarchy[targetRankName];
+            if (!rankConfig) {
+                return interaction.editReply({ content: `The rank "${targetRankName}" is not defined in the role hierarchy.` });
             }
+
+            const actionConfig = rankConfig[action];
+            if (!actionConfig) {
+                return interaction.editReply({ content: `No configuration found for the "${action}" action on the "${targetRankName}" rank.` });
+            }
+
+            if (actionConfig.add) actionConfig.add.forEach(id => newRoleIds.add(id));
+            if (actionConfig.remove) actionConfig.remove.forEach(id => newRoleIds.delete(id));
         }
 
-        // Process roles to remove
-        if (actionConfig.remove) {
-            for (const roleId of actionConfig.remove) {
-                const role = findRoleById(interaction.guild, roleId);
-                if (role && member.roles.cache.has(role.id)) {
-                    await member.roles.remove(role);
-                    removedRoles.push(role.name);
-                }
-            }
-        }
+        await charManager.updateUserRoles(member.id, Array.from(newRoleIds));
+        logger.info(`Updated database roles for ${member.user.tag}.`);
+
+        const { added, removed, discrepancies } = await syncRolesFromDb(member);
 
         let replyMessage = `Role changes for ${targetUser.tag} completed.\n`;
-        if (addedRoles.length > 0) replyMessage += `> **Added:** ${addedRoles.join(', ')}\n`;
-        if (removedRoles.length > 0) replyMessage += `> **Removed:** ${removedRoles.join(', ')}\n`;
-        if (addedRoles.length === 0 && removedRoles.length === 0) {
-            replyMessage = `No role changes were necessary for ${targetUser.tag}.`;
+        if (added.length > 0) replyMessage += `> **Added:** ${added.join(', ')}\n`;
+        if (removed.length > 0) replyMessage += `> **Removed:** ${removed.join(', ')}\n`;
+        if (added.length === 0 && removed.length === 0) {
+            replyMessage = `No role changes were necessary for ${targetUser.tag}. Their roles are already in the correct state.`;
         }
-
-        // Add the DM failure note to the reply if needed.
         if (dmSendFailed) {
             replyMessage += `\n*(Note: Could not send a confirmation DM to the user.)*`;
         }
 
-        // Log the audit event if any roles were changed.
-        if (addedRoles.length > 0 || removedRoles.length > 0) {
-            await auditLogger.logRoleChange(interaction, targetUser, action, addedRoles, removedRoles);
+        if (discrepancies) {
+            replyMessage += `\n\n**⚠️ Warning: Role discrepancies found after sync!**`;
+            if (discrepancies.missing.length > 0) {
+                replyMessage += `\n- **Roles missing on Discord:** ${discrepancies.missing.join(', ')}`;
+            }
+            if (discrepancies.extra.length > 0) {
+                replyMessage += `\n- **Extra roles found on Discord:** ${discrepancies.extra.join(', ')}`;
+            }
+            replyMessage += `\nThis can happen due to Discord API issues. You can run \`/refreshroles user:@${targetUser.tag}\` to try again.`;
+        }
+
+        if (added.length > 0 || removed.length > 0) {
+            await auditLogger.logRoleChange(interaction, targetUser, action, added, removed);
         }
 
         await interaction.editReply({ content: replyMessage });
@@ -152,10 +191,6 @@ async function manageRoles(interaction, action) {
         await interaction.editReply({ content: 'An error occurred while trying to manage roles.' });
     }
 }
-
-// ================================================================= //
-// =================== CENTRALIZED PERMISSION CHECKS ================= //
-// ================================================================= //
 
 const hasRole = (member, roleListName) => {
     const config = configManager.get();
@@ -172,13 +207,12 @@ const isCouncil = (member) => hasRole(member, 'councilRoles');
 const isCommander = (member) => hasRole(member, 'commanderRoles');
 const canAuth = (member) => hasRole(member, 'authRoles');
 
-// Composite permission checks
 const isCommanderOrAdmin = (member) => isCommander(member) || isAdmin(member);
 const isCouncilOrAdmin = (member) => isCouncil(member) || isAdmin(member);
 
-
 module.exports = {
     manageRoles,
+    syncRolesFromDb,
     isAdmin,
     isCouncil,
     isCommander,
