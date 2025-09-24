@@ -149,11 +149,10 @@
             <form id="embed-form" action="/embed/<%= token %>" method="POST">
                 <input type="hidden" name="embedData" id="embedData">
                 <input type="hidden" name="action" id="action">
-                <input type="hidden" name="embedName" value="<%= embedName %>">
-
+                
                 <div class="form-group">
-                    <label for="embed-name-display">Embed Name</label>
-                    <input type="text" id="embed-name-display" value="<%= embedName %>" readonly class="readonly">
+                    <label for="embedName">Embed Name</label>
+                    <input type="text" id="embedName" name="embedName" value="<%= embedName || '' %>" <%= mode === 'edit' ? 'readonly class="readonly"' : 'required' %>>
                 </div>
                 
                 <div class="form-group">
@@ -278,13 +277,15 @@
                 </div>
             `;
             fieldsContainer.insertAdjacentHTML('beforeend', fieldHTML);
+            // Re-attach event listeners to the new fields
+            form.querySelectorAll('input, textarea, select').forEach(el => el.addEventListener('input', updatePreview));
         }
 
         // Sync color pickers
         const colorPicker = document.getElementById('color');
         const colorHex = document.getElementById('color-hex');
-        colorPicker.addEventListener('input', () => { colorHex.value = colorPicker.value; updatePreview(); });
-        colorHex.addEventListener('input', () => { try { colorPicker.value = colorHex.value; } catch(e){} updatePreview(); });
+        colorPicker.addEventListener('input', () => { colorHex.value = colorPicker.value; });
+        colorHex.addEventListener('input', () => { try { colorPicker.value = colorHex.value; } catch(e){} });
 
         // Form submission buttons
         document.getElementById('save-btn').addEventListener('click', () => {
@@ -337,7 +338,7 @@
             const embed = {};
             const getVal = id => document.getElementById(id).value.trim();
             
-            const content = document.getElementById('content').value; // Keep whitespace for content
+            const content = document.getElementById('content').value;
             document.getElementById('preview-content').textContent = content;
             document.getElementById('preview-content').style.display = content ? 'block' : 'none';
 
@@ -371,7 +372,7 @@
                 } else { document.getElementById('preview-title').removeAttribute('href'); }
             } else { document.getElementById('preview-title').style.display = 'none'; }
 
-            const description = document.getElementById('description').value; // Keep whitespace
+            const description = document.getElementById('description').value; 
             if(description) {
                 embed.description = description;
                 document.getElementById('preview-description').innerText = description;
@@ -455,4 +456,3 @@
     </script>
 </body>
 </html>
-

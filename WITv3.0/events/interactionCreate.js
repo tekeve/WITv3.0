@@ -20,8 +20,8 @@ module.exports = {
                 // Dynamic Permissions Check
                 const permissionChecks = {
                     admin: roleManager.isAdmin,
-                    council: roleManager.isCouncilOrAdmin,
-                    commander: roleManager.isCommanderOrAdmin,
+                    council: roleManager.isCouncilOrAdmin, // Council can do their own things + admin things
+                    commander: roleManager.isCommanderOrAdmin, // Commanders can do their own things + admin things
                     auth: roleManager.canAuth,
                     public: () => true,
                 };
@@ -55,7 +55,7 @@ module.exports = {
             }
             else if (interaction.isModalSubmit()) {
                 const { customId } = interaction;
-                if (customId.startsWith('resolve_modal_')) {
+                if (customId.startsWith('resolve_modal_') || customId === 'request_modal') {
                     await requestManager.handleInteraction(interaction);
                 } else if (customId.startsWith('sendmail_modal_')) {
                     await mailManager.handleModal(interaction);
@@ -72,3 +72,4 @@ module.exports = {
         }
     },
 };
+

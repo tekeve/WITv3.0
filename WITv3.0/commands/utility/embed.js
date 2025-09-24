@@ -1,4 +1,4 @@
-﻿const { SlashCommandBuilder, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+﻿const { SlashCommandBuilder, MessageFlags, EmbedBuilder } = require('discord.js');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('@helpers/logger');
 const db = require('@helpers/database');
@@ -8,13 +8,15 @@ const db = require('@helpers/database');
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 async function handleCreateEdit(interaction) {
-    const embedName = interaction.options.getString('name'); // This is null for 'create'
+    const subcommand = interaction.options.getSubcommand();
+    const embedName = interaction.options.getString('name');
     const guild = interaction.guild;
+    const mode = subcommand; // 'create' or 'edit'
 
     // For the 'edit' command, we must first verify the embed exists in this guild.
-    if (embedName) {
-        const existing = await db.query('SELECT embed_name FROM saved_embeds WHERE embed_name = ? AND guild_id = ?', [embedName, guild.id]);
-        if (existing.length === 0) {
+    if (mode === 'edit') {
+        const [existing] = await db.query('SELECT embed_name FROM saved_embeds WHERE embed_name = ? AND guild_id = ?', [embedName, guild.id]);
+        if (!existing) {
             return interaction.reply({
                 content: `An embed named \`${embedName}\` was not found in this server.`,
                 flags: [MessageFlags.Ephemeral]
@@ -26,10 +28,11 @@ async function handleCreateEdit(interaction) {
 
     // Store token with necessary context.
     interaction.client.activeEmbedTokens.set(token, {
+        interaction, // Pass the whole interaction object
         user: interaction.user,
         guild: interaction.guild,
-        guildId: interaction.guild.id, // Storing guildId directly
-        embedName: embedName // Will be null for 'create', or the name for 'edit'
+        mode,
+        embedName // Will be the name for 'edit' or the new name for 'create'
     });
 
     // Set token expiration.
@@ -42,7 +45,7 @@ async function handleCreateEdit(interaction) {
     }, EXPIRATION_MINUTES * 60 * 1000);
 
     const formUrl = `http://${process.env.HOST_NAME}/embed/${token}`;
-    const actionWord = embedName ? 'edit' : 'create';
+    const actionWord = mode;
 
     await interaction.reply({
         content: `Click the button below to **${actionWord}** your embed. This link will expire in **${EXPIRATION_MINUTES} minutes**.`,
@@ -63,6 +66,7 @@ async function handleCreateEdit(interaction) {
     });
 }
 
+
 module.exports = {
     permission: 'admin',
     data: new SlashCommandBuilder()
@@ -71,7 +75,11 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('create')
-                .setDescription('Opens the web creator to build a new embed.'))
+                .setDescription('Opens the web creator to build a new embed.')
+                .addStringOption(option =>
+                    option.setName('name')
+                        .setDescription('The unique name for your new embed.')
+                        .setRequired(true)))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('edit')
@@ -105,7 +113,7 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('delete')
-                .setDescription('Deletes a saved embed.')
+                .setDescription('Deletes a saved embed and its last sent message.')
                 .addStringOption(option =>
                     option.setName('name')
                         .setDescription('The name of the embed to delete.')
@@ -115,7 +123,7 @@ module.exports = {
     async autocomplete(interaction) {
         const focusedValue = interaction.options.getFocused();
         try {
-            const embeds = await db.query('SELECT embed_name FROM saved_embeds WHERE guild_id = ? AND embed_name LIKE ? ORDER BY embed_name LIMIT 25', [interaction.guild.id, `%${focusedValue}%`]);
+            const [embeds] = await db.query('SELECT embed_name FROM saved_embeds WHERE guild_id = ? AND embed_name LIKE ? ORDER BY embed_name LIMIT 25', [interaction.guild.id, `%${focusedValue}%`]);
             await interaction.respond(
                 embeds.map(embed => ({ name: embed.embed_name, value: embed.embed_name }))
             );
@@ -130,32 +138,44 @@ module.exports = {
 
         if (subcommand === 'create' || subcommand === 'edit') {
             await handleCreateEdit(interaction);
+
         } else if (subcommand === 'send') {
             await interaction.deferReply({ ephemeral: true });
             const embedName = interaction.options.getString('name');
             const channel = interaction.options.getChannel('channel');
             const messageContent = interaction.options.getString('message_content');
 
-            const result = await db.query('SELECT embed_data FROM saved_embeds WHERE embed_name = ? AND guild_id = ?', [embedName, interaction.guild.id]);
+            const [result] = await db.query('SELECT embed_data, content FROM saved_embeds WHERE embed_name = ? AND guild_id = ?', [embedName, interaction.guild.id]);
 
-            if (result.length === 0) {
+            if (!result) {
                 return interaction.editReply(`Could not find an embed named \`${embedName}\`.`);
             }
 
             try {
-                const embedData = JSON.parse(result[0].embed_data);
+                // The content from the slash command overrides the saved content
+                const contentToSend = messageContent !== null ? messageContent : result.content;
+                const embedData = typeof result.embed_data === 'string' ? JSON.parse(result.embed_data) : result.embed_data;
                 const embedToSend = new EmbedBuilder(embedData);
-                await channel.send({ content: messageContent, embeds: [embedToSend] });
+
+                const sentMessage = await channel.send({ content: contentToSend, embeds: [embedToSend] });
+
+                // Save the message info to the database
+                await db.query(
+                    'UPDATE saved_embeds SET last_sent_channel_id = ?, last_sent_message_id = ? WHERE embed_name = ? AND guild_id = ?',
+                    [sentMessage.channel.id, sentMessage.id, embedName, interaction.guild.id]
+                );
+
                 await interaction.editReply(`✅ Embed \`${embedName}\` has been sent to ${channel}.`);
             } catch (error) {
                 logger.error(`Failed to send embed "${embedName}":`, error);
-                await interaction.editReply('There was an error parsing or sending the embed.');
+                await interaction.editReply('There was an error parsing or sending the embed. Check my permissions in that channel.');
             }
+
         } else if (subcommand === 'list') {
             await interaction.deferReply({ ephemeral: true });
-            const embeds = await db.query('SELECT embed_name, created_by_tag, last_edited_at FROM saved_embeds WHERE guild_id = ? ORDER BY embed_name', [interaction.guild.id]);
+            const [embeds] = await db.query('SELECT embed_name, last_edited_at FROM saved_embeds WHERE guild_id = ? ORDER BY embed_name', [interaction.guild.id]);
 
-            if (embeds.length === 0) {
+            if (!embeds || embeds.length === 0) {
                 return interaction.editReply('There are no saved embeds for this server.');
             }
 
@@ -169,13 +189,38 @@ module.exports = {
 
             await interaction.editReply({ embeds: [embed] });
         } else if (subcommand === 'delete') {
+            await interaction.deferReply({ ephemeral: true });
             const embedName = interaction.options.getString('name');
-            const result = await db.query('DELETE FROM saved_embeds WHERE embed_name = ? AND guild_id = ?', [embedName, interaction.guild.id]);
+
+            // First, find the embed to get its message ID
+            const [embedToDelete] = await db.query('SELECT last_sent_channel_id, last_sent_message_id FROM saved_embeds WHERE embed_name = ? AND guild_id = ?', [embedName, interaction.guild.id]);
+
+            if (!embedToDelete) {
+                return interaction.editReply(`❌ Could not find an embed named \`${embedName}\` to delete.`);
+            }
+
+            let messageDeletedText = '';
+            // If there's a message associated, try to delete it
+            if (embedToDelete.last_sent_channel_id && embedToDelete.last_sent_message_id) {
+                try {
+                    const channel = await interaction.client.channels.fetch(embedToDelete.last_sent_channel_id);
+                    const message = await channel.messages.fetch(embedToDelete.last_sent_message_id);
+                    await message.delete();
+                    messageDeletedText = ' Its last sent message was also deleted.';
+                } catch (error) {
+                    logger.warn(`Could not delete message for embed '${embedName}' (ID: ${embedToDelete.last_sent_message_id}). It might have been deleted already.`, error.message);
+                    messageDeletedText = ' Its last sent message could not be found or deleted.';
+                }
+            }
+
+            // Now, delete the embed from the database
+            const [result] = await db.query('DELETE FROM saved_embeds WHERE embed_name = ? AND guild_id = ?', [embedName, interaction.guild.id]);
 
             if (result.affectedRows > 0) {
-                await interaction.reply({ content: `✅ Successfully deleted the embed named \`${embedName}\`.`, ephemeral: true });
+                await interaction.editReply(`✅ Successfully deleted the embed named \`${embedName}\`.${messageDeletedText}`);
             } else {
-                await interaction.reply({ content: `❌ Could not find an embed named \`${embedName}\` to delete.`, ephemeral: true });
+                // This case should be rare since we checked first, but it's good practice.
+                await interaction.editReply(`❌ Could not find an embed named \`${embedName}\` to delete.`);
             }
         }
     },
