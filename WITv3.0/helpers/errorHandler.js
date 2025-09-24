@@ -89,7 +89,8 @@ class ErrorHandler {
             case 'AUDIT_LOG_NOT_FOUND':
                 // Don't show user message for this - it's internal
                 errorInfo.userMessage = null;
-                logger.debug(`Audit log entry not found in ${context}`);
+                // Use logger.info instead of logger.debug for compatibility
+                logger.info(`Audit log entry not found in ${context}`);
                 break;
 
             default:
@@ -137,7 +138,7 @@ class ErrorHandler {
      * @param {number} baseDelay - Base delay in milliseconds
      * @param {string} context - Description for logging
      * @param {Object} options - Additional options
-     * @returns {Promise} - Result of the async function or null if appropriate
+     * @returns {Promise<any>} - Result of the async function or null if appropriate
      */
     static async retry(asyncFunction, maxRetries = 3, baseDelay = 1000, context = 'unknown operation', options = {}) {
         const {
@@ -170,7 +171,8 @@ class ErrorHandler {
                 // Handle our custom audit log "not found" error
                 if (error.code === 'AUDIT_LOG_NOT_FOUND') {
                     if (attempt === maxRetries - 1) {
-                        logger.debug(`${context} completed after ${maxRetries} attempts - no matching entry found`);
+                        // Use logger.info instead of logger.debug for compatibility
+                        logger.info(`${context} completed after ${maxRetries} attempts - no matching entry found`);
                         return null; // Always return null for audit log not found
                     }
                     // Continue retrying for audit logs

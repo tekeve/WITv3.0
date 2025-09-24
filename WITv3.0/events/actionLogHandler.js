@@ -27,7 +27,7 @@ let auditLogPermissionWarned = false;
  * @param {import('discord.js').AuditLogEvent} eventType - The type of audit log to fetch.
  * @param {string} targetId - The ID of the object that was actioned upon.
  * @param {Function|null} [changeFilter=null] - An optional function to further filter the log entry based on its `changes` array.
- * @returns {Promise} The full audit log entry, or null.
+ * @returns {Promise<import('discord.js').GuildAuditLogsEntry|null>} The full audit log entry, or null.
  */
 async function getAuditLogEntry(guild, eventType, targetId, changeFilter = null) {
     // Check permissions before attempting
@@ -69,7 +69,8 @@ async function getAuditLogEntry(guild, eventType, targetId, changeFilter = null)
                 throw error;
             }
 
-            logger.debug(`Found audit log entry for ${eventType} on ${targetId}`);
+            // Use logger.info instead of logger.debug for compatibility
+            logger.info(`Found audit log entry for ${eventType} on ${targetId}`);
             return log;
 
         } catch (error) {
