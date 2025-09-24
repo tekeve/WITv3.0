@@ -44,35 +44,87 @@ async function syncRolesFromDb(member) {
     const rolesToAddIds = [...targetRoleIds].filter(id => !currentRoleIds.has(id));
     const rolesToRemoveIds = [...currentRoleIds].filter(id => !targetRoleIds.has(id) && allManageableRoleIds.has(id));
 
-    // 4. Apply the changes
+    // 4. Apply the changes with better error tracking
+    const roleChangeErrors = [];
+
     if (rolesToAddIds.length > 0) {
         const roles = rolesToAddIds.map(id => findRoleById(guild, id)).filter(Boolean);
         intendedAdd.push(...roles.map(r => r.name));
-        await member.roles.add(roles).catch(err => logger.error(`Failed to add roles to ${member.user.tag}:`, err));
+        try {
+            await member.roles.add(roles, 'Role sync from database');
+            logger.info(`Added roles to ${member.user.tag}: ${roles.map(r => r.name).join(', ')}`);
+        } catch (err) {
+            logger.error(`Failed to add roles to ${member.user.tag}:`, err);
+            roleChangeErrors.push(`Failed to add: ${roles.map(r => r.name).join(', ')}`);
+        }
     }
 
     if (rolesToRemoveIds.length > 0) {
         const roles = rolesToRemoveIds.map(id => findRoleById(guild, id)).filter(Boolean);
         intendedRemove.push(...roles.map(r => r.name));
-        await member.roles.remove(roles).catch(err => logger.error(`Failed to remove roles from ${member.user.tag}:`, err));
+        try {
+            await member.roles.remove(roles, 'Role sync from database');
+            logger.info(`Removed roles from ${member.user.tag}: ${roles.map(r => r.name).join(', ')}`);
+        } catch (err) {
+            logger.error(`Failed to remove roles from ${member.user.tag}:`, err);
+            roleChangeErrors.push(`Failed to remove: ${roles.map(r => r.name).join(', ')}`);
+        }
     }
 
-    // --- VERIFICATION STEP ---
-    // 5. Re-fetch the member to get the most up-to-date roles from the API
-    const freshMember = await guild.members.fetch({ user: member.id, force: true });
-    const finalRoleIds = new Set(freshMember.roles.cache.map(r => r.id));
+    // 5. Wait for Discord API to propagate changes (important!)
+    if (intendedAdd.length > 0 || intendedRemove.length > 0) {
+        logger.info(`Waiting for Discord API to propagate role changes for ${member.user.tag}...`);
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Increased delay
+    }
 
-    // 6. Compare final state with target state
-    const missingRoleIds = [...targetRoleIds].filter(id => !finalRoleIds.has(id));
-    const extraRoleIds = [...finalRoleIds].filter(id => !targetRoleIds.has(id) && allManageableRoleIds.has(id));
-
+    // 6. Verification with retry logic
     let discrepancies = null;
-    if (missingRoleIds.length > 0 || extraRoleIds.length > 0) {
-        discrepancies = {
-            missing: missingRoleIds.map(id => findRoleById(guild, id)?.name || `Unknown Role ID: ${id}`),
-            extra: extraRoleIds.map(id => findRoleById(guild, id)?.name || `Unknown Role ID: ${id}`)
-        };
-        logger.warn(`Role discrepancy found for ${member.user.tag}:`, discrepancies);
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+        try {
+            // Re-fetch the member to get the most up-to-date roles from the API
+            const freshMember = await guild.members.fetch({ user: member.id, force: true });
+            const finalRoleIds = new Set(freshMember.roles.cache.map(r => r.id));
+
+            // Compare final state with target state
+            const missingRoleIds = [...targetRoleIds].filter(id => !finalRoleIds.has(id));
+            const extraRoleIds = [...finalRoleIds].filter(id => !targetRoleIds.has(id) && allManageableRoleIds.has(id));
+
+            if (missingRoleIds.length === 0 && extraRoleIds.length === 0) {
+                // Success! No discrepancies found
+                break;
+            }
+
+            // Still have discrepancies
+            discrepancies = {
+                missing: missingRoleIds.map(id => findRoleById(guild, id)?.name || `Unknown Role ID: ${id}`),
+                extra: extraRoleIds.map(id => findRoleById(guild, id)?.name || `Unknown Role ID: ${id}`)
+            };
+
+            retryCount++;
+            if (retryCount < maxRetries) {
+                logger.info(`Discrepancies found for ${member.user.tag}, retrying in ${retryCount * 1000}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, retryCount * 1000)); // Exponential backoff
+            }
+        } catch (error) {
+            logger.error(`Error during verification for ${member.user.tag}:`, error);
+            retryCount++;
+            if (retryCount < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+            }
+        }
+    }
+
+    if (discrepancies) {
+        logger.warn(`Persistent role discrepancy found for ${member.user.tag} after ${maxRetries} retries:`, discrepancies);
+    }
+
+    // Include any role change errors in the response
+    if (roleChangeErrors.length > 0) {
+        if (!discrepancies) discrepancies = { missing: [], extra: [] };
+        discrepancies.errors = roleChangeErrors;
     }
 
     return { added: intendedAdd, removed: intendedRemove, discrepancies };
