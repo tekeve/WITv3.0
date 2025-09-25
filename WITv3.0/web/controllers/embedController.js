@@ -27,7 +27,7 @@ exports.showCreator = (client) => async (req, res) => {
         let embedToEdit = null;
 
         if (mode === 'edit') {
-            const [embedRow] = await db.query('SELECT content, embed_data FROM saved_embeds WHERE guild_id = ? AND embed_name = ?', [guild.id, embedName]);
+            const [embedRow] = await db.query('SELECT content, embed_data, last_sent_channel_id FROM saved_embeds WHERE guild_id = ? AND embed_name = ?', [guild.id, embedName]);
             if (embedRow) {
                 let parsedData = {};
                 // Defensively parse the embed_data, as it could be a string or an object.
@@ -47,7 +47,8 @@ exports.showCreator = (client) => async (req, res) => {
 
                 embedToEdit = {
                     embed_data: parsedData,
-                    content: embedRow.content || ''
+                    content: embedRow.content || '',
+                    last_sent_channel_id: embedRow.last_sent_channel_id
                 };
             }
         }
@@ -144,31 +145,44 @@ exports.handleCreatorSubmission = (client) => async (req, res) => {
 
         let successMessage = `Embed \`${newEmbedName || originalName}\` has been saved successfully.`;
 
-        // --- NEW SEND/EDIT LOGIC ---
+        // --- SEND/EDIT LOGIC ---
         if (action === 'send') {
             if (!channelId) {
                 successMessage += ` but was not sent because no channel was selected.`;
                 logger.warn(`Embed '${newEmbedName}' saved but not sent as no channel was provided.`);
             } else {
                 let sentMessage = null;
-                const channel = await client.channels.fetch(channelId);
+                const newChannel = await client.channels.fetch(channelId);
 
-                // Check if we should edit an existing message
+                // If we are in edit mode, have info on the old message, and are sending to a NEW channel, delete the old message.
+                if (mode === 'edit' && lastSentMessageInfo.messageId && lastSentMessageInfo.channelId !== channelId) {
+                    try {
+                        const oldChannel = await client.channels.fetch(lastSentMessageInfo.channelId);
+                        const oldMessage = await oldChannel.messages.fetch(lastSentMessageInfo.messageId);
+                        await oldMessage.delete();
+                        logger.info(`Deleted old embed message ${lastSentMessageInfo.messageId} from ${oldChannel.name} because it was moved.`);
+                        successMessage += ` The old message in ${oldChannel} was also deleted.`
+                    } catch (deleteError) {
+                        logger.warn(`Could not delete old embed message ${lastSentMessageInfo.messageId}. It might have been deleted already. Error: ${deleteError.message}`);
+                    }
+                }
+
+                // Check if we should edit an existing message (only if it's in the same channel)
                 if (mode === 'edit' && lastSentMessageInfo.messageId && lastSentMessageInfo.channelId === channelId) {
                     try {
-                        const messageToEdit = await channel.messages.fetch(lastSentMessageInfo.messageId);
+                        const messageToEdit = await newChannel.messages.fetch(lastSentMessageInfo.messageId);
                         sentMessage = await messageToEdit.edit({ content: content, embeds: [new EmbedBuilder(parsedEmbed)] });
-                        successMessage += ` and its existing message in ${channel} was updated.`;
+                        successMessage += ` and its existing message in ${newChannel} was updated.`;
                     } catch (editError) {
                         logger.warn(`Could not edit original message ${lastSentMessageInfo.messageId}, sending a new one. Error: ${editError.message}`);
                         // Fallback to sending a new message if editing fails
-                        sentMessage = await channel.send({ content: content, embeds: [new EmbedBuilder(parsedEmbed)] });
-                        successMessage += ` and a new message was sent to ${channel} (the old one couldn't be found).`;
+                        sentMessage = await newChannel.send({ content: content, embeds: [new EmbedBuilder(parsedEmbed)] });
+                        successMessage += ` and a new message was sent to ${newChannel} (the old one couldn't be found).`;
                     }
                 } else {
-                    // Send a new message
-                    sentMessage = await channel.send({ content: content, embeds: [new EmbedBuilder(parsedEmbed)] });
-                    successMessage += ` and sent to ${channel}.`;
+                    // Send a new message if this is a 'create' action or if the channel has changed.
+                    sentMessage = await newChannel.send({ content: content, embeds: [new EmbedBuilder(parsedEmbed)] });
+                    successMessage += ` and sent to ${newChannel}.`;
                 }
 
                 // If a message was sent or edited, update its ID in the database
@@ -180,7 +194,7 @@ exports.handleCreatorSubmission = (client) => async (req, res) => {
                 }
             }
         }
-        // --- END OF NEW LOGIC ---
+        // --- END OF LOGIC ---
 
         await interaction.followUp({ content: successMessage, flags: [MessageFlags.Ephemeral] });
 
@@ -195,5 +209,4 @@ exports.handleCreatorSubmission = (client) => async (req, res) => {
         client.activeEmbedTokens.delete(token);
     }
 };
-
 

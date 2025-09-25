@@ -123,7 +123,7 @@ module.exports = {
     async autocomplete(interaction) {
         const focusedValue = interaction.options.getFocused();
         try {
-            const [embeds] = await db.query('SELECT embed_name FROM saved_embeds WHERE guild_id = ? AND embed_name LIKE ? ORDER BY embed_name LIMIT 25', [interaction.guild.id, `%${focusedValue}%`]);
+            const embeds = await db.query('SELECT embed_name FROM saved_embeds WHERE guild_id = ? AND embed_name LIKE ? ORDER BY embed_name LIMIT 25', [interaction.guild.id, `%${focusedValue}%`]);
             await interaction.respond(
                 embeds.map(embed => ({ name: embed.embed_name, value: embed.embed_name }))
             );
@@ -140,7 +140,7 @@ module.exports = {
             await handleCreateEdit(interaction);
 
         } else if (subcommand === 'send') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
             const embedName = interaction.options.getString('name');
             const channel = interaction.options.getChannel('channel');
             const messageContent = interaction.options.getString('message_content');
@@ -172,8 +172,8 @@ module.exports = {
             }
 
         } else if (subcommand === 'list') {
-            await interaction.deferReply({ ephemeral: true });
-            const [embeds] = await db.query('SELECT embed_name, last_edited_at FROM saved_embeds WHERE guild_id = ? ORDER BY embed_name', [interaction.guild.id]);
+            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+            const embeds = await db.query('SELECT embed_name, last_edited_at FROM saved_embeds WHERE guild_id = ? ORDER BY embed_name', [interaction.guild.id]);
 
             if (!embeds || embeds.length === 0) {
                 return interaction.editReply('There are no saved embeds for this server.');
@@ -189,7 +189,7 @@ module.exports = {
 
             await interaction.editReply({ embeds: [embed] });
         } else if (subcommand === 'delete') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
             const embedName = interaction.options.getString('name');
 
             // First, find the embed to get its message ID
@@ -214,7 +214,7 @@ module.exports = {
             }
 
             // Now, delete the embed from the database
-            const [result] = await db.query('DELETE FROM saved_embeds WHERE embed_name = ? AND guild_id = ?', [embedName, interaction.guild.id]);
+            const result = await db.query('DELETE FROM saved_embeds WHERE embed_name = ? AND guild_id = ?', [embedName, interaction.guild.id]);
 
             if (result.affectedRows > 0) {
                 await interaction.editReply(`✅ Successfully deleted the embed named \`${embedName}\`.${messageDeletedText}`);
