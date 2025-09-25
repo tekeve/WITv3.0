@@ -127,19 +127,22 @@ function scheduleNextIncursionCheck(client, delay) {
 }
 
 /**
- * Fetches the main incursion list and finds the active high-sec incursion, enriching it with system data.
- * @returns {Promise<{ highSecIncursion: object | null, nextCheckDelay: number }>}
+ * Fetches the main incursion list, schedules the next poll, and finds the active high-sec incursion.
+ * @param {import('discord.js').Client} client The Discord client instance.
+ * @returns {Promise<{ highSecIncursion: object | null }>}
  */
-async function fetchHighSecIncursion() {
+async function fetchAndScheduleHighSecIncursion(client) {
     let nextCheckDelay = 60 * 1000; // Default to 60 seconds
 
     // This will throw an error on ESI failure after retries, which is caught by the main updateIncursions function.
     const { data: allIncursions, expires: incursionsExpiry } = await esiService.get({ endpoint: '/incursions/', caller: __filename });
 
+    // Schedule the next check immediately after getting the expiry header.
     if (incursionsExpiry) {
-        const buffer = 5000; // 5-second buffer
+        const buffer = 1000; // Tighter 1-second buffer.
         nextCheckDelay = (incursionsExpiry - Date.now()) + buffer;
     }
+    scheduleNextIncursionCheck(client, nextCheckDelay);
 
     if (!Array.isArray(allIncursions)) {
         // This is an unexpected ESI response format, not a standard HTTP error.
@@ -161,14 +164,14 @@ async function fetchHighSecIncursion() {
 
                 if (systemData && systemData.security_status > 0.45) {
                     const highSecIncursion = { ...incursion, systemData };
-                    return { highSecIncursion, nextCheckDelay };
+                    return { highSecIncursion };
                 }
             } catch (e) {
                 logger.warn(`Could not resolve system ID ${incursion.staging_solar_system_id} for potential HS incursion. Error: ${e.message}`);
             }
         }
     }
-    return { highSecIncursion: null, nextCheckDelay };
+    return { highSecIncursion: null };
 }
 
 async function updateIncursions(client, options = {}) {
@@ -191,12 +194,14 @@ async function updateIncursions(client, options = {}) {
 
     try {
         let highSecIncursion;
-        let nextCheckDelay = 60 * 1000; // Default delay
         const mockOverride = client.mockOverride;
         const isUsingMock = mockOverride && mockOverride.expires > Date.now();
 
         if (isUsingMock) {
             logger.info(`Using mock state override: ${JSON.stringify(mockOverride)}`);
+            // When using a mock, schedule the next check for a short interval to re-evaluate if the mock is still active.
+            scheduleNextIncursionCheck(client, 60 * 1000);
+
             if (mockOverride.state === 'none') {
                 highSecIncursion = null;
             } else {
@@ -217,12 +222,11 @@ async function updateIncursions(client, options = {}) {
                 logger.info('Mock override has expired. Resuming ESI updates.');
                 client.mockOverride = null;
             }
-            const result = await fetchHighSecIncursion();
+            // Fetch the data and schedule the next poll in one step.
+            const result = await fetchAndScheduleHighSecIncursion(client);
             highSecIncursion = result.highSecIncursion;
-            nextCheckDelay = result.nextCheckDelay;
         }
 
-        scheduleNextIncursionCheck(client, nextCheckDelay);
 
         const currentStateKey = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
 
@@ -343,4 +347,3 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
-

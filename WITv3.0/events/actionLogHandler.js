@@ -484,26 +484,35 @@ async function handleMessageDelete(message) {
 }
 
 async function handleMessageUpdate(oldMessage, newMessage) {
+    // Basic checks to prevent logging unnecessary events
     if (newMessage.partial || !newMessage.guild || !newMessage.author || newMessage.author.bot) return;
+    // Ignore updates that don't change content (e.g., embed loading)
     if (oldMessage.content === newMessage.content) return;
 
     try {
+        // Fetch the member object to ensure we have the most up-to-date server-specific info
+        const member = newMessage.member || await newMessage.guild.members.fetch(newMessage.author.id);
+
         const embed = new EmbedBuilder()
-            .setColor(0xFAA61A)
-            .setTitle('Message Edited')
+            .setColor(0xFAA61A) // Orange color for edits
+            .setAuthor({ name: member.displayName, iconURL: member.user.displayAvatarURL() })
+            .setDescription(`Message edited in ${newMessage.channel}. [Jump to Message](${newMessage.url})`)
             .addFields(
-                { name: 'Author', value: newMessage.author.tag, inline: true },
-                { name: 'Channel', value: newMessage.channel.toString(), inline: true },
-                { name: 'Original Content', value: `\`\`\`${(oldMessage.content || '*Empty*').substring(0, 1000)}\`\`\`` },
-                { name: 'Updated Content', value: `\`\`\`${(newMessage.content || '*Empty*').substring(0, 1000)}\`\`\`` }
+                // Shows the user's full tag and makes them clickable
+                { name: 'User', value: `${newMessage.author} (${newMessage.author.tag})`, inline: false },
+                // Shows the original content
+                { name: 'Before', value: `\`\`\`${(oldMessage.content || '*Empty or an embed*').substring(0, 1020)}\`\`\`` },
+                // Shows the new, updated content
+                { name: 'After', value: `\`\`\`${(newMessage.content || '*Empty*').substring(0, 1020)}\`\`\`` }
             )
-            .setURL(newMessage.url)
             .setTimestamp();
+
         actionLog.postLog(newMessage.guild, 'log_message_edit', embed, { channel: newMessage.channel, member: newMessage.member });
     } catch (error) {
         await ErrorHandler.handleDiscordError(error, `handling message edit event`);
     }
 }
+
 
 async function handleRoleCreate(role) {
     try {

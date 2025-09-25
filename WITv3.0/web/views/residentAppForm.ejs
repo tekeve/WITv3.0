@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -99,6 +99,10 @@
             width: 100%;
             margin-top: 2.5rem;
         }
+        .submit-btn:disabled {
+            background-color: #475569;
+            cursor: not-allowed;
+        }
         .warning-box {
             background-color: rgba(239, 68, 68, 0.1);
             border-left: 4px solid #ef4444;
@@ -170,6 +174,15 @@
             cursor: not-allowed;
             border-color: #475569;
         }
+        .validation-status {
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-top: 0.5rem;
+            min-height: 1.2em; /* Reserve space to prevent layout shifts */
+        }
+        .validation-status.valid { color: #22c55e; }
+        .validation-status.invalid { color: #ef4444; }
+        .validation-status.checking { color: #f59e0b; }
     </style>
 </head>
 <body>
@@ -187,9 +200,10 @@
 
             <div class="form-group">
                 <label for="character_name">Character Name</label>
-                <input type="text" id="character_name" name="character_name" value="<%= mainChar ? mainChar.character_name : '' %>" required>
+                <input type="text" id="character_name" name="character_name" value="<%= mainChar ? mainChar.character_name : '' %>" required data-validated="false" data-is-valid="false">
+                <div class="validation-status" id="main-char-status"></div>
                  <div class="warning-box">
-                    <strong>Important:</strong> This must match your main character's name in-game exactly for automatic registration.
+                    <strong>Important:</strong> This must match your main character's name in-game exactly for automatic registration. The name will be validated against ESI.
                 </div>
             </div>
             
@@ -212,18 +226,17 @@
                             <input type="text" id="alt-input" placeholder="Enter alt name and click Add">
                             <button type="button" id="add-alt-btn" class="add-alt-btn">Add</button>
                         </div>
+                        <div class="validation-status" id="alt-char-status"></div>
                     </div>
                     <div>
                         <div id="alts-list-container">
-                            <!-- JS will populate this -->
                         </div>
                         <div id="alts-hidden-inputs">
-                            <!-- JS will populate this with hidden inputs for the form -->
                         </div>
                     </div>
                 </div>
                 <div class="warning-box" style="margin-top: 1rem;">
-                    <strong>Important:</strong> Each alt name must match the in-game name exactly for automatic registration.
+                    <strong>Important:</strong> Each alt name must match the in-game name exactly. Names will be validated.
                 </div>
             </div>
             
@@ -288,38 +301,113 @@
                 <div class="char-counter"></div>
             </div>
 
-            <button type="submit" class="submit-btn">Submit Application</button>
+            <button type="submit" class="submit-btn" id="submit-btn">Submit Application</button>
         </form>
     </div>
     
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            function setupCharCounter(textarea) {
-                const counter = textarea.nextElementSibling;
-                const maxLength = textarea.maxLength;
-
-                const updateCounter = () => {
-                    const remaining = maxLength - textarea.value.length;
-                    counter.textContent = `${remaining} characters remaining`;
-                };
-
-                textarea.addEventListener('input', updateCounter);
-                updateCounter(); 
-            }
+            const form = document.getElementById('resident-form');
+            const submitBtn = document.getElementById('submit-btn');
             
-            setupCharCounter(document.getElementById('why_commander'));
-            setupCharCounter(document.getElementById('why_wtm'));
-            
+            const mainCharInput = document.getElementById('character_name');
+            const mainCharStatus = document.getElementById('main-char-status');
+
             const addAltBtn = document.getElementById('add-alt-btn');
             const altInput = document.getElementById('alt-input');
+            const altCharStatus = document.getElementById('alt-char-status');
             const altsListContainer = document.getElementById('alts-list-container');
             const hiddenInputsContainer = document.getElementById('alts-hidden-inputs');
-            
-            const addAltTag = (altName) => {
-                if (!altName) return;
 
-                const existingAlts = Array.from(hiddenInputsContainer.querySelectorAll('input')).map(input => input.value);
-                if (existingAlts.includes(altName)) {
+            let validationTimeout;
+
+            // --- CORE VALIDATION FUNCTION ---
+            async function validateCharacter(charName, inputElement, statusElement) {
+                if (!charName || charName.trim().length < 3) {
+                    statusElement.textContent = '';
+                    inputElement.dataset.isValid = 'false';
+                    inputElement.dataset.validated = 'false';
+                    checkFormValidity();
+                    return { success: false };
+                }
+
+                statusElement.textContent = 'Checking...';
+                statusElement.className = 'validation-status checking';
+                inputElement.dataset.validated = 'false';
+                checkFormValidity();
+
+                try {
+                    const response = await fetch('/residentapp/validate-char', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ characterName: charName })
+                    });
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        statusElement.textContent = `✔ Valid: ${data.characterName}`;
+                        statusElement.className = 'validation-status valid';
+                        inputElement.value = data.characterName;
+                        inputElement.dataset.isValid = 'true';
+                    } else {
+                        statusElement.textContent = `✖ Error: ${data.message || 'Validation failed'}`;
+                        statusElement.className = 'validation-status invalid';
+                        inputElement.dataset.isValid = 'false';
+                    }
+                } catch (error) {
+                    statusElement.textContent = '✖ Error: Could not reach server.';
+                    statusElement.className = 'validation-status invalid';
+                    inputElement.dataset.isValid = 'false';
+                } finally {
+                    inputElement.dataset.validated = 'true';
+                    checkFormValidity();
+                    return { success: inputElement.dataset.isValid === 'true' };
+                }
+            }
+
+            // --- FORM SUBMISSION & VALIDITY CHECK ---
+            function checkFormValidity() {
+                const isMainValid = mainCharInput.dataset.isValid === 'true';
+                submitBtn.disabled = !isMainValid;
+                submitBtn.textContent = isMainValid ? 'Submit Application' : 'Correct Character Name to Submit';
+            }
+
+            form.addEventListener('submit', (e) => {
+                checkFormValidity();
+                if (submitBtn.disabled) {
+                    e.preventDefault();
+                    alert('Please ensure your main character name is valid before submitting.');
+                }
+            });
+
+            // --- MAIN CHARACTER VALIDATION ---
+            mainCharInput.addEventListener('input', () => {
+                mainCharInput.dataset.validated = 'false';
+                mainCharInput.dataset.isValid = 'false';
+                mainCharStatus.textContent = 'Validation pending...';
+                mainCharStatus.className = 'validation-status checking';
+                checkFormValidity();
+
+                clearTimeout(validationTimeout);
+                validationTimeout = setTimeout(() => {
+                    validateCharacter(mainCharInput.value, mainCharInput, mainCharStatus);
+                }, 800);
+            });
+            
+             // Initial validation for pre-filled main character
+            if (mainCharInput.value) {
+                validateCharacter(mainCharInput.value, mainCharInput, mainCharStatus);
+            }
+
+
+            // --- ALT CHARACTER LOGIC ---
+            const addAltTag = (altName) => {
+                 if (!altName) return;
+
+                const existingAlts = Array.from(hiddenInputsContainer.querySelectorAll('input')).map(input => input.value.toLowerCase());
+                if (existingAlts.includes(altName.toLowerCase())) {
+                    altCharStatus.textContent = '✖ Error: This alt has already been added.';
+                    altCharStatus.className = 'validation-status invalid';
                     return; 
                 }
 
@@ -346,16 +434,18 @@
                 hiddenInputsContainer.appendChild(hiddenInput);
             };
 
-            const handleAddAltClick = () => {
+            const handleAddAltClick = async () => {
                 const altName = altInput.value.trim();
-                if (altName) {
-                    const existingAlts = Array.from(hiddenInputsContainer.querySelectorAll('input')).map(input => input.value);
-                    if (existingAlts.includes(altName)) {
-                        alert('This alt has already been added.');
-                        return;
-                    }
-                    addAltTag(altName);
+                if (!altName) return;
+                
+                addAltBtn.disabled = true;
+                const result = await validateCharacter(altName, altInput, altCharStatus);
+                addAltBtn.disabled = false;
+
+                if (result.success) {
+                    addAltTag(altInput.value); // Use the corrected name
                     altInput.value = '';
+                    altCharStatus.textContent = '';
                     altInput.focus();
                 }
             };
@@ -367,13 +457,28 @@
                     handleAddAltClick();
                 }
             });
-
+            
+            // --- INITIAL SETUP ---
             const existingAltsData = <%- JSON.stringify(alts.map(alt => alt.character_name)) %>;
             if (existingAltsData && existingAltsData.length > 0) {
                 existingAltsData.forEach(altName => {
                     addAltTag(altName);
                 });
             }
+
+            function setupCharCounter(textarea) {
+                const counter = textarea.nextElementSibling;
+                const maxLength = textarea.maxLength;
+                const updateCounter = () => {
+                    const remaining = maxLength - textarea.value.length;
+                    counter.textContent = `${remaining} characters remaining`;
+                };
+                textarea.addEventListener('input', updateCounter);
+                updateCounter(); 
+            }
+            
+            setupCharCounter(document.getElementById('why_commander'));
+            setupCharCounter(document.getElementById('why_wtm'));
 
             function setupExclusiveCheckboxes(containerId) {
                 const container = document.getElementById(containerId);
@@ -394,6 +499,8 @@
             }
             setupExclusiveCheckboxes('logi-ships');
             setupExclusiveCheckboxes('bs-ships');
+            
+            checkFormValidity(); // Initial check
         });
     </script>
 </body>

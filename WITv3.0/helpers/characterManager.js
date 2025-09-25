@@ -29,6 +29,7 @@ async function getCharacterDetails(characterName) {
 }
 
 module.exports = {
+    getCharacterDetails,
     /**
      * Adds a main character for a Discord user.
      * @param {string} discordId - The user's Discord ID.
@@ -223,3 +224,4 @@ module.exports = {
         return await db.query(sql);
     },
 };
+
