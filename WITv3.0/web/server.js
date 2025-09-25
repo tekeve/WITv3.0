@@ -11,6 +11,7 @@ const webeditRoutes = require('./routes/webeditRoutes');
 const actionlogRoutes = require('./routes/actionlogRoutes');
 const residentAppRoutes = require('./routes/residentAppRoutes');
 const embedRoutes = require('./routes/embedRoutes');
+const logiRoutes = require('./routes/logiRoutes'); // Import the new router
 
 /**
  * Initializes and starts the Express web server.
@@ -35,6 +36,7 @@ function startServer(client) {
     app.use('/', actionlogRoutes(client));
     app.use('/', residentAppRoutes(client, client.activeResidentAppTokens));
     app.use('/', embedRoutes(client));
+    app.use('/', logiRoutes(client)); // Use the new logi router
 
     app.get('/', (req, res) => {
         res.send('Web server is running.');
@@ -46,4 +48,3 @@ function startServer(client) {
 }
 
 module.exports = { startServer };
-

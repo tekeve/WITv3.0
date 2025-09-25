@@ -1,0 +1,551 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logi Sign-off Form</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1e293b; 
+            --bg-secondary: #334155; 
+            --bg-tertiary: #475569;
+            --bg-card: #0f172a; /* Darker background for cards */
+            --border-color: #475569;
+            --text-primary: #e2e8f0; 
+            --text-secondary: #94a3b8;
+            --accent-green: #22c55e; 
+            --accent-red: #ef4444; 
+            --accent-blue: #3b82f6; 
+            --accent-orange: #f97316;
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 1.5rem;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        @media (min-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+                grid-template-areas:
+                    "header header"
+                    "form form"
+                    "inprogress trusted";
+            }
+            #main-header { grid-area: header; }
+            #add-pilot-panel { grid-area: form; }
+            #in-progress-panel { grid-area: inprogress; }
+            #trusted-panel { grid-area: trusted; }
+        }
+        .panel {
+            background-color: var(--bg-secondary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 2rem 0; text-align: center; }
+        h2 { 
+            font-size: 1.125rem; font-weight: 600; margin: 0 0 1rem 0;
+            text-align: left;
+        }
+        .form-group { position: relative; }
+        label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); }
+        input[type="text"], input[type="search"], textarea {
+            width: 100%; padding: 0.65rem 0.85rem; border-radius: 0.375rem;
+            background-color: var(--bg-primary); border: 1px solid var(--border-color);
+            color: var(--text-primary); font-size: 0.875rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        input:focus, textarea:focus {
+            outline: none; border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        textarea { resize: none; }
+        
+        button {
+            padding: 0.5rem 1rem; border: none; border-radius: 0.375rem;
+            font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            transition: background-color 0.2s; display: inline-flex;
+            align-items: center; justify-content: center; white-space: nowrap;
+        }
+        button:disabled { background-color: #4b5563; color: #9ca3af; cursor: not-allowed; }
+        .btn-green { background-color: var(--accent-green); color: white; }
+        .btn-red { background-color: var(--accent-red); color: white; }
+        .btn-blue { background-color: var(--accent-blue); color: white; }
+        .btn-orange { background-color: var(--accent-orange); color: white; }
+        .btn-green:hover:not(:disabled) { background-color: #16a34a; }
+        .btn-red:hover:not(:disabled) { background-color: #b91c1c; }
+        .btn-blue:hover:not(:disabled) { background-color: #2563eb; }
+        .btn-orange:hover:not(:disabled) { background-color: #ea580c; }
+        
+        .pilot-list { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; }
+        .pilot-card {
+            background-color: var(--bg-primary); /* Match search box BG */
+            padding: 0.75rem 1rem; border-radius: 0.5rem;
+            display: flex; flex-direction: column; gap: 0.5rem;
+            border-left: 4px solid var(--border-color);
+        }
+        .pilot-card.status-in-progress { border-color: var(--accent-blue); }
+        .pilot-card.status-trusted { border-color: var(--accent-green); }
+        .pilot-card.status-demerit { border-color: var(--accent-orange); }
+        
+        .pilot-main { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .pilot-info { flex-grow: 1; min-width: 0; }
+        .pilot-name { font-weight: 600; color: #f1f5f9; font-size: 0.9rem; }
+        .pilot-date { font-size: 0.75rem; color: var(--text-secondary); }
+        .pilot-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+        
+        .latest-comment-wrapper {
+            font-size: 0.875rem; color: var(--text-secondary);
+            display: flex; align-items: flex-start; gap: 0.75rem; margin-top: 0.25rem;
+        }
+        .comment-bar { min-width: 3px; background-color: var(--border-color); align-self: stretch; border-radius: 3px; flex-shrink: 0; }
+        .latest-comment { word-break: break-word; white-space: pre-wrap; flex-grow: 1; min-width: 0; }
+        .latest-comment strong { color: #cbd5e1; }
+        
+        .history-toggle {
+            font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;
+            display: flex; align-items: center; gap: 4px; user-select: none;
+        }
+        .history-toggle svg { width: 12px; height: 12px; transition: transform 0.2s; }
+        .history-toggle.expanded svg { transform: rotate(180deg); }
+        
+        .history-content {
+            display: none; margin-top: 0.75rem; padding-top: 0.75rem;
+            border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;
+        }
+        .history-entry { font-size: 0.8rem; display: flex; align-items: flex-start; gap: 0.5rem; }
+        .bar-signoff { background-color: var(--accent-blue); } 
+        .bar-demerit { background-color: var(--accent-orange); } 
+        .bar-comment { background-color: var(--accent-blue); }
+        
+        .pagination { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary);
+        }
+        .validation-status { font-size: 0.8rem; font-weight: 500; margin-top: 0.5rem; min-height: 1.2em; }
+        .validation-status.valid { color: var(--accent-green); } .validation-status.invalid { color: var(--accent-red); } .validation-status.checking { color: var(--accent-orange); }
+        
+        .modal-backdrop { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background-color: rgba(0,0,0,0.6); display: none; 
+            justify-content: center; align-items: center; z-index: 1000; 
+        }
+        .modal { 
+            background-color: var(--bg-secondary); padding: 1.5rem; border-radius: 0.75rem; 
+            width: 90%; max-width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); 
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .modal-title { font-size: 1.25rem; font-weight: 600; margin: 0; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); }
+        .modal-footer { margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem; }
+        .char-counter { text-align: right; font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="main-header">Logistics Sign-off Management</h1>
+
+        <div class="panel" id="add-pilot-panel">
+            <h2>Add New Pilot Sign-off</h2>
+            <form id="add-new-pilot-form" style="display: grid; grid-template-columns: 2fr 3fr auto; gap: 1rem; align-items: flex-end;">
+                <div>
+                    <label for="new-pilot-name">Pilot Name</label>
+                    <input type="text" id="new-pilot-name" placeholder="Enter new pilot's name..." required>
+                    <div class="validation-status" id="new-pilot-status"></div>
+                </div>
+                <div>
+                    <label for="new-pilot-comment">Comment</label>
+                    <textarea id="new-pilot-comment" rows="1" required maxlength="500"></textarea>
+                    <div class="char-counter"></div>
+                </div>
+                <button type="submit" class="button btn-blue" style="padding: 0.65rem 1rem;">Add First Sign-off</button>
+            </form>
+        </div>
+
+        <div class="panel in-progress-panel">
+            <h2 id="in-progress-header">In-Progress Pilots (0)</h2>
+            <input type="search" id="in-progress-search" placeholder="Search in-progress pilots...">
+            <div id="in-progress-list" class="pilot-list"></div>
+            <div id="in-progress-pagination" class="pagination"></div>
+        </div>
+
+        <div class="panel trusted-panel">
+            <h2 id="trusted-header">Trusted Pilots (0)</h2>
+            <input type="search" id="trusted-search" placeholder="Search trusted pilots...">
+            <div id="trusted-list" class="pilot-list"></div>
+            <div id="trusted-pagination" class="pagination"></div>
+        </div>
+    </div>
+
+    <!-- Modal Template -->
+    <div id="comment-modal" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title" class="modal-title">Add Entry</h3>
+                <button id="modal-close-btn" class="modal-close">&times;</button>
+            </div>
+            <form id="modal-form">
+                <input type="hidden" id="modal-pilot-name">
+                <input type="hidden" id="modal-action-type">
+                <div class="form-group">
+                    <label for="modal-comment">Comment</label>
+                    <textarea id="modal-comment" rows="4" required maxlength="500"></textarea>
+                    <div class="char-counter"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="modal-cancel-btn" class="button" style="background-color: var(--bg-tertiary);">Cancel</button>
+                    <button type="submit" id="modal-confirm-btn" class="button">Confirm</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const commanderName = "<%= commanderName %>";
+            const token = "<%= token %>";
+            const SIGNOFFS_REQUIRED = 2;
+            const DEMERITS_REQUIRED = 2;
+
+            let inProgressState = { page: 1, search: '' };
+            let trustedState = { page: 1, search: '' };
+            let searchTimeout;
+
+            const formatDate = (dateString) => {
+                if (!dateString) return 'N/A';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            };
+
+            const renderPilots = (data) => {
+                // In-Progress Pilots
+                const inProgressList = document.getElementById('in-progress-list');
+                inProgressList.innerHTML = data.inProgress.pilots.map(p => {
+                    const history = p.history ? (typeof p.history === 'string' ? JSON.parse(p.history) : p.history) : [];
+                    const signoffCount = history.filter(h => h.type === 'signoff').length;
+                    const latestHistory = history.length > 0 ? history[history.length - 1] : null;
+                    const historyHtml = history.map(h => `
+                        <div class="history-entry">
+                            <div class="comment-bar bar-${h.type}"></div>
+                            <div><strong>${h.commander}</strong> on ${formatDate(h.date)}: ${h.comment}</div>
+                        </div>`).join('') || 'No history yet.';
+                    return `
+                        <div class="pilot-card status-in-progress" data-pilot-name="${p.pilot_name}">
+                            <div class="pilot-main">
+                                <div class="pilot-info">
+                                    <span class="pilot-name">${p.pilot_name} (${signoffCount}/${SIGNOFFS_REQUIRED})</span>
+                                    <span class="pilot-date">Added: ${formatDate(p.created_at)}</span>
+                                </div>
+                                <div class="pilot-actions">
+                                    <button class="button btn-blue" data-action="signoff" data-name="${p.pilot_name}">Add Sign-off</button>
+                                </div>
+                            </div>
+                            ${latestHistory ? `
+                            <div class="latest-comment-wrapper">
+                                <div class="comment-bar bar-signoff"></div>
+                                <div class="latest-comment"><strong>${latestHistory.commander}:</strong> ${latestHistory.comment}</div>
+                            </div>` : ''}
+                            <div class="pilot-footer">
+                                <span class="history-toggle">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                    Show History
+                                </span>
+                            </div>
+                            <div class="history-content">${historyHtml}</div>
+                        </div>`;
+                }).join('');
+                document.getElementById('in-progress-header').textContent = `In-Progress Pilots (${data.inProgress.total})`;
+                renderPagination('in-progress-pagination', data.inProgress, 'in-progress');
+
+                // Trusted Pilots
+                const trustedList = document.getElementById('trusted-list');
+                trustedList.innerHTML = data.trusted.pilots.map(p => {
+                    const history = p.history ? (typeof p.history === 'string' ? JSON.parse(p.history) : p.history) : [];
+                    const demeritCount = history.filter(h => h.type === 'demerit').length;
+                    const latestHistory = history.length > 0 ? history[history.length - 1] : null;
+                    const cardStatus = demeritCount > 0 ? 'status-demerit' : 'status-trusted';
+                    const historyHtml = history.map(h => `
+                         <div class="history-entry">
+                             <div class="comment-bar bar-${h.type}"></div>
+                             <div><strong>${h.commander}</strong> on ${formatDate(h.date)}: ${h.comment}</div>
+                        </div>`).join('') || 'No history recorded.';
+                    return `
+                        <div class="pilot-card ${cardStatus}" data-pilot-name="${p.pilot_name}">
+                             <div class="pilot-main">
+                                <div class="pilot-info">
+                                    <span class="pilot-name">${p.pilot_name} ${demeritCount > 0 ? `(${demeritCount}/${DEMERITS_REQUIRED} demerits)`: ''}</span>
+                                    <span class="pilot-date">Trusted Since: ${formatDate(p.added_at)}</span>
+                                </div>
+                                <div class="pilot-actions">
+                                    <button class="button btn-green" data-action="comment" data-name="${p.pilot_name}">Add Comment</button>
+                                    <button class="button btn-orange" data-action="demerit" data-name="${p.pilot_name}">Add Demerit</button>
+                                </div>
+                            </div>
+                            ${latestHistory ? `
+                            <div class="latest-comment-wrapper">
+                                <div class="comment-bar bar-${latestHistory.type}"></div>
+                                <div class="latest-comment"><strong>${latestHistory.commander}:</strong> ${latestHistory.comment}</div>
+                            </div>` : ''}
+                            <div class="pilot-footer">
+                                <span class="history-toggle">
+                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                    Show History
+                                </span>
+                            </div>
+                            <div class="history-content">${historyHtml}</div>
+                        </div>`;
+                }).join('');
+                document.getElementById('trusted-header').textContent = `Trusted Pilots (${data.trusted.total})`;
+                renderPagination('trusted-pagination', data.trusted, 'trusted');
+            };
+
+            const renderPagination = (containerId, data, type) => {
+                const container = document.getElementById(containerId);
+                container.innerHTML = '';
+                const { total, page, limit } = data;
+                const totalPages = Math.ceil(total / limit);
+                if (totalPages <= 1) return;
+
+                const prevButton = document.createElement('button');
+                prevButton.textContent = 'Previous';
+                prevButton.disabled = page === 1;
+                prevButton.onclick = () => {
+                    if (type === 'in-progress') inProgressState.page--;
+                    else trustedState.page--;
+                    fetchData();
+                };
+
+                const pageInfo = document.createElement('span');
+                pageInfo.textContent = `Page ${page} of ${totalPages}`;
+
+                const nextButton = document.createElement('button');
+                nextButton.textContent = 'Next';
+                nextButton.disabled = page === totalPages;
+                nextButton.onclick = () => {
+                    if (type === 'in-progress') inProgressState.page++;
+                    else trustedState.page++;
+                    fetchData();
+                };
+                container.append(prevButton, pageInfo, nextButton);
+            };
+
+            const fetchData = async () => {
+                const params = new URLSearchParams({
+                    inProgressPage: inProgressState.page,
+                    inProgressSearch: inProgressState.search,
+                    trustedPage: trustedState.page,
+                    trustedSearch: trustedState.search
+                });
+                try {
+                    const response = await fetch(`/logi/data?${params.toString()}`);
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    const data = await response.json();
+                    renderPilots(data);
+                } catch (error) {
+                    console.error('Failed to fetch pilot data:', error);
+                }
+            };
+            
+            // --- Modal Logic ---
+            const modal = document.getElementById('comment-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalComment = document.getElementById('modal-comment');
+            const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+            const modalForm = document.getElementById('modal-form');
+
+            const openModal = (action, pilotName) => {
+                const typeDisplay = action.charAt(0).toUpperCase() + action.slice(1);
+                modalTitle.textContent = `${typeDisplay} for ${pilotName}`;
+                modal.style.display = 'flex';
+                modalForm.reset();
+                setupCharCounter(modalComment);
+                modalComment.focus();
+
+                modalConfirmBtn.className = 'button';
+                if(action === 'signoff') modalConfirmBtn.classList.add('btn-blue');
+                if(action === 'comment') modalConfirmBtn.classList.add('btn-green');
+                if(action === 'demerit') modalConfirmBtn.classList.add('btn-orange');
+                
+                document.getElementById('modal-pilot-name').value = pilotName;
+                document.getElementById('modal-action-type').value = action;
+            };
+
+            const closeModal = () => modal.style.display = 'none';
+
+            document.getElementById('modal-close-btn').onclick = closeModal;
+            document.getElementById('modal-cancel-btn').onclick = closeModal;
+            modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+
+            document.body.addEventListener('click', e => {
+                const targetButton = e.target.closest('button[data-action]');
+                if (targetButton) {
+                    openModal(targetButton.dataset.action, targetButton.dataset.name);
+                }
+                const historyToggle = e.target.closest('.history-toggle');
+                if (historyToggle) {
+                    const content = historyToggle.parentElement.parentElement.querySelector('.history-content');
+                    historyToggle.classList.toggle('expanded');
+                    content.style.display = content.style.display === 'flex' ? 'none' : 'flex';
+                }
+            });
+
+            modalForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                modalConfirmBtn.disabled = true;
+                const pilotName = document.getElementById('modal-pilot-name').value;
+                const comment = modalComment.value;
+                const type = document.getElementById('modal-action-type').value;
+
+                try {
+                    const response = await fetch(`/logi/event/${token}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ pilotName, comment, type })
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        closeModal();
+                        fetchData(); 
+                    } else {
+                        alert(`Error: ${result.message}`);
+                    }
+                } catch (error) {
+                    console.error('Error submitting action:', error);
+                    alert('An unexpected error occurred.');
+                } finally {
+                    modalConfirmBtn.disabled = false;
+                }
+            });
+
+            // --- New Pilot Form Logic ---
+            const newPilotForm = document.getElementById('add-new-pilot-form');
+            const newPilotNameInput = document.getElementById('new-pilot-name');
+            const newPilotCommentInput = document.getElementById('new-pilot-comment');
+            const newPilotStatus = document.getElementById('new-pilot-status');
+            let validationTimeout;
+
+            const validateNewPilot = async () => {
+                const charName = newPilotNameInput.value.trim();
+                const submitBtn = newPilotForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+
+                if (!charName || charName.length < 3) {
+                    newPilotStatus.textContent = '';
+                    newPilotForm.dataset.isValid = 'false';
+                    return;
+                }
+                newPilotStatus.textContent = 'Checking...';
+                newPilotStatus.className = 'validation-status checking';
+                newPilotForm.dataset.isValid = 'false';
+
+                try {
+                    const response = await fetch('/logi/validate-char', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ characterName: charName })
+                    });
+                    const data = await response.json();
+                    if (response.ok && data.success) {
+                        newPilotStatus.textContent = `✔ Valid: ${data.characterName}`;
+                        newPilotStatus.className = 'validation-status valid';
+                        newPilotNameInput.value = data.characterName;
+                        newPilotForm.dataset.isValid = 'true';
+                        submitBtn.disabled = false;
+                    } else {
+                        newPilotStatus.textContent = `✖ Error: ${data.message || 'Validation failed'}`;
+                        newPilotStatus.className = 'validation-status invalid';
+                        newPilotForm.dataset.isValid = 'false';
+                    }
+                } catch (error) {
+                    newPilotStatus.textContent = '✖ Error: Could not reach validation server.';
+                    newPilotStatus.className = 'validation-status invalid';
+                }
+            };
+
+            newPilotNameInput.addEventListener('input', () => {
+                clearTimeout(validationTimeout);
+                validationTimeout = setTimeout(validateNewPilot, 500);
+            });
+
+            newPilotForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (newPilotForm.dataset.isValid !== 'true') {
+                    alert('Please enter a valid pilot name before submitting.');
+                    return;
+                }
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+
+                const pilotName = newPilotNameInput.value;
+                const comment = newPilotCommentInput.value;
+
+                try {
+                    const response = await fetch(`/logi/event/${token}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ pilotName, comment, type: 'signoff' })
+                    });
+                    const result = await response.json();
+                     if (result.success) {
+                        newPilotForm.reset();
+                        newPilotStatus.textContent = '';
+                        setupCharCounter(newPilotCommentInput);
+                        fetchData();
+                    } else {
+                        alert(`Error: ${result.message}`);
+                    }
+                } catch (error) {
+                    console.error('Error adding new pilot:', error);
+                    alert('An unexpected error occurred.');
+                } finally {
+                    submitBtn.disabled = false;
+                }
+            });
+
+            // --- Search and Initial Load ---
+            const setupSearch = (inputId, stateObject) => {
+                 document.getElementById(inputId).addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        stateObject.search = e.target.value;
+                        stateObject.page = 1;
+                        fetchData();
+                    }, 500);
+                });
+            };
+            setupSearch('in-progress-search', inProgressState);
+            setupSearch('trusted-search', trustedState);
+            
+            // Character Counters
+            function setupCharCounter(element) {
+                const counter = element.nextElementSibling;
+                if (!counter || !counter.classList.contains('char-counter')) return;
+                const maxLength = element.maxLength;
+                const update = () => counter.textContent = `${maxLength - element.value.length} characters remaining`;
+                element.addEventListener('input', update);
+                update();
+            }
+            setupCharCounter(document.getElementById('new-pilot-comment'));
+            setupCharCounter(document.getElementById('modal-comment'));
+
+            fetchData(); // Initial data load
+        });
+    </script>
+</body>
+</html>
+

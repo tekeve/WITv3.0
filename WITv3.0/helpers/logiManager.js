@@ -1,0 +1,265 @@
+﻿const { EmbedBuilder } = require('discord.js');
+const db = require('@helpers/database');
+const logger = require('@helpers/logger');
+const configManager = require('@helpers/configManager');
+const charManager = require('@helpers/characterManager');
+
+const SIGNOFFS_REQUIRED = 2;
+
+/**
+ * Fetches paginated and searchable data for the logi signoff form.
+ * @param {object} options - Options for pagination and searching.
+ * @returns {Promise<object>}
+ */
+async function getSignoffData(options = {}) {
+    const {
+        searchInProgress = '',
+        searchTrusted = '',
+        pageInProgress = 1,
+        pageTrusted = 1,
+        limit = 25
+    } = options;
+
+    const offsetInProgress = (pageInProgress - 1) * limit;
+    const offsetTrusted = (pageTrusted - 1) * limit;
+    const searchInProgressWildcard = `%${searchInProgress}%`;
+    const searchTrustedWildcard = `%${searchTrusted}%`;
+
+    try {
+        const [inProgressCountResult] = await db.query('SELECT COUNT(*) as count FROM logi_signoffs WHERE pilot_name LIKE ?', [searchInProgressWildcard]);
+        const [trustedCountResult] = await db.query('SELECT COUNT(*) as count FROM trusted_pilots WHERE pilot_name LIKE ?', [searchTrustedWildcard]);
+
+        const totalInProgress = inProgressCountResult.count;
+        const totalTrusted = trustedCountResult.count;
+
+        const inProgress = await db.query('SELECT id, pilot_name, history, created_at FROM logi_signoffs WHERE pilot_name LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?', [searchInProgressWildcard, limit, offsetInProgress]);
+        const trusted = await db.query('SELECT pilot_name, added_at, history FROM trusted_pilots WHERE pilot_name LIKE ? ORDER BY added_at DESC LIMIT ? OFFSET ?', [searchTrustedWildcard, limit, offsetTrusted]);
+
+        const parseHistory = (pilot) => {
+            try {
+                pilot.history = pilot.history ? JSON.parse(pilot.history) : [];
+                // Ensure history is sorted by date, most recent last
+                pilot.history.sort((a, b) => new Date(a.date) - new Date(b.date));
+            } catch (e) {
+                pilot.history = [];
+            }
+        };
+
+        inProgress.forEach(parseHistory);
+        trusted.forEach(parseHistory);
+
+        return {
+            inProgress: { pilots: inProgress, total: totalInProgress, page: pageInProgress, limit },
+            trusted: { pilots: trusted, total: totalTrusted, page: pageTrusted, limit }
+        };
+
+    } catch (error) {
+        logger.error('Failed to get paginated signoff data from database:', error);
+        throw error;
+    }
+}
+
+
+/**
+ * Sends a notification to the council channel when a pilot passes signoffs.
+ * @param {string} pilotName - The name of the pilot who passed.
+ * @param {Array} history - The pilot's full history array.
+ * @param {import('discord.js').Client} client - The Discord client instance.
+ */
+async function notifyCouncilOfPass(pilotName, history, client) {
+    const config = configManager.get();
+    const channelId = config.logiSignoffChannelId ? config.logiSignoffChannelId[0] : null;
+
+    if (!channelId) {
+        logger.warn('logiSignoffChannelId is not configured. Cannot send pass notification.');
+        return;
+    }
+
+    try {
+        const channel = await client.channels.fetch(channelId);
+        const councilRoles = config.councilRoles || [];
+        const roleMentions = councilRoles.map(id => `<@&${id}>`).join(' ');
+        const signoffCommanders = [...new Set(history.filter(h => h.type === 'signoff').map(h => h.commander))];
+
+        const embed = new EmbedBuilder()
+            .setColor(0x57F287) // Green
+            .setTitle('✅ New Trusted Logistics Pilot')
+            .setDescription(`**${pilotName}** has completed their logistics sign-offs and is now trusted.`)
+            .addFields(
+                { name: 'Signed off by', value: signoffCommanders.join(', ') || 'N/A' }
+            )
+            .setTimestamp();
+
+        await channel.send({ content: roleMentions, embeds: [embed] });
+        logger.success(`Sent pass notification for ${pilotName}.`);
+    } catch (error) {
+        logger.error('Failed to send pass notification:', error);
+    }
+}
+
+/**
+ * Adds a signoff for a pilot. If the pilot is new, they are created.
+ * If they reach the required number of signoffs, they are promoted.
+ * @param {string} pilotName - The name of the pilot being signed off.
+ * @param {string} commanderName - The name of the commander giving the signoff.
+ * @param {string} comment - The comment for the signoff.
+ * @param {import('discord.js').Client} client - The Discord client.
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+async function addSignoff(pilotName, commanderName, comment, client) {
+    try {
+        const [isTrusted] = await db.query('SELECT 1 FROM trusted_pilots WHERE pilot_name = ?', [pilotName]);
+        if (isTrusted) {
+            return { success: false, message: `**${pilotName}** is already a trusted pilot.` };
+        }
+
+        const [pilot] = await db.query('SELECT * FROM logi_signoffs WHERE pilot_name = ?', [pilotName]);
+
+        let currentHistory = pilot && pilot.history ? JSON.parse(pilot.history) : [];
+        const signoffsInHistory = currentHistory.filter(h => h.type === 'signoff');
+
+        if (signoffsInHistory.some(s => s.commander === commanderName)) {
+            return { success: false, message: `You have already signed off **${pilotName}**.` };
+        }
+
+        const newEvent = { type: 'signoff', commander: commanderName, comment, date: new Date().toISOString() };
+        currentHistory.push(newEvent);
+
+        if (pilot) {
+            await db.query('UPDATE logi_signoffs SET history = ? WHERE id = ?', [JSON.stringify(currentHistory), pilot.id]);
+        } else {
+            await db.query('INSERT INTO logi_signoffs (pilot_name, history) VALUES (?, ?)', [pilotName, JSON.stringify(currentHistory)]);
+        }
+
+        const newSignoffCount = currentHistory.filter(h => h.type === 'signoff').length;
+
+        if (newSignoffCount >= SIGNOFFS_REQUIRED) {
+            await db.query('DELETE FROM logi_signoffs WHERE pilot_name = ?', [pilotName]);
+            await db.query('INSERT INTO trusted_pilots (pilot_name, history) VALUES (?, ?)', [pilotName, JSON.stringify(currentHistory)]);
+            await notifyCouncilOfPass(pilotName, currentHistory, client);
+            return { success: true, message: `**${pilotName}** has been successfully signed off and is now a trusted pilot!` };
+        } else {
+            return { success: true, message: `Sign-off added for **${pilotName}**. They now have ${newSignoffCount}/${SIGNOFFS_REQUIRED} sign-offs.` };
+        }
+    } catch (error) {
+        logger.error(`Error adding signoff for ${pilotName}:`, error);
+        return { success: false, message: 'A database error occurred.' };
+    }
+}
+
+/**
+ * Adds a demerit for a trusted pilot. If it's the second demerit, the pilot is moved back to 'in_progress'.
+ * @param {string} pilotName - The name of the pilot receiving the demerit.
+ * @param {string} commanderName - The name of the commander giving the demerit.
+ * @param {string} comment - The required comment for the demerit.
+ * @param {import('discord.js').Client} client - The Discord client.
+ * @returns {Promise<{success: boolean, message: string, demoted: boolean}>}
+ */
+async function addDemerit(pilotName, commanderName, comment, client) {
+    try {
+        const [pilot] = await db.query('SELECT history FROM trusted_pilots WHERE pilot_name = ?', [pilotName]);
+        if (!pilot) {
+            return { success: false, message: 'Could not find that trusted pilot.' };
+        }
+
+        const currentHistory = pilot.history ? JSON.parse(pilot.history) : [];
+        const demeritsInHistory = currentHistory.filter(h => h.type === 'demerit');
+
+        if (demeritsInHistory.some(d => d.commander === commanderName)) {
+            return { success: false, message: `You have already given a demerit to **${pilotName}**.` };
+        }
+
+        const newEvent = { type: 'demerit', commander: commanderName, comment, date: new Date().toISOString() };
+        currentHistory.push(newEvent);
+
+        const newDemeritCount = currentHistory.filter(h => h.type === 'demerit').length;
+
+        if (newDemeritCount >= SIGNOFFS_REQUIRED) {
+            await db.query('DELETE FROM trusted_pilots WHERE pilot_name = ?', [pilotName]);
+            await db.query('INSERT INTO logi_signoffs (pilot_name, history) VALUES (?, ?)', [pilotName, JSON.stringify(currentHistory)]);
+            await notifyCouncilOfDistrust(pilotName, currentHistory, client);
+            return { success: true, message: `**${pilotName}** received a second demerit and has been moved back to the in-progress list.`, demoted: true };
+        } else {
+            await db.query('UPDATE trusted_pilots SET history = ? WHERE pilot_name = ?', [JSON.stringify(currentHistory), pilotName]);
+            return { success: true, message: `Demerit added for **${pilotName}**. They now have ${newDemeritCount}/${SIGNOFFS_REQUIRED} demerits.`, demoted: false };
+        }
+    } catch (error) {
+        logger.error(`Error adding demerit for ${pilotName}:`, error);
+        return { success: false, message: 'A database error occurred.' };
+    }
+}
+
+/**
+ * Adds a positive comment to an already trusted pilot's history.
+ * @param {string} pilotName - The name of the trusted pilot.
+ * @param {string} commanderName - The name of the commander giving the comment.
+ * @param {string} comment - The positive comment.
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+async function addTrustedComment(pilotName, commanderName, comment) {
+    try {
+        const [pilot] = await db.query('SELECT history FROM trusted_pilots WHERE pilot_name = ?', [pilotName]);
+        if (!pilot) {
+            return { success: false, message: 'Could not find that trusted pilot.' };
+        }
+        const currentHistory = pilot.history ? JSON.parse(pilot.history) : [];
+        const newEvent = { type: 'signoff', commander: commanderName, comment, date: new Date().toISOString() };
+        currentHistory.push(newEvent);
+        await db.query('UPDATE trusted_pilots SET history = ? WHERE pilot_name = ?', [JSON.stringify(currentHistory), pilotName]);
+        return { success: true, message: `Positive comment added for **${pilotName}**.` };
+    } catch (error) {
+        logger.error(`Error adding trusted comment for ${pilotName}:`, error);
+        return { success: false, message: 'A database error occurred.' };
+    }
+}
+
+
+/**
+ * Sends a notification when a pilot is no longer trusted.
+ * @param {string} pilotName - The name of the pilot.
+ * @param {Array} history - The pilot's full history.
+ * @param {import('discord.js').Client} client - The Discord client.
+ */
+async function notifyCouncilOfDistrust(pilotName, history, client) {
+    const config = configManager.get();
+    const channelId = config.logiSignoffChannelId ? config.logiSignoffChannelId[0] : null;
+
+    if (!channelId) {
+        logger.warn('logiSignoffChannelId is not configured. Cannot send distrust notification.');
+        return;
+    }
+
+    try {
+        const channel = await client.channels.fetch(channelId);
+        const councilRoles = config.councilRoles || [];
+        const roleMentions = councilRoles.map(id => `<@&${id}>`).join(' ');
+        const demerits = history.filter(h => h.type === 'demerit');
+
+        const embed = new EmbedBuilder()
+            .setColor(0xED4245) // Red
+            .setTitle('❌ Logi Pilot No Longer Trusted')
+            .setDescription(`**${pilotName}** has received two demerits and has been moved back to the in-progress list for re-evaluation.`)
+            .setTimestamp();
+
+        demerits.forEach((demerit, index) => {
+            embed.addFields({
+                name: `Demerit #${index + 1} by ${demerit.commander}`,
+                value: `*${demerit.comment}*`
+            });
+        });
+
+        await channel.send({ content: roleMentions, embeds: [embed] });
+        logger.success(`Sent distrust notification for ${pilotName}.`);
+    } catch (error) {
+        logger.error('Failed to send distrust notification:', error);
+    }
+}
+
+module.exports = {
+    getSignoffData,
+    addSignoff,
+    addDemerit,
+    addTrustedComment,
+    validateCharacter: charManager.getCharacterDetails
+};
+
