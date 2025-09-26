@@ -19,13 +19,17 @@ exports.showForm = (client) => async (req, res) => {
         const commanderName = commanderChar?.main?.character_name || tokenData.user.tag;
 
         // Fetch initial data for both lists
-        const { inProgress, trusted } = await logiManager.getSignoffData();
+        const initialData = await logiManager.getSignoffData();
+
+        // Ensure the data passed to the template is always a valid object, even if empty.
+        const inProgressData = initialData.inProgress || { pilots: [], total: 0, page: 1, limit: 25 };
+        const trustedData = initialData.trusted || { pilots: [], total: 0, page: 1, limit: 25 };
 
         res.render('logiForm', {
             token,
             commanderName,
-            inProgressData: inProgress,
-            trustedData: trusted,
+            inProgressData,
+            trustedData,
         });
     } catch (error) {
         logger.error('Error preparing logi sign-off page:', error);
