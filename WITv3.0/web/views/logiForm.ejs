@@ -3,23 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logi Sign-off Form</title>
+    <title>Logistics Sign-off Form</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-primary: #1e293b; 
-            --bg-secondary: #334155; 
+            --bg-primary: #1e293b;
+            --bg-secondary: #334155;
             --bg-tertiary: #475569;
-            --bg-card: #0f172a; /* Darker background for cards */
+            --bg-card: #0f172a; /* Darker card background from image */
             --border-color: #475569;
-            --text-primary: #e2e8f0; 
+            --text-primary: #e2e8f0;
             --text-secondary: #94a3b8;
-            --accent-green: #22c55e; 
-            --accent-red: #ef4444; 
-            --accent-blue: #3b82f6; 
-            --accent-orange: #f97316;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-blue: #3b82f6; /* Blue for signoff buttons from image */
+            --accent-orange: #f59e0b; /* Orange for demerit warning */
+            --accent-yellow: #f59e0b;
         }
         *, *::before, *::after { box-sizing: border-box; }
         body {
@@ -27,9 +28,10 @@
             background-color: var(--bg-primary);
             color: var(--text-primary);
             margin: 0;
-            padding: 1.5rem;
+            padding: 2rem;
         }
         .container {
+            width: 100%;
             max-width: 1400px;
             margin: 0 auto;
             display: grid;
@@ -54,106 +56,148 @@
             border-radius: 0.75rem;
             padding: 1.5rem;
             border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             display: flex;
             flex-direction: column;
         }
-        h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 2rem 0; text-align: center; }
+        h1, h2 { color: #f8fafc; text-align: center; }
+        h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 2rem 0; }
         h2 { 
-            font-size: 1.125rem; font-weight: 600; margin: 0 0 1rem 0;
-            text-align: left;
+            font-size: 1.125rem; font-weight: 600; margin: 0 0 1.5rem 0; 
+            border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; text-align: left;
         }
-        .form-group { position: relative; }
+        .form-group { margin-bottom: 1rem; position: relative; }
         label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); }
-        input[type="text"], input[type="search"], textarea {
-            width: 100%; padding: 0.65rem 0.85rem; border-radius: 0.375rem;
-            background-color: var(--bg-primary); border: 1px solid var(--border-color);
-            color: var(--text-primary); font-size: 0.875rem;
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 0.65rem 0.85rem;
+            border-radius: 0.375rem;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 0.875rem;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
         input:focus, textarea:focus {
-            outline: none; border-color: var(--accent-blue);
+            outline: none;
+            border-color: var(--accent-blue);
             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
         }
-        textarea { resize: none; }
+        textarea { resize: none; min-height: 60px; }
         
         button {
-            padding: 0.5rem 1rem; border: none; border-radius: 0.375rem;
-            font-size: 0.8rem; font-weight: 600; cursor: pointer;
-            transition: background-color 0.2s; display: inline-flex;
-            align-items: center; justify-content: center; white-space: nowrap;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         button:disabled { background-color: #4b5563; color: #9ca3af; cursor: not-allowed; }
         .btn-green { background-color: var(--accent-green); color: white; }
         .btn-red { background-color: var(--accent-red); color: white; }
         .btn-blue { background-color: var(--accent-blue); color: white; }
-        .btn-orange { background-color: var(--accent-orange); color: white; }
         .btn-green:hover:not(:disabled) { background-color: #16a34a; }
         .btn-red:hover:not(:disabled) { background-color: #b91c1c; }
         .btn-blue:hover:not(:disabled) { background-color: #2563eb; }
-        .btn-orange:hover:not(:disabled) { background-color: #ea580c; }
         
-        .pilot-list { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem; }
+        .search-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .search-bar input { flex-grow: 1; }
+        .pilot-list { flex-grow: 1; overflow-y: auto; padding-right: 0.5rem; margin: 0 -0.5rem; min-height: 40vh; }
+        
         .pilot-card {
-            background-color: var(--bg-primary); /* Match search box BG */
-            padding: 0.75rem 1rem; border-radius: 0.5rem;
-            display: flex; flex-direction: column; gap: 0.5rem;
-            border-left: 4px solid var(--border-color);
+            background-color: var(--bg-card);
+            border-radius: 0.375rem;
+            margin-bottom: 0.75rem;
+            position: relative;
+            border: 1px solid var(--bg-tertiary);
+            overflow: hidden; /* To contain the border */
         }
-        .pilot-card.status-in-progress { border-color: var(--accent-blue); }
-        .pilot-card.status-trusted { border-color: var(--accent-green); }
-        .pilot-card.status-demerit { border-color: var(--accent-orange); }
-        
-        .pilot-main { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .status-bar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+        }
+        .status-bar.status-inprogress { background-color: var(--accent-blue); }
+        .status-bar.status-trusted { background-color: var(--accent-green); }
+        .status-bar.status-demerit { background-color: var(--accent-orange); }
+
+        .pilot-card-content { padding: 1rem; padding-left: 1.25rem; }
+        .pilot-card-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
         .pilot-info { flex-grow: 1; min-width: 0; }
-        .pilot-name { font-weight: 600; color: #f1f5f9; font-size: 0.9rem; }
-        .pilot-date { font-size: 0.75rem; color: var(--text-secondary); }
-        .pilot-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+        .pilot-name { font-size: 1rem; font-weight: 600; color: #f8fafc; }
         
-        .latest-comment-wrapper {
-            font-size: 0.875rem; color: var(--text-secondary);
-            display: flex; align-items: flex-start; gap: 0.75rem; margin-top: 0.25rem;
-        }
-        .comment-bar { min-width: 3px; background-color: var(--border-color); align-self: stretch; border-radius: 3px; flex-shrink: 0; }
-        .latest-comment { word-break: break-word; white-space: pre-wrap; flex-grow: 1; min-width: 0; }
+        .latest-comment-wrapper { display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.5rem; }
+        .comment-bar { flex-shrink: 0; width: 3px; border-radius: 3px; align-self: stretch; }
+        .comment-bar.status-inprogress { background-color: var(--accent-blue); }
+        .comment-bar.status-demerit { background-color: var(--accent-orange); }
+        .latest-comment { font-size: 0.8rem; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
         .latest-comment strong { color: #cbd5e1; }
+
+        .pilot-card-actions { flex-shrink: 0; }
         
-        .history-toggle {
-            font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;
-            display: flex; align-items: center; gap: 4px; user-select: none;
+        .history-toggle-btn {
+            background: none; border: none; cursor: pointer; padding: 0.25rem;
+            display: flex; align-items: center; color: var(--text-secondary); margin-top: 0.75rem;
         }
-        .history-toggle svg { width: 12px; height: 12px; transition: transform 0.2s; }
-        .history-toggle.expanded svg { transform: rotate(180deg); }
+        .history-toggle-btn svg { width: 16px; height: 16px; transition: transform 0.2s ease-in-out; }
+        .history-toggle-btn.expanded svg { transform: rotate(180deg); }
         
-        .history-content {
+        .signoff-history {
             display: none; margin-top: 0.75rem; padding-top: 0.75rem;
-            border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.5rem;
+            border-top: 1px solid var(--bg-tertiary); font-size: 0.8rem;
+            list-style: none; padding-left: 0;
         }
-        .history-entry { font-size: 0.8rem; display: flex; align-items: flex-start; gap: 0.5rem; }
-        .bar-signoff { background-color: var(--accent-blue); } 
-        .bar-demerit { background-color: var(--accent-orange); } 
-        .bar-comment { background-color: var(--accent-blue); }
+        .signoff-history li { margin-bottom: 0.25rem; color: var(--text-secondary); }
+        .signoff-history strong { color: var(--text-primary); }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7); display: none;
+            justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal {
+            background-color: var(--bg-secondary); padding: 2rem;
+            border-radius: 0.75rem; width: 90%; max-width: 500px;
+        }
+        .modal h3 { margin: 0 0 1.5rem 0; text-align: center; }
+        .modal .form-group { position: relative; }
+        .modal textarea { min-height: 80px; resize: none; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
+        
+        .char-counter {
+            position: absolute; bottom: 8px; right: 12px;
+            font-size: 0.75rem; color: var(--text-secondary); pointer-events: none;
+        }
+        
+        .toast {
+            position: fixed; top: 1.5rem; right: 1.5rem;
+            background-color: var(--bg-tertiary); color: var(--text-primary);
+            padding: 1rem 1.5rem; border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1001;
+            opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background-color: var(--accent-green); color: white; }
+        .toast.error { background-color: var(--accent-red); color: white; }
         
         .pagination { 
             display: flex; justify-content: space-between; align-items: center; 
             margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary);
+            border-top: 1px solid var(--border-color); padding-top: 1rem;
         }
-        .validation-status { font-size: 0.8rem; font-weight: 500; margin-top: 0.5rem; min-height: 1.2em; }
-        .validation-status.valid { color: var(--accent-green); } .validation-status.invalid { color: var(--accent-red); } .validation-status.checking { color: var(--accent-orange); }
         
-        .modal-backdrop { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background-color: rgba(0,0,0,0.6); display: none; 
-            justify-content: center; align-items: center; z-index: 1000; 
-        }
-        .modal { 
-            background-color: var(--bg-secondary); padding: 1.5rem; border-radius: 0.75rem; 
-            width: 90%; max-width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); 
-        }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-        .modal-title { font-size: 1.25rem; font-weight: 600; margin: 0; }
-        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); }
-        .modal-footer { margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem; }
-        .char-counter { text-align: right; font-size: 0.75rem; color: #94a3b8; margin-top: 4px; }
+        .validation-status { font-size: 0.8rem; font-weight: 500; margin-top: 0.5rem; min-height: 1.2em; }
+        .validation-status.valid { color: var(--accent-green); }
+        .validation-status.invalid { color: var(--accent-red); }
+        .validation-status.checking { color: var(--accent-yellow); }
     </style>
 </head>
 <body>
@@ -162,388 +206,420 @@
 
         <div class="panel" id="add-pilot-panel">
             <h2>Add New Pilot Sign-off</h2>
-            <form id="add-new-pilot-form" style="display: grid; grid-template-columns: 2fr 3fr auto; gap: 1rem; align-items: flex-end;">
-                <div>
-                    <label for="new-pilot-name">Pilot Name</label>
-                    <input type="text" id="new-pilot-name" placeholder="Enter new pilot's name..." required>
-                    <div class="validation-status" id="new-pilot-status"></div>
-                </div>
-                <div>
-                    <label for="new-pilot-comment">Comment</label>
-                    <textarea id="new-pilot-comment" rows="1" required maxlength="500"></textarea>
-                    <div class="char-counter"></div>
-                </div>
-                <button type="submit" class="button btn-blue" style="padding: 0.65rem 1rem;">Add First Sign-off</button>
-            </form>
+            <div class="form-group">
+                <label for="new-pilot-name">Pilot Name</label>
+                <input type="text" id="new-pilot-name" placeholder="Enter pilot's exact in-game name" autocomplete="off">
+                <div class="validation-status" id="new-pilot-status"></div>
+            </div>
+            <div class="form-group">
+                <label for="new-pilot-comment">Comment (Optional)</label>
+                <textarea id="new-pilot-comment" maxlength="500"></textarea>
+                 <div class="char-counter"></div>
+            </div>
+            <button class="btn-green" id="add-new-pilot-btn" disabled>Add First Sign-off</button>
         </div>
 
-        <div class="panel in-progress-panel">
-            <h2 id="in-progress-header">In-Progress Pilots (0)</h2>
-            <input type="search" id="in-progress-search" placeholder="Search in-progress pilots...">
+        <div class="panel" id="in-progress-panel">
+            <h2>In-Progress Pilots</h2>
+            <div class="search-bar">
+                <input type="text" id="search-in-progress" placeholder="Search in-progress...">
+            </div>
             <div id="in-progress-list" class="pilot-list"></div>
-            <div id="in-progress-pagination" class="pagination"></div>
+            <div class="pagination" id="pagination-in-progress"></div>
         </div>
 
-        <div class="panel trusted-panel">
-            <h2 id="trusted-header">Trusted Pilots (0)</h2>
-            <input type="search" id="trusted-search" placeholder="Search trusted pilots...">
+        <div class="panel" id="trusted-panel">
+            <h2>Trusted Pilots</h2>
+            <div class="search-bar">
+                <input type="text" id="search-trusted" placeholder="Search trusted...">
+            </div>
             <div id="trusted-list" class="pilot-list"></div>
-            <div id="trusted-pagination" class="pagination"></div>
+            <div class="pagination" id="pagination-trusted"></div>
         </div>
     </div>
+    
+    <div id="toast" class="toast"></div>
 
-    <!-- Modal Template -->
-    <div id="comment-modal" class="modal-backdrop">
+    <!-- Reusable Modal -->
+    <div class="modal-overlay" id="action-modal">
         <div class="modal">
-            <div class="modal-header">
-                <h3 id="modal-title" class="modal-title">Add Entry</h3>
-                <button id="modal-close-btn" class="modal-close">&times;</button>
+            <h3 id="modal-title"></h3>
+            <div class="form-group">
+                <label for="modal-comment">Comment</label>
+                <textarea id="modal-comment" maxlength="500"></textarea>
+                <div class="char-counter"></div>
             </div>
-            <form id="modal-form">
-                <input type="hidden" id="modal-pilot-name">
-                <input type="hidden" id="modal-action-type">
-                <div class="form-group">
-                    <label for="modal-comment">Comment</label>
-                    <textarea id="modal-comment" rows="4" required maxlength="500"></textarea>
-                    <div class="char-counter"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" id="modal-cancel-btn" class="button" style="background-color: var(--bg-tertiary);">Cancel</button>
-                    <button type="submit" id="modal-confirm-btn" class="button">Confirm</button>
-                </div>
-            </form>
+            <div class="modal-actions">
+                <button id="modal-cancel-btn">Cancel</button>
+                <button id="modal-confirm-btn">Confirm</button>
+            </div>
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const commanderName = "<%= commanderName %>";
-            const token = "<%= token %>";
-            const SIGNOFFS_REQUIRED = 2;
-            const DEMERITS_REQUIRED = 2;
-
-            let inProgressState = { page: 1, search: '' };
-            let trustedState = { page: 1, search: '' };
-            let searchTimeout;
-
-            const formatDate = (dateString) => {
-                if (!dateString) return 'N/A';
-                const date = new Date(dateString);
-                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+            const state = {
+                token: "<%= token %>",
+                commanderName: "<%= commanderName %>",
+                validationTimeout: null,
+                searchTimeout: null,
+                currentModalAction: null
             };
 
-            const renderPilots = (data) => {
-                // In-Progress Pilots
-                const inProgressList = document.getElementById('in-progress-list');
-                inProgressList.innerHTML = data.inProgress.pilots.map(p => {
-                    const history = p.history ? (typeof p.history === 'string' ? JSON.parse(p.history) : p.history) : [];
-                    const signoffCount = history.filter(h => h.type === 'signoff').length;
-                    const latestHistory = history.length > 0 ? history[history.length - 1] : null;
-                    const historyHtml = history.map(h => `
-                        <div class="history-entry">
-                            <div class="comment-bar bar-${h.type}"></div>
-                            <div><strong>${h.commander}</strong> on ${formatDate(h.date)}: ${h.comment}</div>
-                        </div>`).join('') || 'No history yet.';
-                    return `
-                        <div class="pilot-card status-in-progress" data-pilot-name="${p.pilot_name}">
-                            <div class="pilot-main">
-                                <div class="pilot-info">
-                                    <span class="pilot-name">${p.pilot_name} (${signoffCount}/${SIGNOFFS_REQUIRED})</span>
-                                    <span class="pilot-date">Added: ${formatDate(p.created_at)}</span>
-                                </div>
-                                <div class="pilot-actions">
-                                    <button class="button btn-blue" data-action="signoff" data-name="${p.pilot_name}">Add Sign-off</button>
-                                </div>
-                            </div>
-                            ${latestHistory ? `
-                            <div class="latest-comment-wrapper">
-                                <div class="comment-bar bar-signoff"></div>
-                                <div class="latest-comment"><strong>${latestHistory.commander}:</strong> ${latestHistory.comment}</div>
-                            </div>` : ''}
-                            <div class="pilot-footer">
-                                <span class="history-toggle">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
-                                    Show History
-                                </span>
-                            </div>
-                            <div class="history-content">${historyHtml}</div>
-                        </div>`;
-                }).join('');
-                document.getElementById('in-progress-header').textContent = `In-Progress Pilots (${data.inProgress.total})`;
-                renderPagination('in-progress-pagination', data.inProgress, 'in-progress');
-
-                // Trusted Pilots
-                const trustedList = document.getElementById('trusted-list');
-                trustedList.innerHTML = data.trusted.pilots.map(p => {
-                    const history = p.history ? (typeof p.history === 'string' ? JSON.parse(p.history) : p.history) : [];
-                    const demeritCount = history.filter(h => h.type === 'demerit').length;
-                    const latestHistory = history.length > 0 ? history[history.length - 1] : null;
-                    const cardStatus = demeritCount > 0 ? 'status-demerit' : 'status-trusted';
-                    const historyHtml = history.map(h => `
-                         <div class="history-entry">
-                             <div class="comment-bar bar-${h.type}"></div>
-                             <div><strong>${h.commander}</strong> on ${formatDate(h.date)}: ${h.comment}</div>
-                        </div>`).join('') || 'No history recorded.';
-                    return `
-                        <div class="pilot-card ${cardStatus}" data-pilot-name="${p.pilot_name}">
-                             <div class="pilot-main">
-                                <div class="pilot-info">
-                                    <span class="pilot-name">${p.pilot_name} ${demeritCount > 0 ? `(${demeritCount}/${DEMERITS_REQUIRED} demerits)`: ''}</span>
-                                    <span class="pilot-date">Trusted Since: ${formatDate(p.added_at)}</span>
-                                </div>
-                                <div class="pilot-actions">
-                                    <button class="button btn-green" data-action="comment" data-name="${p.pilot_name}">Add Comment</button>
-                                    <button class="button btn-orange" data-action="demerit" data-name="${p.pilot_name}">Add Demerit</button>
-                                </div>
-                            </div>
-                            ${latestHistory ? `
-                            <div class="latest-comment-wrapper">
-                                <div class="comment-bar bar-${latestHistory.type}"></div>
-                                <div class="latest-comment"><strong>${latestHistory.commander}:</strong> ${latestHistory.comment}</div>
-                            </div>` : ''}
-                            <div class="pilot-footer">
-                                <span class="history-toggle">
-                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
-                                    Show History
-                                </span>
-                            </div>
-                            <div class="history-content">${historyHtml}</div>
-                        </div>`;
-                }).join('');
-                document.getElementById('trusted-header').textContent = `Trusted Pilots (${data.trusted.total})`;
-                renderPagination('trusted-pagination', data.trusted, 'trusted');
-            };
-
-            const renderPagination = (containerId, data, type) => {
-                const container = document.getElementById(containerId);
-                container.innerHTML = '';
-                const { total, page, limit } = data;
-                const totalPages = Math.ceil(total / limit);
-                if (totalPages <= 1) return;
-
-                const prevButton = document.createElement('button');
-                prevButton.textContent = 'Previous';
-                prevButton.disabled = page === 1;
-                prevButton.onclick = () => {
-                    if (type === 'in-progress') inProgressState.page--;
-                    else trustedState.page--;
-                    fetchData();
-                };
-
-                const pageInfo = document.createElement('span');
-                pageInfo.textContent = `Page ${page} of ${totalPages}`;
-
-                const nextButton = document.createElement('button');
-                nextButton.textContent = 'Next';
-                nextButton.disabled = page === totalPages;
-                nextButton.onclick = () => {
-                    if (type === 'in-progress') inProgressState.page++;
-                    else trustedState.page++;
-                    fetchData();
-                };
-                container.append(prevButton, pageInfo, nextButton);
-            };
-
-            const fetchData = async () => {
-                const params = new URLSearchParams({
-                    inProgressPage: inProgressState.page,
-                    inProgressSearch: inProgressState.search,
-                    trustedPage: trustedState.page,
-                    trustedSearch: trustedState.search
-                });
-                try {
-                    const response = await fetch(`/logi/data?${params.toString()}`);
-                    if (!response.ok) throw new Error('Network response was not ok');
-                    const data = await response.json();
-                    renderPilots(data);
-                } catch (error) {
-                    console.error('Failed to fetch pilot data:', error);
-                }
-            };
-            
-            // --- Modal Logic ---
-            const modal = document.getElementById('comment-modal');
+            const newPilotNameInput = document.getElementById('new-pilot-name');
+            const newPilotStatus = document.getElementById('new-pilot-status');
+            const addNewPilotBtn = document.getElementById('add-new-pilot-btn');
+            const newPilotComment = document.getElementById('new-pilot-comment');
+            const searchInProgressInput = document.getElementById('search-in-progress');
+            const searchTrustedInput = document.getElementById('search-trusted');
+            const modalOverlay = document.getElementById('action-modal');
             const modalTitle = document.getElementById('modal-title');
             const modalComment = document.getElementById('modal-comment');
             const modalConfirmBtn = document.getElementById('modal-confirm-btn');
-            const modalForm = document.getElementById('modal-form');
+            const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
-            const openModal = (action, pilotName) => {
-                const typeDisplay = action.charAt(0).toUpperCase() + action.slice(1);
-                modalTitle.textContent = `${typeDisplay} for ${pilotName}`;
-                modal.style.display = 'flex';
-                modalForm.reset();
-                setupCharCounter(modalComment);
-                modalComment.focus();
-
-                modalConfirmBtn.className = 'button';
-                if(action === 'signoff') modalConfirmBtn.classList.add('btn-blue');
-                if(action === 'comment') modalConfirmBtn.classList.add('btn-green');
-                if(action === 'demerit') modalConfirmBtn.classList.add('btn-orange');
-                
-                document.getElementById('modal-pilot-name').value = pilotName;
-                document.getElementById('modal-action-type').value = action;
-            };
-
-            const closeModal = () => modal.style.display = 'none';
-
-            document.getElementById('modal-close-btn').onclick = closeModal;
-            document.getElementById('modal-cancel-btn').onclick = closeModal;
-            modal.onclick = (e) => { if (e.target === modal) closeModal(); };
-
-            document.body.addEventListener('click', e => {
-                const targetButton = e.target.closest('button[data-action]');
-                if (targetButton) {
-                    openModal(targetButton.dataset.action, targetButton.dataset.name);
-                }
-                const historyToggle = e.target.closest('.history-toggle');
-                if (historyToggle) {
-                    const content = historyToggle.parentElement.parentElement.querySelector('.history-content');
-                    historyToggle.classList.toggle('expanded');
-                    content.style.display = content.style.display === 'flex' ? 'none' : 'flex';
-                }
-            });
-
-            modalForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                modalConfirmBtn.disabled = true;
-                const pilotName = document.getElementById('modal-pilot-name').value;
-                const comment = modalComment.value;
-                const type = document.getElementById('modal-action-type').value;
-
-                try {
-                    const response = await fetch(`/logi/event/${token}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ pilotName, comment, type })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        closeModal();
-                        fetchData(); 
-                    } else {
-                        alert(`Error: ${result.message}`);
-                    }
-                } catch (error) {
-                    console.error('Error submitting action:', error);
-                    alert('An unexpected error occurred.');
-                } finally {
-                    modalConfirmBtn.disabled = false;
-                }
-            });
-
-            // --- New Pilot Form Logic ---
-            const newPilotForm = document.getElementById('add-new-pilot-form');
-            const newPilotNameInput = document.getElementById('new-pilot-name');
-            const newPilotCommentInput = document.getElementById('new-pilot-comment');
-            const newPilotStatus = document.getElementById('new-pilot-status');
-            let validationTimeout;
-
-            const validateNewPilot = async () => {
-                const charName = newPilotNameInput.value.trim();
-                const submitBtn = newPilotForm.querySelector('button[type="submit"]');
-                submitBtn.disabled = true;
-
-                if (!charName || charName.length < 3) {
-                    newPilotStatus.textContent = '';
-                    newPilotForm.dataset.isValid = 'false';
-                    return;
-                }
-                newPilotStatus.textContent = 'Checking...';
-                newPilotStatus.className = 'validation-status checking';
-                newPilotForm.dataset.isValid = 'false';
-
-                try {
-                    const response = await fetch('/logi/validate-char', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ characterName: charName })
-                    });
-                    const data = await response.json();
-                    if (response.ok && data.success) {
-                        newPilotStatus.textContent = `✔ Valid: ${data.characterName}`;
-                        newPilotStatus.className = 'validation-status valid';
-                        newPilotNameInput.value = data.characterName;
-                        newPilotForm.dataset.isValid = 'true';
-                        submitBtn.disabled = false;
-                    } else {
-                        newPilotStatus.textContent = `✖ Error: ${data.message || 'Validation failed'}`;
-                        newPilotStatus.className = 'validation-status invalid';
-                        newPilotForm.dataset.isValid = 'false';
-                    }
-                } catch (error) {
-                    newPilotStatus.textContent = '✖ Error: Could not reach validation server.';
-                    newPilotStatus.className = 'validation-status invalid';
-                }
-            };
-
-            newPilotNameInput.addEventListener('input', () => {
-                clearTimeout(validationTimeout);
-                validationTimeout = setTimeout(validateNewPilot, 500);
-            });
-
-            newPilotForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                if (newPilotForm.dataset.isValid !== 'true') {
-                    alert('Please enter a valid pilot name before submitting.');
-                    return;
-                }
-                const submitBtn = e.target.querySelector('button[type="submit"]');
-                submitBtn.disabled = true;
-
-                const pilotName = newPilotNameInput.value;
-                const comment = newPilotCommentInput.value;
-
-                try {
-                    const response = await fetch(`/logi/event/${token}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ pilotName, comment, type: 'signoff' })
-                    });
-                    const result = await response.json();
-                     if (result.success) {
-                        newPilotForm.reset();
-                        newPilotStatus.textContent = '';
-                        setupCharCounter(newPilotCommentInput);
-                        fetchData();
-                    } else {
-                        alert(`Error: ${result.message}`);
-                    }
-                } catch (error) {
-                    console.error('Error adding new pilot:', error);
-                    alert('An unexpected error occurred.');
-                } finally {
-                    submitBtn.disabled = false;
-                }
-            });
-
-            // --- Search and Initial Load ---
-            const setupSearch = (inputId, stateObject) => {
-                 document.getElementById(inputId).addEventListener('input', (e) => {
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(() => {
-                        stateObject.search = e.target.value;
-                        stateObject.page = 1;
-                        fetchData();
-                    }, 500);
-                });
-            };
-            setupSearch('in-progress-search', inProgressState);
-            setupSearch('trusted-search', trustedState);
+            // --- GENERAL HELPERS ---
+            function showToast(message, type = 'info') {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.className = `toast show ${type}`;
+                setTimeout(() => { toast.className = 'toast'; }, 3000);
+            }
             
-            // Character Counters
-            function setupCharCounter(element) {
-                const counter = element.nextElementSibling;
+            function setupCharCounter(textarea) {
+                const counter = textarea.nextElementSibling;
                 if (!counter || !counter.classList.contains('char-counter')) return;
-                const maxLength = element.maxLength;
-                const update = () => counter.textContent = `${maxLength - element.value.length} characters remaining`;
-                element.addEventListener('input', update);
+                const maxLength = textarea.maxLength;
+                const update = () => { counter.textContent = `${maxLength - textarea.value.length}`; };
+                textarea.addEventListener('input', update);
                 update();
             }
-            setupCharCounter(document.getElementById('new-pilot-comment'));
-            setupCharCounter(document.getElementById('modal-comment'));
 
-            fetchData(); // Initial data load
+            function formatDate(isoString) {
+                if (!isoString) return 'N/A';
+                const date = new Date(isoString);
+                const options = { year: 'numeric', month: 'short', day: 'numeric' };
+                return date.toLocaleDateString('en-GB', options);
+            }
+
+            async function apiCall(endpoint, body) {
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    const data = await response.json();
+                    if (!response.ok) { throw new Error(data.message || `HTTP error! Status: ${response.status}`); }
+                    return data;
+                } catch (error) {
+                    showToast(error.message, 'error');
+                    console.error('API Call Failed:', error);
+                    return { success: false };
+                }
+            }
+            
+            // --- MODAL HANDLING ---
+            function openModal(title, isDemerit, confirmAction) {
+                modalTitle.textContent = title;
+                modalComment.value = '';
+                modalComment.placeholder = isDemerit ? 'Enter REQUIRED demerit comment...' : 'Add optional comment...';
+                modalConfirmBtn.className = isDemerit ? 'btn-red' : 'btn-blue';
+                modalConfirmBtn.textContent = isDemerit ? 'Add Demerit' : 'Add Sign-off';
+                
+                state.currentModalAction = async () => {
+                    const comment = modalComment.value.trim();
+                    if (isDemerit && !comment) {
+                        showToast('A comment is required for a demerit.', 'error');
+                        return;
+                    }
+                    modalConfirmBtn.disabled = true;
+                    await confirmAction(comment);
+                    closeModal();
+                };
+                
+                modalOverlay.style.display = 'flex';
+                setupCharCounter(modalComment);
+                modalComment.focus();
+            }
+
+            function closeModal() {
+                modalOverlay.style.display = 'none';
+                state.currentModalAction = null;
+                 modalConfirmBtn.disabled = false;
+            }
+
+            modalConfirmBtn.addEventListener('click', () => {
+                if (state.currentModalAction) state.currentModalAction();
+            });
+            modalCancelBtn.addEventListener('click', closeModal);
+            modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
+            
+            // --- DATA & RENDERING ---
+            async function fetchData(listToUpdate) {
+                const body = {
+                    searchInProgress: state.inProgress.search,
+                    searchTrusted: state.trusted.search,
+                    pageInProgress: state.inProgress.page,
+                    pageTrusted: state.trusted.page,
+                };
+                const result = await apiCall(`/logi/data/${state.token}`, body);
+                if (result.success) {
+                    if (listToUpdate === 'inProgress' || listToUpdate === 'all') {
+                        state.inProgress = result.data.inProgress;
+                        renderInProgressList();
+                    }
+                    if (listToUpdate === 'trusted' || listToUpdate === 'all') {
+                        state.trusted = result.data.trusted;
+                        renderTrustedList();
+                    }
+                }
+            }
+
+            function renderInProgressList() {
+                const listEl = document.getElementById('in-progress-list');
+                listEl.innerHTML = '';
+                if (state.inProgress.pilots.length === 0) {
+                    listEl.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">No pilots found.</p>';
+                } else {
+                    state.inProgress.pilots.forEach(p => listEl.appendChild(createInProgressPilotElement(p)));
+                }
+                renderPagination('inProgress');
+            }
+            
+            function renderTrustedList() {
+                const listEl = document.getElementById('trusted-list');
+                listEl.innerHTML = '';
+                if (state.trusted.pilots.length === 0) {
+                     listEl.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">No pilots found.</p>';
+                } else {
+                    state.trusted.pilots.forEach(p => listEl.appendChild(createTrustedPilotElement(p)));
+                }
+                renderPagination('trusted');
+            }
+            
+            function renderPagination(listType) {
+                const data = state[listType];
+                const container = document.getElementById(`pagination-${listType}`);
+                container.innerHTML = '';
+                if (data.total <= data.limit) return;
+                const pageInfo = document.createElement('span');
+                const start = data.total > 0 ? Math.min((data.page - 1) * data.limit + 1, data.total) : 0;
+                const end = Math.min(data.page * data.limit, data.total);
+                pageInfo.textContent = `Showing ${start}-${end} of ${data.total}`;
+                const buttons = document.createElement('div');
+                buttons.style.display = 'flex'; buttons.style.gap = '0.5rem';
+                const prevBtn = document.createElement('button');
+                prevBtn.textContent = '◀ Prev';
+                prevBtn.disabled = data.page <= 1;
+                prevBtn.onclick = () => { state[listType].page--; fetchData(listType); };
+                const nextBtn = document.createElement('button');
+                nextBtn.textContent = 'Next ▶';
+                nextBtn.disabled = end >= data.total;
+                nextBtn.onclick = () => { state[listType].page++; fetchData(listType); };
+                buttons.append(prevBtn, nextBtn);
+                container.append(pageInfo, buttons);
+            }
+
+            // --- ELEMENT CREATION (REVISED) ---
+            const chevronSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
+
+            function createInProgressPilotElement(pilot) {
+                const card = document.createElement('div');
+                card.className = 'pilot-card';
+                const lastSignoff = pilot.signoffs.length > 0 ? pilot.signoffs[pilot.signoffs.length - 1] : null;
+
+                card.innerHTML = `
+                    <div class="status-bar status-inprogress"></div>
+                    <div class="pilot-card-content">
+                        <div class="pilot-card-main">
+                            <div class="pilot-info">
+                                <div class="pilot-name">${pilot.pilot_name}</div>
+                                ${lastSignoff ? `
+                                <div class="latest-comment-wrapper">
+                                    <div class="comment-bar status-inprogress"></div>
+                                    <div class="latest-comment"><strong>${lastSignoff.commander}:</strong> ${lastSignoff.comment || '<em>No comment</em>'}</div>
+                                </div>
+                                ` : '<div class="latest-comment"><em>Awaiting first sign-off.</em></div>'}
+                            </div>
+                            <div class="pilot-card-actions">
+                                <button class="btn-blue signoff-btn">Add Sign-off</button>
+                                ${pilot.signoffs.length > 0 ? `<button class="history-toggle-btn">${chevronSVG}</button>` : ''}
+                            </div>
+                        </div>
+                        <ul class="signoff-history" style="display: none;">
+                            ${pilot.signoffs.map(s => `<li><strong>${s.commander}</strong> (${formatDate(s.date)}): ${s.comment || '<em>No comment</em>'}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+
+                card.querySelector('.signoff-btn').addEventListener('click', () => {
+                    openModal(`Add Sign-off for ${pilot.pilot_name}`, false, async (comment) => {
+                        const result = await apiCall(`/logi/${state.token}`, { pilotName: pilot.pilot_name, commanderName: state.commanderName, comment });
+                        if (result.success) {
+                            showToast(result.message, 'success');
+                            await fetchData('all');
+                        }
+                    });
+                });
+                
+                const toggleBtn = card.querySelector('.history-toggle-btn');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', e => {
+                        e.preventDefault();
+                        const history = card.querySelector('.signoff-history');
+                        const isExpanded = history.style.display === 'block';
+                        history.style.display = isExpanded ? 'none' : 'block';
+                        toggleBtn.classList.toggle('expanded', !isExpanded);
+                    });
+                }
+                return card;
+            }
+
+            function createTrustedPilotElement(pilot) {
+                const card = document.createElement('div');
+                const demeritCount = pilot.demerits.length;
+                card.className = `pilot-card`;
+                const lastDemerit = demeritCount > 0 ? pilot.demerits[demeritCount - 1] : null;
+
+                card.innerHTML = `
+                    <div class="status-bar ${demeritCount > 0 ? 'status-demerit' : 'status-trusted'}"></div>
+                    <div class="pilot-card-content">
+                        <div class="pilot-card-main">
+                            <div class="pilot-info">
+                                <div class="pilot-name">${pilot.pilot_name}</div>
+                                ${lastDemerit ? `
+                                <div class="latest-comment-wrapper">
+                                    <div class="comment-bar status-demerit"></div>
+                                    <div class="latest-comment"><strong>Demerit from ${lastDemerit.commander}:</strong> ${lastDemerit.comment}</div>
+                                </div>
+                                ` : `<div class="latest-comment">Trusted since ${formatDate(pilot.added_at)}</div>`}
+                            </div>
+                            <div class="pilot-card-actions">
+                                <button class="btn-red demerit-btn">Add Demerit</button>
+                                <button class="history-toggle-btn">${chevronSVG}</button>
+                            </div>
+                        </div>
+                        <ul class="signoff-history" style="display:none;">
+                           <!-- History content here -->
+                        </ul>
+                    </div>
+                `;
+
+                function demeritsHtml(demerits) {
+                    if (!demerits || demerits.length === 0) return '';
+                    return `<br><lh style="color: var(--text-primary); font-weight: 600;">Demerits (${demerits.length}/2):</lh>
+                        ${demerits.map(d => `<li><strong>${d.commander}</strong> (${formatDate(d.date)}): ${d.comment}</li>`).join('')}`;
+                }
+
+                const signoffsHtml = pilot.signoffs && pilot.signoffs.length > 0
+                    ? `<lh style="color: var(--text-primary); font-weight: 600;">Original Sign-offs:</lh>` + pilot.signoffs.map(s => `<li><strong>${s.commander}</strong> (${formatDate(s.date)}): ${s.comment || '<em>No comment</em>'}</li>`).join('')
+                    : `<li><em>Sign-off history not recorded. Final sign-off by ${pilot.final_signoff_by}.</em></li>`;
+
+                card.querySelector('.signoff-history').innerHTML = signoffsHtml + demeritsHtml(pilot.demerits);
+
+                card.querySelector('.demerit-btn').addEventListener('click', () => {
+                    openModal(`Add Demerit for ${pilot.pilot_name}`, true, async (comment) => {
+                         const result = await apiCall(`/logi/demerit/${state.token}`, { pilotName: pilot.pilot_name, commanderName: state.commanderName, comment });
+                        if (result.success) {
+                            showToast(result.message, 'success');
+                            await fetchData('all');
+                        }
+                    });
+                });
+                
+                const toggleBtn = card.querySelector('.history-toggle-btn');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', e => {
+                        e.preventDefault();
+                        const history = card.querySelector('.signoff-history');
+                        const isExpanded = history.style.display === 'block';
+                        history.style.display = isExpanded ? 'none' : 'block';
+                        toggleBtn.classList.toggle('expanded', !isExpanded);
+                    });
+                }
+                return card;
+            }
+
+            // --- EVENT LISTENERS & INITIALIZATION ---
+            
+            async function validateNewPilot() { /* Unchanged */ }
+            newPilotNameInput.addEventListener('input', () => { /* Unchanged */ });
+            addNewPilotBtn.addEventListener('click', async (e) => { /* Unchanged */ });
+            searchInProgressInput.addEventListener('input', () => { /* Unchanged */ });
+            searchTrustedInput.addEventListener('input', () => { /* Unchanged */ });
+
+            // Re-paste the full functions from the previous EJS file for these helpers:
+            // validateNewPilot and the event listeners for inputs/buttons.
+            
+            // Full function definitions for copy-paste clarity
+            function setupCharCounter(textarea) {
+                const counter = textarea.nextElementSibling;
+                if (!counter || !counter.classList.contains('char-counter')) return;
+                const maxLength = textarea.maxLength;
+                const update = () => { counter.textContent = `${maxLength - textarea.value.length}`; };
+                textarea.addEventListener('input', update);
+                update();
+            }
+
+            async function validateNewPilot() {
+                const pilotName = newPilotNameInput.value.trim();
+                addNewPilotBtn.disabled = true;
+                if (!pilotName || pilotName.length < 3) { newPilotStatus.textContent = ''; return; }
+                newPilotStatus.textContent = 'Checking...';
+                newPilotStatus.className = 'validation-status checking';
+                const result = await apiCall('/logi/validate-char', { characterName: pilotName });
+                if (result.success) {
+                    newPilotNameInput.value = result.characterName;
+                    newPilotStatus.textContent = `✔ Valid: ${result.characterName}`;
+                    newPilotStatus.className = 'validation-status valid';
+                    addNewPilotBtn.disabled = false;
+                } else {
+                    newPilotStatus.textContent = `✖ Error: ${result.message}`;
+                    newPilotStatus.className = 'validation-status invalid';
+                }
+            }
+            newPilotNameInput.addEventListener('input', () => {
+                clearTimeout(state.validationTimeout);
+                state.validationTimeout = setTimeout(validateNewPilot, 500);
+            });
+            addNewPilotBtn.addEventListener('click', async (e) => {
+                e.target.disabled = true;
+                const pilotName = newPilotNameInput.value;
+                const comment = newPilotComment.value;
+                const result = await apiCall(`/logi/${state.token}`, { pilotName, commanderName: state.commanderName, comment });
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    newPilotNameInput.value = '';
+                    newPilotComment.value = '';
+                    newPilotStatus.textContent = '';
+                    setupCharCounter(newPilotComment);
+                    await fetchData('all');
+                }
+                validateNewPilot();
+            });
+            searchInProgressInput.addEventListener('input', () => {
+                clearTimeout(state.searchTimeout);
+                state.searchTimeout = setTimeout(() => {
+                    state.inProgress.search = searchInProgressInput.value;
+                    state.inProgress.page = 1;
+                    fetchData('inProgress');
+                }, 300);
+            });
+            searchTrustedInput.addEventListener('input', () => {
+                clearTimeout(state.searchTimeout);
+                state.searchTimeout = setTimeout(() => {
+                    state.trusted.search = searchTrustedInput.value;
+                    state.trusted.page = 1;
+                    fetchData('trusted');
+                }, 300);
+            });
+
+            // Initial setup
+            setupCharCounter(newPilotComment);
+            setupCharCounter(modalComment);
+            renderInProgressList();
+            renderTrustedList();
         });
     </script>
 </body>
