@@ -12,14 +12,14 @@
             --bg-primary: #1e293b;
             --bg-secondary: #334155;
             --bg-tertiary: #475569;
-            --bg-card: #0f172a; /* Darker card background from image */
+            --bg-card: #0f172a;
             --border-color: #475569;
             --text-primary: #e2e8f0;
             --text-secondary: #94a3b8;
             --accent-green: #22c55e;
             --accent-red: #ef4444;
-            --accent-blue: #3b82f6; /* Blue for signoff buttons from image */
-            --accent-orange: #f59e0b; /* Orange for demerit warning */
+            --accent-blue: #3b82f6;
+            --accent-orange: #f59e0b;
             --accent-yellow: #f59e0b;
         }
         *, *::before, *::after { box-sizing: border-box; }
@@ -65,6 +65,23 @@
         h2 { 
             font-size: 1.125rem; font-weight: 600; margin: 0 0 1.5rem 0; 
             border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; text-align: left;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+        }
+        
+        .panel-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #f8fafc;
+            margin: 0;
         }
         .form-group { margin-bottom: 1rem; position: relative; }
         label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); }
@@ -115,7 +132,7 @@
             margin-bottom: 0.75rem;
             position: relative;
             border: 1px solid var(--bg-tertiary);
-            overflow: hidden; /* To contain the border */
+            overflow: hidden;
         }
         .status-bar {
             position: absolute;
@@ -157,7 +174,6 @@
         .signoff-history li { margin-bottom: 0.25rem; color: var(--text-secondary); }
         .signoff-history strong { color: var(--text-primary); }
 
-        /* Modal Styles */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.7); display: none;
@@ -189,9 +205,28 @@
         .toast.error { background-color: var(--accent-red); color: white; }
         
         .pagination { 
-            display: flex; justify-content: space-between; align-items: center; 
-            margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary);
-            border-top: 1px solid var(--border-color); padding-top: 1rem;
+            display: flex; 
+            align-items: center; 
+            gap: 1rem;
+            font-size: 0.875rem; 
+            color: var(--text-secondary);
+        }
+        
+        .pagination-info {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        
+        .pagination-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .pagination-buttons button {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            min-width: auto;
         }
         
         .validation-status { font-size: 0.8rem; font-weight: 500; margin-top: 0.5rem; min-height: 1.2em; }
@@ -220,21 +255,25 @@
         </div>
 
         <div class="panel" id="in-progress-panel">
-            <h2>In-Progress Pilots</h2>
+            <div class="panel-header">
+                <h3 class="panel-title">In-Progress Pilots</h3>
+                <div class="pagination" id="pagination-in-progress"></div>
+            </div>
             <div class="search-bar">
                 <input type="text" id="search-in-progress" placeholder="Search in-progress...">
             </div>
             <div id="in-progress-list" class="pilot-list"></div>
-            <div class="pagination" id="pagination-in-progress"></div>
         </div>
 
         <div class="panel" id="trusted-panel">
-            <h2>Trusted Pilots</h2>
+            <div class="panel-header">
+                <h3 class="panel-title">Trusted Pilots</h3>
+                <div class="pagination" id="pagination-trusted"></div>
+            </div>
             <div class="search-bar">
                 <input type="text" id="search-trusted" placeholder="Search trusted...">
             </div>
             <div id="trusted-list" class="pilot-list"></div>
-            <div class="pagination" id="pagination-trusted"></div>
         </div>
     </div>
     
@@ -258,6 +297,40 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('=== DOM CONTENT LOADED ===');
+            
+            // Check if all required DOM elements exist
+            const requiredElements = [
+                'in-progress-list',
+                'trusted-list', 
+                'pagination-in-progress',
+                'pagination-trusted',
+                'new-pilot-name',
+                'new-pilot-status',
+                'add-new-pilot-btn',
+                'new-pilot-comment',
+                'search-in-progress',
+                'search-trusted'
+            ];
+            
+            console.log('=== DOM ELEMENTS CHECK ===');
+            const missingElements = [];
+            requiredElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    console.log(`✅ Found: ${id}`);
+                } else {
+                    console.error(`❌ Missing: ${id}`);
+                    missingElements.push(id);
+                }
+            });
+            
+            if (missingElements.length > 0) {
+                console.error('Missing required DOM elements:', missingElements);
+                return;
+            }
+            
+            console.log('✅ All required DOM elements found!');
             // --- STATE INITIALIZATION ---
             const state = {
                 token: "<%= token %>",
@@ -269,10 +342,23 @@
                 currentModalAction: null
             };
 
+            // Ensure search and page properties exist
+            if (!state.inProgress) state.inProgress = { pilots: [], total: 0, page: 1, limit: 10, search: '' };
+            if (!state.trusted) state.trusted = { pilots: [], total: 0, page: 1, limit: 10, search: '' };
+            
             state.inProgress.search = state.inProgress.search || '';
             state.inProgress.page = state.inProgress.page || 1;
+            state.inProgress.limit = state.inProgress.limit || 10; // Ensure limit defaults to 10
             state.trusted.search = state.trusted.search || '';
             state.trusted.page = state.trusted.page || 1;
+            state.trusted.limit = state.trusted.limit || 10; // Ensure limit defaults to 10
+
+            console.log('=== STATE INITIALIZATION ===');
+            console.log('Raw state from server:', state);
+            console.log('In-progress pilots count:', state.inProgress?.pilots?.length || 0);
+            console.log('Trusted pilots count:', state.trusted?.pilots?.length || 0);
+            console.log('In-progress pilots data:', state.inProgress?.pilots);
+            console.log('Trusted pilots data:', state.trusted?.pilots);
 
             const newPilotNameInput = document.getElementById('new-pilot-name');
             const newPilotStatus = document.getElementById('new-pilot-status');
@@ -345,7 +431,7 @@
                     }
                     modalConfirmBtn.disabled = true;
                     const result = await confirmAction(comment); 
-                    if (result.success) { // Check the success flag from the API response
+                    if (result && result.success) {
                         closeModal();
                     } else {
                         modalConfirmBtn.disabled = false;
@@ -377,72 +463,159 @@
                     pageInProgress: state.inProgress.page,
                     pageTrusted: state.trusted.page,
                 };
+                
+                console.log('Fetching data with body:', body);
+                
                 const result = await apiCall(`/logi/data/${state.token}`, body);
-                if (result.success) {
+                if (result && result.success) {
+                    console.log('Received data:', result.data);
+                    
                     if (listToUpdate === 'inProgress' || listToUpdate === 'all') {
+                        console.log('Updating in-progress state. Old:', state.inProgress.pilots?.length, 'New:', result.data.inProgress?.pilots?.length);
                         state.inProgress = { ...state.inProgress, ...result.data.inProgress };
+                        console.log('State after update:', state.inProgress);
                         renderInProgressList();
                     }
                     if (listToUpdate === 'trusted' || listToUpdate === 'all') {
+                        console.log('Updating trusted state. Old:', state.trusted.pilots?.length, 'New:', result.data.trusted?.pilots?.length);
                         state.trusted = { ...state.trusted, ...result.data.trusted };
+                        console.log('State after update:', state.trusted);
                         renderTrustedList();
                     }
+                } else {
+                    console.error('Failed to fetch data:', result?.message || 'Unknown error');
                 }
             }
 
             function renderInProgressList() {
+                console.log('=== RENDERING IN-PROGRESS LIST ===');
+                console.log('Current state.inProgress:', state.inProgress);
+                console.log('Pilots array:', state.inProgress?.pilots);
+                
                 const listEl = document.getElementById('in-progress-list');
+                if (!listEl) {
+                    console.error('Could not find in-progress-list element!');
+                    return;
+                }
+                
+                // Clear existing content
                 listEl.innerHTML = '';
-                if (!state.inProgress || state.inProgress.pilots.length === 0) {
+                
+                if (!state.inProgress || !state.inProgress.pilots || state.inProgress.pilots.length === 0) {
+                    console.log('No in-progress pilots to display');
                     listEl.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">No pilots found.</p>';
                 } else {
-                    state.inProgress.pilots.forEach(p => listEl.appendChild(createInProgressPilotElement(p)));
+                    console.log(`Rendering ${state.inProgress.pilots.length} in-progress pilots`);
+                    state.inProgress.pilots.forEach((pilot, index) => {
+                        console.log(`Creating element for pilot ${index + 1}:`, pilot.pilot_name);
+                        const element = createInProgressPilotElement(pilot);
+                        listEl.appendChild(element);
+                    });
                 }
                 renderPagination('inProgress');
+                console.log('=== IN-PROGRESS RENDERING COMPLETE ===');
             }
             
             function renderTrustedList() {
+                console.log('=== RENDERING TRUSTED LIST ===');
+                console.log('Current state.trusted:', state.trusted);
+                console.log('Pilots array:', state.trusted?.pilots);
+                
                 const listEl = document.getElementById('trusted-list');
+                if (!listEl) {
+                    console.error('Could not find trusted-list element!');
+                    return;
+                }
+                
+                // Clear existing content
                 listEl.innerHTML = '';
-                if (!state.trusted || state.trusted.pilots.length === 0) {
-                     listEl.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">No pilots found.</p>';
+                
+                if (!state.trusted || !state.trusted.pilots || state.trusted.pilots.length === 0) {
+                    console.log('No trusted pilots to display');
+                    listEl.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">No pilots found.</p>';
                 } else {
-                    state.trusted.pilots.forEach(p => listEl.appendChild(createTrustedPilotElement(p)));
+                    console.log(`Rendering ${state.trusted.pilots.length} trusted pilots`);
+                    state.trusted.pilots.forEach((pilot, index) => {
+                        console.log(`Creating element for pilot ${index + 1}:`, pilot.pilot_name);
+                        const element = createTrustedPilotElement(pilot);
+                        listEl.appendChild(element);
+                    });
                 }
                 renderPagination('trusted');
+                console.log('=== TRUSTED RENDERING COMPLETE ===');
             }
             
             function renderPagination(listType) {
                 const data = state[listType];
-                if (!data) return;
-                const container = document.getElementById(`pagination-${listType}`);
+                if (!data) {
+                    console.warn(`No data for listType: ${listType}`);
+                    return;
+                }
+                
+                const containerId = `pagination-${listType === 'inProgress' ? 'in-progress' : 'trusted'}`;
+                const container = document.getElementById(containerId);
+                
+                console.log(`Looking for pagination container: ${containerId}`);
+                console.log('Container found:', container);
+                
+                if (!container) {
+                    console.error(`Pagination container not found: ${containerId}`);
+                    return;
+                }
+                
                 container.innerHTML = '';
-                if (data.total <= data.limit) return;
+                
+                if (data.total <= data.limit) {
+                    console.log('Not enough items for pagination');
+                    // Still show the count even if no pagination needed
+                    if (data.total > 0) {
+                        const pageInfo = document.createElement('span');
+                        pageInfo.className = 'pagination-info';
+                        pageInfo.textContent = `${data.total} pilot${data.total !== 1 ? 's' : ''}`;
+                        container.appendChild(pageInfo);
+                    }
+                    return;
+                }
+                
                 const pageInfo = document.createElement('span');
+                pageInfo.className = 'pagination-info';
                 const start = data.total > 0 ? Math.min((data.page - 1) * data.limit + 1, data.total) : 0;
                 const end = Math.min(data.page * data.limit, data.total);
-                pageInfo.textContent = `Showing ${start}-${end} of ${data.total}`;
-                const buttons = document.createElement('div');
-                buttons.style.display = 'flex'; buttons.style.gap = '0.5rem';
+                pageInfo.textContent = `${start}-${end} of ${data.total}`;
+                
+                const buttonsContainer = document.createElement('div');
+                buttonsContainer.className = 'pagination-buttons';
+                
                 const prevBtn = document.createElement('button');
-                prevBtn.textContent = '◀ Prev';
+                prevBtn.textContent = '‹';
+                prevBtn.title = 'Previous Page';
                 prevBtn.disabled = data.page <= 1;
-                prevBtn.onclick = () => { state[listType].page--; fetchData(listType); };
+                prevBtn.onclick = () => { 
+                    state[listType].page--; 
+                    fetchData(listType); 
+                };
+                
                 const nextBtn = document.createElement('button');
-                nextBtn.textContent = 'Next ▶';
+                nextBtn.textContent = '›';
+                nextBtn.title = 'Next Page';
                 nextBtn.disabled = end >= data.total;
-                nextBtn.onclick = () => { state[listType].page++; fetchData(listType); };
-                buttons.append(prevBtn, nextBtn);
-                container.append(pageInfo, buttons);
+                nextBtn.onclick = () => { 
+                    state[listType].page++; 
+                    fetchData(listType); 
+                };
+                
+                buttonsContainer.append(prevBtn, nextBtn);
+                container.append(pageInfo, buttonsContainer);
             }
 
-            // --- ELEMENT CREATION (FIXED) ---
+            // --- ELEMENT CREATION ---
             const chevronSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
 
             function createInProgressPilotElement(pilot) {
                 const card = document.createElement('div');
                 card.className = 'pilot-card';
-                // Correctly filter the history array
+                
+                if (!pilot.history) pilot.history = [];
                 const signoffs = pilot.history.filter(h => h.type === 'signoff');
                 const lastHistoryItem = pilot.history.length > 0 ? pilot.history[pilot.history.length - 1] : null;
 
@@ -467,7 +640,7 @@
                         <ul class="signoff-history" style="display: none;">
                             ${pilot.history.map(s => {
                                 const typeClass = s.type === 'demerit' ? 'status-demerit' : 'status-inprogress';
-                                return `<li style="border-left: 3px solid var(--${typeClass}); padding-left: 8px;"><strong>${s.commander}</strong> (${formatDate(s.date)}): ${s.comment || '<em>No comment</em>'}</li>`
+                                return `<li style="border-left: 3px solid var(--accent-${s.type === 'demerit' ? 'orange' : 'blue'}); padding-left: 8px;"><strong>${s.commander}</strong> (${formatDate(s.date)}): ${s.comment || '<em>No comment</em>'}</li>`
                             }).join('')}
                         </ul>
                     </div>
@@ -475,14 +648,19 @@
 
                 card.querySelector('.signoff-btn').addEventListener('click', () => {
                     openModal(`Add Sign-off for ${pilot.pilot_name}`, false, async (comment) => {
+                        console.log('=== SIGNOFF ACTION STARTED ===');
                         const result = await apiCall(`/logi/${state.token}`, { pilotName: pilot.pilot_name, commanderName: state.commanderName, comment });
-                        if (result.success) {
+                        console.log('Signoff result:', result);
+                        
+                        if (result && result.success) {
                             showToast(result.message, 'success');
+                            console.log('=== FETCHING UPDATED DATA ===');
                             await fetchData('all');
+                            console.log('=== DATA FETCH COMPLETE ===');
                         } else {
-                            showToast(result.message, 'error');
+                            showToast(result?.message || 'Unknown error', 'error');
                         }
-                        return result; // Return full result object
+                        return result;
                     });
                 });
                 
@@ -501,7 +679,8 @@
 
             function createTrustedPilotElement(pilot) {
                 const card = document.createElement('div');
-                // Correctly filter the history array for demerits
+                
+                if (!pilot.history) pilot.history = [];
                 const demerits = pilot.history.filter(h => h.type === 'demerit');
                 const demeritCount = demerits.length;
                 card.className = `pilot-card`;
@@ -530,7 +709,7 @@
                            ${pilot.history.map(h => {
                                const typeClass = h.type === 'demerit' ? 'status-demerit' : 'status-inprogress';
                                const typeLabel = h.type === 'demerit' ? 'Demerit' : (h.type === 'signoff' ? 'Sign-off' : 'Comment');
-                               return `<li style="border-left: 3px solid var(--${typeClass}); padding-left: 8px;"><strong>${typeLabel} from ${h.commander}</strong> (${formatDate(h.date)}): ${h.comment || '<em>No comment</em>'}</li>`
+                               return `<li style="border-left: 3px solid var(--accent-${h.type === 'demerit' ? 'orange' : 'blue'}); padding-left: 8px;"><strong>${typeLabel} from ${h.commander}</strong> (${formatDate(h.date)}): ${h.comment || '<em>No comment</em>'}</li>`
                            }).join('')}
                         </ul>
                     </div>
@@ -538,12 +717,17 @@
                 
                 card.querySelector('.comment-btn').addEventListener('click', () => {
                     openModal(`Add Positive Comment for ${pilot.pilot_name}`, false, async (comment) => {
+                        console.log('=== COMMENT ACTION STARTED ===');
                         const result = await apiCall(`/logi/comment/${state.token}`, { pilotName: pilot.pilot_name, commanderName: state.commanderName, comment });
-                        if (result.success) {
+                        console.log('Comment result:', result);
+                        
+                        if (result && result.success) {
                             showToast(result.message, 'success');
+                            console.log('=== FETCHING UPDATED DATA (TRUSTED) ===');
                             await fetchData('trusted');
+                            console.log('=== DATA FETCH COMPLETE ===');
                         } else {
-                             showToast(result.message, 'error');
+                             showToast(result?.message || 'Unknown error', 'error');
                         }
                         return result;
                     });
@@ -551,12 +735,17 @@
 
                 card.querySelector('.demerit-btn').addEventListener('click', () => {
                     openModal(`Add Demerit for ${pilot.pilot_name}`, true, async (comment) => {
+                        console.log('=== DEMERIT ACTION STARTED ===');
                         const result = await apiCall(`/logi/demerit/${state.token}`, { pilotName: pilot.pilot_name, commanderName: state.commanderName, comment });
-                        if (result.success) {
+                        console.log('Demerit result:', result);
+                        
+                        if (result && result.success) {
                             showToast(result.message, result.demoted ? 'error' : 'success');
+                            console.log('=== FETCHING UPDATED DATA (ALL) ===');
                             await fetchData('all');
+                            console.log('=== DATA FETCH COMPLETE ===');
                         } else {
-                            showToast(result.message, 'error');
+                            showToast(result?.message || 'Unknown error', 'error');
                         }
                         return result;
                     });
@@ -593,28 +782,37 @@
                     newPilotStatus.className = 'validation-status invalid';
                 }
             }
+            
             newPilotNameInput.addEventListener('input', () => {
                 clearTimeout(state.validationTimeout);
                 state.validationTimeout = setTimeout(validateNewPilot, 500);
             });
+            
             addNewPilotBtn.addEventListener('click', async (e) => {
                 e.target.disabled = true;
                 const pilotName = newPilotNameInput.value;
                 const comment = newPilotComment.value;
+                
+                console.log('=== ADD NEW PILOT ACTION STARTED ===');
                 const result = await apiCall(`/logi/${state.token}`, { pilotName, commanderName: state.commanderName, comment });
-                if (result.success) {
+                console.log('Add pilot result:', result);
+                
+                if (result && result.success) {
                     showToast(result.message, 'success');
                     newPilotNameInput.value = '';
                     newPilotComment.value = '';
                     newPilotStatus.textContent = '';
                     setupCharCounter(newPilotComment);
+                    console.log('=== FETCHING UPDATED DATA (ALL) ===');
                     await fetchData('all');
+                    console.log('=== DATA FETCH COMPLETE ===');
                 } else {
-                     showToast(result.message, 'error');
+                     showToast(result?.message || 'Unknown error', 'error');
                 }
                 e.target.disabled = false;
                 validateNewPilot();
             });
+            
             searchInProgressInput.addEventListener('input', () => {
                 clearTimeout(state.searchTimeout);
                 state.searchTimeout = setTimeout(() => {
@@ -623,6 +821,7 @@
                     fetchData('inProgress');
                 }, 300);
             });
+            
             searchTrustedInput.addEventListener('input', () => {
                 clearTimeout(state.searchTimeout);
                 state.searchTimeout = setTimeout(() => {
@@ -635,17 +834,64 @@
             // Initial setup
             setupCharCounter(newPilotComment);
             setupCharCounter(modalComment);
+            
+            // Validate that we have data before rendering
+            console.log('=== PRE-RENDER VALIDATION ===');
+            console.log('state.inProgress:', state.inProgress);
+            console.log('state.trusted:', state.trusted);
+            
+            // Ensure state has pilot arrays
+            if (!state.inProgress.pilots) {
+                console.warn('No inProgress.pilots array, initializing empty array');
+                state.inProgress.pilots = [];
+            }
+            if (!state.trusted.pilots) {
+                console.warn('No trusted.pilots array, initializing empty array');
+                state.trusted.pilots = [];
+            }
+            
+            console.log('Final pilot counts before render:');
+            console.log('In-progress:', state.inProgress.pilots.length);
+            console.log('Trusted:', state.trusted.pilots.length);
+            
+            // Add a manual refresh button for debugging (remove in production)
+            const debugRefreshBtn = document.createElement('button');
+            debugRefreshBtn.textContent = 'Force Refresh Data';
+            debugRefreshBtn.style.position = 'fixed';
+            debugRefreshBtn.style.top = '10px';
+            debugRefreshBtn.style.right = '10px';
+            debugRefreshBtn.style.zIndex = '9999';
+            debugRefreshBtn.style.background = '#f59e0b';
+            debugRefreshBtn.style.color = 'white';
+            debugRefreshBtn.style.border = 'none';
+            debugRefreshBtn.style.padding = '8px 12px';
+            debugRefreshBtn.style.borderRadius = '4px';
+            debugRefreshBtn.style.cursor = 'pointer';
+            debugRefreshBtn.addEventListener('click', () => {
+                console.log('=== MANUAL REFRESH TRIGGERED ===');
+                fetchData('all');
+            });
+            document.body.appendChild(debugRefreshBtn);
+            
+            // Force initial render
+            console.log('=== FORCING INITIAL RENDER ===');
+            setTimeout(() => {
+                console.log('=== DELAYED RENDER ATTEMPT ===');
+                renderInProgressList();
+                renderTrustedList();
+            }, 100);
+            
+            // Initial render of lists
+            console.log('=== IMMEDIATE INITIAL RENDERING ===');
             renderInProgressList();
             renderTrustedList();
             
             // Auto-refresh data every 25 seconds
             setInterval(() => {
-                console.log('Auto-refreshing logi data...');
+                console.log('=== AUTO-REFRESH TRIGGERED ===');
                 fetchData('all');
             }, 25000); 
         });
     </script>
 </body>
 </html>
-
-

@@ -21,9 +21,27 @@ exports.showForm = (client) => async (req, res) => {
         // Fetch initial data for both lists
         const initialData = await logiManager.getSignoffData();
 
-        // Ensure the data passed to the template is always a valid object, even if empty.
-        const inProgressData = initialData.inProgress || { pilots: [], total: 0, page: 1, limit: 25 };
-        const trustedData = initialData.trusted || { pilots: [], total: 0, page: 1, limit: 25 };
+        // Ensure the data passed to the template is always a valid object with proper structure
+        const inProgressData = {
+            pilots: initialData.inProgress?.pilots || [],
+            total: initialData.inProgress?.total || 0,
+            page: initialData.inProgress?.page || 1,
+            limit: initialData.inProgress?.limit || 10, // Changed from 25 to 10
+            search: ''
+        };
+
+        const trustedData = {
+            pilots: initialData.trusted?.pilots || [],
+            total: initialData.trusted?.total || 0,
+            page: initialData.trusted?.page || 1,
+            limit: initialData.trusted?.limit || 10, // Changed from 25 to 10
+            search: ''
+        };
+
+        // Debug logging
+        console.log('Rendering logi form with data:');
+        console.log('In-progress pilots:', inProgressData.pilots.length);
+        console.log('Trusted pilots:', trustedData.pilots.length);
 
         res.render('logiForm', {
             token,
@@ -48,8 +66,14 @@ exports.handleSignoff = (client) => async (req, res) => {
     }
 
     const { pilotName, commanderName, comment } = req.body;
-    const result = await logiManager.addSignoff(pilotName, commanderName, comment, client);
-    res.json(result);
+
+    try {
+        const result = await logiManager.addSignoff(pilotName, commanderName, comment, client);
+        res.json(result);
+    } catch (error) {
+        logger.error('Error in handleSignoff:', error);
+        res.status(500).json({ success: false, message: 'An error occurred while processing the signoff.' });
+    }
 };
 
 /**
@@ -61,9 +85,16 @@ exports.handleDemerit = (client) => async (req, res) => {
     if (!client.activeLogiTokens?.has(token)) {
         return res.status(403).json({ success: false, message: 'This form session has expired. Please generate a new link in Discord.' });
     }
+
     const { pilotName, commanderName, comment } = req.body;
-    const result = await logiManager.addDemerit(pilotName, commanderName, comment, client);
-    res.json(result);
+
+    try {
+        const result = await logiManager.addDemerit(pilotName, commanderName, comment, client);
+        res.json(result);
+    } catch (error) {
+        logger.error('Error in handleDemerit:', error);
+        res.status(500).json({ success: false, message: 'An error occurred while processing the demerit.' });
+    }
 };
 
 /**
@@ -75,11 +106,17 @@ exports.handleTrustedComment = (client) => async (req, res) => {
     if (!client.activeLogiTokens?.has(token)) {
         return res.status(403).json({ success: false, message: 'This form session has expired. Please generate a new link in Discord.' });
     }
-    const { pilotName, commanderName, comment } = req.body;
-    const result = await logiManager.addTrustedComment(pilotName, commanderName, comment);
-    res.json(result);
-};
 
+    const { pilotName, commanderName, comment } = req.body;
+
+    try {
+        const result = await logiManager.addTrustedComment(pilotName, commanderName, comment);
+        res.json(result);
+    } catch (error) {
+        logger.error('Error in handleTrustedComment:', error);
+        res.status(500).json({ success: false, message: 'An error occurred while processing the comment.' });
+    }
+};
 
 /**
  * Handles real-time validation of a character name against ESI.
@@ -111,11 +148,32 @@ exports.getPaginatedData = (client) => async (req, res) => {
     if (!client.activeLogiTokens?.has(token)) {
         return res.status(403).json({ success: false, message: 'This form session has expired. Please refresh the page or generate a new link.' });
     }
+
     try {
         const data = await logiManager.getSignoffData(req.body);
-        res.json({ success: true, data });
+
+        // Ensure the response has the proper structure
+        const response = {
+            success: true,
+            data: {
+                inProgress: {
+                    pilots: data.inProgress?.pilots || [],
+                    total: data.inProgress?.total || 0,
+                    page: data.inProgress?.page || 1,
+                    limit: data.inProgress?.limit || 10 // Changed from 25 to 10
+                },
+                trusted: {
+                    pilots: data.trusted?.pilots || [],
+                    total: data.trusted?.total || 0,
+                    page: data.trusted?.page || 1,
+                    limit: data.trusted?.limit || 10 // Changed from 25 to 10
+                }
+            }
+        };
+
+        res.json(response);
     } catch (error) {
+        logger.error('Error in getPaginatedData:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch updated data.' });
     }
 };
-

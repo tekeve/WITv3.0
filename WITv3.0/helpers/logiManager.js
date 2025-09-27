@@ -17,7 +17,7 @@ async function getSignoffData(options = {}) {
         searchTrusted = '',
         pageInProgress = 1,
         pageTrusted = 1,
-        limit = 25
+        limit = 10
     } = options;
 
     const offsetInProgress = (pageInProgress - 1) * limit;
