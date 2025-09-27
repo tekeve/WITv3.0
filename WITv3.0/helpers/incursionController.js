@@ -139,8 +139,12 @@ async function fetchAndScheduleHighSecIncursion(client) {
 
     // Schedule the next check immediately after getting the expiry header.
     if (incursionsExpiry) {
-        const buffer = 1000; // Tighter 1-second buffer.
-        nextCheckDelay = (incursionsExpiry - Date.now()) + buffer;
+        const timeUntilExpiry = incursionsExpiry - Date.now();
+        // The goal is to check again immediately after the ESI cache expires.
+        // A small buffer is added to account for any minor clock drift or network latency,
+        // ensuring the old cache is truly gone when we make the next request.
+        const refreshBuffer = 1000; // 1 second in milliseconds
+        nextCheckDelay = timeUntilExpiry + refreshBuffer;
     }
     scheduleNextIncursionCheck(client, nextCheckDelay);
 

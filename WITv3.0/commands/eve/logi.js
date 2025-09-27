@@ -23,19 +23,15 @@ module.exports = {
             interaction.client.activeLogiTokens = new Map();
         }
 
+        const EXPIRATION_MINUTES = 60;
+        const expiryTimestamp = Date.now() + (EXPIRATION_MINUTES * 60 * 1000);
+
         interaction.client.activeLogiTokens.set(token, {
             user: interaction.user,
             member: interaction.member,
-            guildId: interaction.guild.id
+            guildId: interaction.guild.id,
+            expires: expiryTimestamp // Store expiry timestamp
         });
-
-        const EXPIRATION_MINUTES = 60;
-        setTimeout(() => {
-            if (interaction.client.activeLogiTokens.has(token)) {
-                logger.warn(`Logi Signoff Token ${token} for ${interaction.user.tag} has expired.`);
-                interaction.client.activeLogiTokens.delete(token);
-            }
-        }, EXPIRATION_MINUTES * 60 * 1000);
 
         const formUrl = `http://${process.env.HOST_NAME}/logi/${token}`;
 

@@ -5,6 +5,7 @@ const configManager = require('@helpers/configManager');
 const charManager = require('@helpers/characterManager');
 
 const SIGNOFFS_REQUIRED = 2;
+const DEMERITS_FOR_REMOVAL = 2;
 
 /**
  * Fetches paginated and searchable data for the logi signoff form.
@@ -38,7 +39,6 @@ async function getSignoffData(options = {}) {
         const parseHistory = (pilot) => {
             try {
                 pilot.history = pilot.history ? JSON.parse(pilot.history) : [];
-                // Ensure history is sorted by date, most recent last
                 pilot.history.sort((a, b) => new Date(a.date) - new Date(b.date));
             } catch (e) {
                 pilot.history = [];
@@ -116,10 +116,19 @@ async function addSignoff(pilotName, commanderName, comment, client) {
         const [pilot] = await db.query('SELECT * FROM logi_signoffs WHERE pilot_name = ?', [pilotName]);
 
         let currentHistory = pilot && pilot.history ? JSON.parse(pilot.history) : [];
-        const signoffsInHistory = currentHistory.filter(h => h.type === 'signoff');
 
-        if (signoffsInHistory.some(s => s.commander === commanderName)) {
-            return { success: false, message: `You have already signed off **${pilotName}**.` };
+        // Reset demerit count upon first new signoff after being demoted
+        const demeritsInHistory = currentHistory.filter(h => h.type === 'demerit').length;
+        if (demeritsInHistory >= DEMERITS_FOR_REMOVAL) {
+            currentHistory.push({ type: 'comment', commander: 'System', comment: 'Pilot sign-off process restarted.', date: new Date().toISOString() });
+        }
+
+        const signoffsSinceLastDemerit = currentHistory.slice(
+            (currentHistory.map(e => e.type).lastIndexOf('demerit') + 1)
+        ).filter(h => h.type === 'signoff');
+
+        if (signoffsSinceLastDemerit.some(s => s.commander === commanderName)) {
+            return { success: false, message: `You have already signed off **${pilotName}** since their last demerit.` };
         }
 
         const newEvent = { type: 'signoff', commander: commanderName, comment, date: new Date().toISOString() };
@@ -131,7 +140,9 @@ async function addSignoff(pilotName, commanderName, comment, client) {
             await db.query('INSERT INTO logi_signoffs (pilot_name, history) VALUES (?, ?)', [pilotName, JSON.stringify(currentHistory)]);
         }
 
-        const newSignoffCount = currentHistory.filter(h => h.type === 'signoff').length;
+        const newSignoffCount = currentHistory.slice(
+            (currentHistory.map(e => e.type).lastIndexOf('demerit') + 1)
+        ).filter(h => h.type === 'signoff').length;
 
         if (newSignoffCount >= SIGNOFFS_REQUIRED) {
             await db.query('DELETE FROM logi_signoffs WHERE pilot_name = ?', [pilotName]);
@@ -162,26 +173,37 @@ async function addDemerit(pilotName, commanderName, comment, client) {
             return { success: false, message: 'Could not find that trusted pilot.' };
         }
 
-        const currentHistory = pilot.history ? JSON.parse(pilot.history) : [];
-        const demeritsInHistory = currentHistory.filter(h => h.type === 'demerit');
+        let currentHistory = pilot.history ? JSON.parse(pilot.history) : [];
 
-        if (demeritsInHistory.some(d => d.commander === commanderName)) {
-            return { success: false, message: `You have already given a demerit to **${pilotName}**.` };
+        // Reset signoff count upon first new demerit after being trusted
+        const signoffsInHistory = currentHistory.filter(h => h.type === 'signoff').length;
+        if (signoffsInHistory >= SIGNOFFS_REQUIRED) {
+            currentHistory.push({ type: 'comment', commander: 'System', comment: 'Pilot demerit process started.', date: new Date().toISOString() });
+        }
+
+        const demeritsSinceLastSignoff = currentHistory.slice(
+            (currentHistory.map(e => e.type).lastIndexOf('signoff') + 1)
+        ).filter(h => h.type === 'demerit');
+
+        if (demeritsSinceLastSignoff.some(d => d.commander === commanderName)) {
+            return { success: false, message: `You have already given a demerit to **${pilotName}** since they were last trusted.` };
         }
 
         const newEvent = { type: 'demerit', commander: commanderName, comment, date: new Date().toISOString() };
         currentHistory.push(newEvent);
 
-        const newDemeritCount = currentHistory.filter(h => h.type === 'demerit').length;
+        const newDemeritCount = currentHistory.slice(
+            (currentHistory.map(e => e.type).lastIndexOf('signoff') + 1)
+        ).filter(h => h.type === 'demerit').length;
 
-        if (newDemeritCount >= SIGNOFFS_REQUIRED) {
+        if (newDemeritCount >= DEMERITS_FOR_REMOVAL) {
             await db.query('DELETE FROM trusted_pilots WHERE pilot_name = ?', [pilotName]);
             await db.query('INSERT INTO logi_signoffs (pilot_name, history) VALUES (?, ?)', [pilotName, JSON.stringify(currentHistory)]);
             await notifyCouncilOfDistrust(pilotName, currentHistory, client);
             return { success: true, message: `**${pilotName}** received a second demerit and has been moved back to the in-progress list.`, demoted: true };
         } else {
             await db.query('UPDATE trusted_pilots SET history = ? WHERE pilot_name = ?', [JSON.stringify(currentHistory), pilotName]);
-            return { success: true, message: `Demerit added for **${pilotName}**. They now have ${newDemeritCount}/${SIGNOFFS_REQUIRED} demerits.`, demoted: false };
+            return { success: true, message: `Demerit added for **${pilotName}**. They now have ${newDemeritCount}/${DEMERITS_FOR_REMOVAL} demerits.`, demoted: false };
         }
     } catch (error) {
         logger.error(`Error adding demerit for ${pilotName}:`, error);
@@ -203,13 +225,36 @@ async function addTrustedComment(pilotName, commanderName, comment) {
             return { success: false, message: 'Could not find that trusted pilot.' };
         }
         const currentHistory = pilot.history ? JSON.parse(pilot.history) : [];
-        const newEvent = { type: 'signoff', commander: commanderName, comment, date: new Date().toISOString() };
+        const newEvent = { type: 'comment', commander: commanderName, comment, date: new Date().toISOString() };
         currentHistory.push(newEvent);
         await db.query('UPDATE trusted_pilots SET history = ? WHERE pilot_name = ?', [JSON.stringify(currentHistory), pilotName]);
-        return { success: true, message: `Positive comment added for **${pilotName}**.` };
+        return { success: true, message: `Comment added for **${pilotName}**.` };
     } catch (error) {
         logger.error(`Error adding trusted comment for ${pilotName}:`, error);
         return { success: false, message: 'A database error occurred.' };
+    }
+}
+
+/**
+ * Permanently deletes a pilot from either the in_progress or trusted list.
+ * @param {string} pilotName The name of the pilot to delete.
+ * @param {string} listType The list the pilot is on ('inProgress' or 'trusted').
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+async function deletePilot(pilotName, listType) {
+    try {
+        const tableName = listType === 'inProgress' ? 'logi_signoffs' : 'trusted_pilots';
+        const result = await db.query(`DELETE FROM ${tableName} WHERE pilot_name = ?`, [pilotName]);
+
+        if (result.affectedRows > 0) {
+            logger.info(`Admin deleted pilot ${pilotName} from ${tableName}.`);
+            return { success: true, message: `Successfully deleted ${pilotName}.` };
+        } else {
+            return { success: false, message: `Could not find ${pilotName} in the specified list to delete.` };
+        }
+    } catch (error) {
+        logger.error(`Error deleting pilot ${pilotName}:`, error);
+        return { success: false, message: 'A database error occurred during deletion.' };
     }
 }
 
@@ -260,6 +305,7 @@ module.exports = {
     addSignoff,
     addDemerit,
     addTrustedComment,
+    deletePilot,
     validateCharacter: charManager.getCharacterDetails
 };
 

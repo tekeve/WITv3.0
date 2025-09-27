@@ -13,6 +13,7 @@ module.exports = (client) => {
     router.post('/logi/data/:token', logiController.getPaginatedData(client));
     router.post('/logi/demerit/:token', logiController.handleDemerit(client));
     router.post('/logi/comment/:token', logiController.handleTrustedComment(client));
+    router.post('/logi/delete/:token', logiController.handleDeletePilot(client));
 
     // Routes for displaying and handling the main form submission for in-progress pilots
     router.get('/logi/:token', logiController.showForm(client));
@@ -20,4 +21,3 @@ module.exports = (client) => {
 
     return router;
 };
-
