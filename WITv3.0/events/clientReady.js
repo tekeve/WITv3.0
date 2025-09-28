@@ -21,6 +21,6 @@ module.exports = {
 
 		// Initialize and start GitHub watcher with a standard interval
 		await githubWatcher.initializeLastSha();
-		setInterval(() => githubWatcher.checkGithubForUpdates(client), 5 * 60 * 1000); // Check every 5 minutes
+		setInterval(() => githubWatcher.checkGithubForUpdates(client), 2 * 60 * 1000); // Check every 5 minutes
 	},
 };

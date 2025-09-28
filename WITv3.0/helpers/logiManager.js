@@ -79,14 +79,21 @@ async function notifyCouncilOfPass(pilotName, history, client) {
         const channel = await client.channels.fetch(channelId);
         const councilRoles = config.councilRoles || [];
         const roleMentions = councilRoles.map(id => `<@&${id}>`).join(' ');
-        const signoffCommanders = [...new Set(history.filter(h => h.type === 'signoff').map(h => h.commander))];
+
+        const historyString = history.map(h => {
+            const typeEmoji = h.type === 'signoff' ? '✅' : (h.type === 'demerit' ? '❌' : '💬');
+            const comment = h.comment ? `"${h.comment}"` : '*No comment*';
+            return `${typeEmoji} **${h.commander}**: ${comment}`;
+        }).join('\n');
+
+        const finalHistoryString = historyString.length > 1024 ? historyString.substring(0, 1021) + '...' : historyString;
 
         const embed = new EmbedBuilder()
             .setColor(0x57F287) // Green
             .setTitle('✅ New Trusted Logistics Pilot')
             .setDescription(`**${pilotName}** has completed their logistics sign-offs and is now trusted.`)
             .addFields(
-                { name: 'Signed off by', value: signoffCommanders.join(', ') || 'N/A' }
+                { name: 'Full Sign-off History', value: finalHistoryString || 'No history recorded.' }
             )
             .setTimestamp();
 
@@ -278,20 +285,21 @@ async function notifyCouncilOfDistrust(pilotName, history, client) {
         const channel = await client.channels.fetch(channelId);
         const councilRoles = config.councilRoles || [];
         const roleMentions = councilRoles.map(id => `<@&${id}>`).join(' ');
-        const demerits = history.filter(h => h.type === 'demerit');
+
+        const historyString = history.map(h => {
+            const typeEmoji = h.type === 'signoff' ? '✅' : (h.type === 'demerit' ? '❌' : '💬');
+            const comment = h.comment ? `"${h.comment}"` : '*No comment*';
+            return `${typeEmoji} **${h.commander}**: ${comment}`;
+        }).join('\n');
+
+        const finalHistoryString = historyString.length > 1024 ? historyString.substring(0, 1021) + '...' : historyString;
 
         const embed = new EmbedBuilder()
             .setColor(0xED4245) // Red
             .setTitle('❌ Logi Pilot No Longer Trusted')
             .setDescription(`**${pilotName}** has received two demerits and has been moved back to the in-progress list for re-evaluation.`)
+            .addFields({ name: 'Full History', value: finalHistoryString || 'No history recorded.' })
             .setTimestamp();
-
-        demerits.forEach((demerit, index) => {
-            embed.addFields({
-                name: `Demerit #${index + 1} by ${demerit.commander}`,
-                value: `*${demerit.comment}*`
-            });
-        });
 
         await channel.send({ content: roleMentions, embeds: [embed] });
         logger.success(`Sent distrust notification for ${pilotName}.`);

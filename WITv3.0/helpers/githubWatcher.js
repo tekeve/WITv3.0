@@ -9,22 +9,38 @@ let lastKnownShas = {};
 
 /**
  * Initializes the last known SHAs from the database on startup.
+ * This version is more robust against malformed data.
  */
 async function initializeLastSha() {
     try {
         const rows = await db.query("SELECT value FROM config WHERE key_name = 'lastCommitSha'");
         if (rows.length > 0 && rows[0].value) {
-            // The value is stored as a JSON string representing an object
-            lastKnownShas = JSON.parse(rows[0].value);
-            logger.info(`Initialized last known commit SHAs from DB:`, lastKnownShas);
+            let parsedValue;
+            try {
+                parsedValue = JSON.parse(rows[0].value);
+            } catch (e) {
+                logger.error('Failed to parse lastCommitSha JSON from DB. Value was:', rows[0].value);
+                lastKnownShas = {};
+                return;
+            }
+
+            // Ensure the parsed value is a non-null object
+            if (typeof parsedValue === 'object' && parsedValue !== null && !Array.isArray(parsedValue)) {
+                lastKnownShas = parsedValue;
+                logger.info(`Initialized last known commit SHAs from DB:`, lastKnownShas);
+            } else {
+                logger.warn(`lastCommitSha in DB is not a valid object. Resetting. Value was:`, parsedValue);
+                lastKnownShas = {};
+            }
         } else {
-            lastKnownShas = {}; // Initialize as an empty object if not found
+            lastKnownShas = {}; // Initialize as an empty object if not found in DB
         }
     } catch (error) {
         logger.error('Failed to initialize last commit SHAs from database:', error);
         lastKnownShas = {}; // Reset on error to be safe
     }
 }
+
 
 /**
  * Saves the latest commit SHAs object to the database.
@@ -48,9 +64,15 @@ async function saveLastShas(shas) {
 async function checkGithubForUpdates(client) {
     const config = configManager.get();
     const repoUrl = config.githubRepoUrl ? config.githubRepoUrl[0] : null;
-    const branches = config.githubBranch || []; // Expecting an array of branches
+    let branches = config.githubBranch || []; // Expecting an array
     const channelId = config.githubChannelId ? config.githubChannelId[0] : null;
     const githubToken = process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
+
+    // Defensively ensure 'branches' is an array.
+    if (!Array.isArray(branches)) {
+        logger.warn(`'githubBranch' config is not an array. It is: ${JSON.stringify(branches)}. Treating as a single-item array.`);
+        branches = [String(branches)];
+    }
 
     if (!repoUrl || !channelId || branches.length === 0) {
         logger.warn('GitHub watcher is missing repository URL, channel ID, or branches in config.');
@@ -85,10 +107,9 @@ async function checkGithubForUpdates(client) {
 
             const lastShaForBranch = lastKnownShas[branch];
 
-            // If we have a SHA for this branch and it's different from the latest one
+            // If we have a SHA for this branch and it's different from the latest one, post a notification.
             if (lastShaForBranch && lastShaForBranch !== latestCommit.sha) {
                 logger.info(`New commit found on branch '${branch}': ${latestCommit.sha}`);
-                hasChanges = true;
 
                 const channel = await client.channels.fetch(channelId);
                 if (channel) {
@@ -111,7 +132,7 @@ async function checkGithubForUpdates(client) {
                 }
             }
 
-            // Update the last known SHA for this branch
+            // Update the last known SHA for this branch if it's new or has changed.
             if (lastKnownShas[branch] !== latestCommit.sha) {
                 lastKnownShas[branch] = latestCommit.sha;
                 hasChanges = true;
@@ -136,3 +157,4 @@ module.exports = {
     checkGithubForUpdates,
     initializeLastSha,
 };
+
