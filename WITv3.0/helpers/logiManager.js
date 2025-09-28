@@ -27,14 +27,14 @@ async function getSignoffData(options = {}) {
     const searchTrustedWildcard = `%${searchTrusted}%`;
 
     try {
-        const [inProgressCountResult] = await db.query('SELECT COUNT(*) as count FROM logi_signoffs WHERE pilot_name LIKE ?', [searchInProgressWildcard]);
-        const [trustedCountResult] = await db.query('SELECT COUNT(*) as count FROM trusted_pilots WHERE pilot_name LIKE ?', [searchTrustedWildcard]);
+        const [inProgressCountResult] = await db.query('SELECT COUNT(*) as count FROM logi_signoffs WHERE pilot_name LIKE ? OR history LIKE ?', [searchInProgressWildcard, searchInProgressWildcard]);
+        const [trustedCountResult] = await db.query('SELECT COUNT(*) as count FROM trusted_pilots WHERE pilot_name LIKE ? OR history LIKE ?', [searchTrustedWildcard, searchTrustedWildcard]);
 
         const totalInProgress = inProgressCountResult.count;
         const totalTrusted = trustedCountResult.count;
 
-        const inProgress = await db.query('SELECT id, pilot_name, history, created_at FROM logi_signoffs WHERE pilot_name LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?', [searchInProgressWildcard, limit, offsetInProgress]);
-        const trusted = await db.query('SELECT pilot_name, added_at, history FROM trusted_pilots WHERE pilot_name LIKE ? ORDER BY added_at DESC LIMIT ? OFFSET ?', [searchTrustedWildcard, limit, offsetTrusted]);
+        const inProgress = await db.query('SELECT id, pilot_name, history, created_at FROM logi_signoffs WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?', [searchInProgressWildcard, searchInProgressWildcard, limit, offsetInProgress]);
+        const trusted = await db.query('SELECT pilot_name, added_at, history FROM trusted_pilots WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY added_at DESC LIMIT ? OFFSET ?', [searchTrustedWildcard, searchTrustedWildcard, limit, offsetTrusted]);
 
         const parseHistory = (pilot) => {
             try {
@@ -300,12 +300,21 @@ async function notifyCouncilOfDistrust(pilotName, history, client) {
     }
 }
 
+/**
+ * Validates a character name against ESI by proxying charManager.
+ * @param {string} characterName The name of the character.
+ * @returns {Promise<object|null>}
+ */
+async function validateCharacter(characterName) {
+    return charManager.getCharacterDetails(characterName);
+}
+
 module.exports = {
     getSignoffData,
     addSignoff,
     addDemerit,
     addTrustedComment,
     deletePilot,
-    validateCharacter: charManager.getCharacterDetails
+    validateCharacter
 };
 

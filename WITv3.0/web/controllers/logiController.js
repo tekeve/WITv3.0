@@ -1,4 +1,4 @@
-const logger = require('@helpers/logger');
+﻿const logger = require('@helpers/logger');
 const logiManager = require('@helpers/logiManager');
 const charManager = require('@helpers/characterManager');
 const roleManager = require('@helpers/roleManager');
@@ -159,7 +159,7 @@ exports.handleDeletePilot = (client) => async (req, res) => {
 /**
  * Handles real-time validation of a character name against ESI.
  */
-exports.validateCharacter = () => async (req, res) => {
+exports.validateCharacter = async (req, res) => {
     const { characterName } = req.body;
     if (!characterName || characterName.trim().length < 3) {
         return res.json({ success: false, message: 'Name is too short.' });
@@ -217,3 +217,4 @@ exports.getPaginatedData = (client) => async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to fetch updated data.' });
     }
 };
+

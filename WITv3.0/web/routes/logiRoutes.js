@@ -9,7 +9,7 @@ const logiController = require('../controllers/logiController');
  */
 module.exports = (client) => {
     // These specific API routes MUST be defined before the generic /:token route
-    router.post('/logi/validate-char', logiController.validateCharacter());
+    router.post('/logi/validate-char', logiController.validateCharacter);
     router.post('/logi/data/:token', logiController.getPaginatedData(client));
     router.post('/logi/demerit/:token', logiController.handleDemerit(client));
     router.post('/logi/comment/:token', logiController.handleTrustedComment(client));
@@ -21,3 +21,4 @@ module.exports = (client) => {
 
     return router;
 };
+
