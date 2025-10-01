@@ -29,6 +29,7 @@ async function getCharacterDetails(characterName) {
 }
 
 module.exports = {
+    getCharacterDetails,
     /**
      * Adds a main character for a Discord user.
      * @param {string} discordId - The user's Discord ID.
@@ -148,11 +149,27 @@ module.exports = {
      * @returns {Promise<{main: object, alts: object[]}|null>}
      */
     getChars: async (discordId) => {
-        const rows = await db.query('SELECT character_id, character_name, is_main FROM users WHERE discord_id = ?', [discordId]);
+        const rows = await db.query('SELECT character_id, character_name, is_main, roles FROM users WHERE discord_id = ?', [discordId]);
         if (rows.length === 0) return null;
 
         const main = rows.find(r => r.is_main);
         const alts = rows.filter(r => !r.is_main);
+
+        // FIX: Ensure roles are parsed from JSON string if they exist, and handle nulls
+        if (main) {
+            if (main.roles && typeof main.roles === 'string') {
+                try {
+                    main.roles = JSON.parse(main.roles);
+                } catch (e) {
+                    logger.error(`Failed to parse roles JSON for user ${discordId}:`, main.roles);
+                    main.roles = []; // Default to empty array on parse error
+                }
+            } else {
+                // If main.roles is null, undefined, or not a string, ensure it's an empty array.
+                main.roles = [];
+            }
+        }
+
         return { main, alts };
     },
 
@@ -207,3 +224,4 @@ module.exports = {
         return await db.query(sql);
     },
 };
+

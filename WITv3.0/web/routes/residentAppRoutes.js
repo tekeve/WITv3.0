@@ -8,7 +8,11 @@ const residentAppController = require('../controllers/residentAppController');
  * @returns The configured Express router.
  */
 module.exports = (client) => {
-    // Corrected to use the exported 'showForm' and 'handleSubmission' functions
+    // Specific routes must be defined BEFORE generic routes with parameters.
+    // This ensures that a request to '/residentapp/validate-char' is not captured by '/residentapp/:token'.
+    router.post('/residentapp/validate-char', residentAppController.validateCharacter());
+
+    // Routes for displaying and handling the main form submission.
     router.get('/residentapp/:token', residentAppController.showForm(client));
     router.post('/residentapp/:token', residentAppController.handleSubmission(client));
 

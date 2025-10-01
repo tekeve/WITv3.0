@@ -2,16 +2,16 @@ const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { v4: uuidv4 } = require('uuid');
 const configManager = require('@helpers/configManager');
 const logger = require('@helpers/logger');
+const roleManager = require('@helpers/roleManager');
 
 module.exports = {
-    permission: 'public', // Changed to public to allow initial setup
+    permission: 'admin', // Only admins can initiate setup.
     data: new SlashCommandBuilder()
         .setName('setup')
-        .setDescription('Generates a unique link to perform initial bot setup.'),
+        .setDescription('Generates a link to perform or edit the bot setup (owner-only after first run).'),
     async execute(interaction) {
         const config = configManager.get();
-        // Check if config exists and if setupLocked is a truthy value
-        const isSetupLocked = config && config.setupLocked && config.setupLocked.includes("true");
+        const isSetupComplete = config && config.setupLocked && config.setupLocked.includes("true");
 
         // After the first setup, only the server owner or an admin can run this command again.
         if (isSetupComplete && (interaction.user.id !== interaction.guild.ownerId && !roleManager.isAdmin(interaction.member))) {
@@ -41,6 +41,7 @@ module.exports = {
 
         // Construct the full URL for the setup form
         const formUrl = `http://${process.env.HOST_NAME}/setup/${token}`;
+        const actionWord = isSetupComplete ? "Edit Configuration" : "Open Setup Form";
 
         // Reply to the user with a button linking to the form
         await interaction.reply({
@@ -51,7 +52,7 @@ module.exports = {
                     components: [
                         {
                             type: 2, // Button
-                            label: 'Open Setup Form',
+                            label: actionWord,
                             style: 5, // Link Style
                             url: formUrl
                         }
@@ -62,4 +63,3 @@ module.exports = {
         });
     },
 };
-

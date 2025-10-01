@@ -83,3 +83,33 @@ exports.handleSubmission = (client) => async (req, res) => {
     });
 };
 
+
+/**
+ * Handles real-time validation of a character name against the ESI.
+ * @returns An async function to handle the POST request.
+ */
+exports.validateCharacter = () => async (req, res) => {
+    // The web form will send a JSON body, so we need express.json() middleware in server.js
+    const { characterName } = req.body;
+
+    if (!characterName || characterName.trim().length < 3) {
+        return res.json({ success: false, message: 'Name is too short.' });
+    }
+
+    try {
+        const charDetails = await charManager.getCharacterDetails(characterName);
+
+        if (charDetails) {
+            // Character found, return success and the correctly capitalized name
+            res.json({ success: true, characterName: charDetails.character_name });
+        } else {
+            // Character not found by ESI
+            res.json({ success: false, message: 'Character not found in EVE Online.' });
+        }
+    } catch (error) {
+        // Handle potential ESI errors (e.g., 503, timeout)
+        logger.error(`ESI validation error for character "${characterName}":`, error.message);
+        res.status(500).json({ success: false, message: 'Could not contact ESI. Please try again.' });
+    }
+};
+

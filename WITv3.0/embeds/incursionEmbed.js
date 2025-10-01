@@ -26,7 +26,7 @@ function formatDuration(seconds) {
 /**
  * Builds the embed for an active high-sec incursion.
  * @param {object} highSecIncursion - The incursion data from ESI.
- * @param {object} state - The current stored state from the database.
+ * @param {object} state - The current stored state from the database, now including routeData.
  * @param {object} config - The bot's configuration object.
  * @param {boolean} isUsingMock - Whether mock data is being used.
  * @param {object} mockOverride - The mock data object.
@@ -37,33 +37,13 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
     const spawnData = incursionSystems.find(c => c.Constellation_id === highSecIncursion.constellation_id);
     if (!spawnData) throw new Error(`No matching spawn data for Constellation ID: ${highSecIncursion.constellation_id}`);
 
-    const currentHqId = spawnData.dock_up_system_id;
     const hqSystemFullName = spawnData.headquarters_system;
     const hqSystemName = hqSystemFullName.split(' (')[0];
 
-    const jumpPromises = Object.entries(config.tradeHubs).map(async ([name, id]) => {
-        const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${name}:${hqSystemName}:secure`;
-        const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${name}:${hqSystemName}:shortest`;
-        const secureEsiUrl = `/route/${id}/${currentHqId}/?flag=secure`;
-        const shortestEsiUrl = `/route/${id}/${currentHqId}/?flag=shortest`;
-        try {
-            const [secureResObj, shortestResObj] = await Promise.all([
-                esiService.get({ endpoint: secureEsiUrl, caller: __filename }),
-                esiService.get({ endpoint: shortestEsiUrl, caller: __filename })
-            ]);
-            const secureJumps = Array.isArray(secureResObj.data) ? secureResObj.data.length - 1 : NaN;
-            const shortestJumps = Array.isArray(shortestResObj.data) ? shortestResObj.data.length - 1 : NaN;
-            if (isNaN(secureJumps) || isNaN(shortestJumps)) return { name, jumps: 'N/A' };
+    // Use pre-calculated route data from the state object.
+    const tradeHubJumpsString = state.routeData?.tradeHubRoutes || 'Calculating...';
+    const routeFromLastHqString = state.routeData?.lastHqRoute;
 
-            if (secureJumps === shortestJumps) {
-                return { name, jumps: `[${secureJumps}j (safest)](${secureGatecheckUrl})` };
-            }
-            return { name, jumps: `[${secureJumps}j (safest)](${secureGatecheckUrl}) / [${shortestJumps}j (shortest)](${shortestGatecheckUrl})` };
-        } catch { return { name, jumps: 'N/A' }; }
-    });
-
-    const jumpCounts = await Promise.all(jumpPromises);
-    const tradeHubJumpsString = jumpCounts.map(hub => `**${hub.name}**:\n${hub.jumps}`).join('\n');
     const formatSystemLinks = (systemString) => !systemString ? 'None' : systemString.split(',').map(name => `[${name.trim()}](https://evemaps.dotlan.net/system/${encodeURIComponent(name.trim())})`).join(', ');
 
     const timelineParts = [];
@@ -100,53 +80,9 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
         { name: 'Routes from Trade Hubs', value: tradeHubJumpsString, inline: true }
     ];
 
-    if (state.lastHqSystemId && state.lastHqSystemId !== currentHqId) {
-        let routeString = 'N/A';
-        const lastHqNameData = incursionSystems.find(sys => Number(sys.dock_up_system_id) === state.lastHqSystemId);
-
-        if (lastHqNameData) {
-            const lastHqName = lastHqNameData.headquarters_system.split(' (')[0];
-            const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${hqSystemName}:secure`;
-            const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${hqSystemName}:shortest`;
-            const secureEsiUrl = `/route/${state.lastHqSystemId}/${currentHqId}/?flag=secure`;
-            const shortestEsiUrl = `/route/${state.lastHqSystemId}/${currentHqId}/?flag=shortest`;
-
-            try {
-                const results = await Promise.allSettled([
-                    esiService.get({ endpoint: secureEsiUrl, caller: __filename }),
-                    esiService.get({ endpoint: shortestEsiUrl, caller: __filename })
-                ]);
-
-                const secureRes = results[0].status === 'fulfilled' ? results[0].value.data : null;
-                const shortestRes = results[1].status === 'fulfilled' ? results[1].value.data : null;
-
-                const secureJumps = Array.isArray(secureRes) ? secureRes.length - 1 : null;
-                const shortestJumps = Array.isArray(shortestRes) ? shortestRes.length - 1 : null;
-
-                if (secureJumps !== null && secureJumps === shortestJumps) {
-                    routeString = `**${lastHqName}**: [${secureJumps}j (safest)](${secureGatecheckUrl})`;
-                } else {
-                    const parts = [];
-                    if (secureJumps !== null) {
-                        parts.push(`[${secureJumps}j (safest)](${secureGatecheckUrl})`);
-                    }
-                    if (shortestJumps !== null) {
-                        parts.push(`[${shortestJumps}j (shortest)](${shortestGatecheckUrl})`);
-                    }
-
-                    if (parts.length > 0) {
-                        routeString = `**${lastHqName}**: ${parts.join(' / ')}`;
-                    } else {
-                        routeString = `**${lastHqName}**: No Stargate Route`;
-                    }
-                }
-            } catch (error) {
-                logger.error(`Unexpected error in route calculation: ${error.message}`);
-                routeString = `**${lastHqName}**: Error`;
-            }
-        }
+    if (routeFromLastHqString) {
         fields.push({ name: '\u200B', value: '\u200B', inline: true }); // Spacer
-        fields.push({ name: 'Route from Last HQ', value: routeString, inline: true });
+        fields.push({ name: 'Route from Last HQ', value: routeFromLastHqString, inline: true });
     }
 
     embed.addFields(fields)
@@ -184,9 +120,11 @@ function buildNoIncursionEmbed(state) {
         if (stats.establishedPhase) {
             statsFields.push(`**Established Phase**: ${stats.establishedPhase}`);
         }
-        if (stats.mobilizingPhase) {
-            statsFields.push(`**Mobilizing Phase**: ${stats.mobilizingPhase}`);
-        }
+        /**
+         * if (stats.mobilizingPhase) {
+         * statsFields.push(`**Mobilizing Phase**: ${stats.mobilizingPhase}`);
+         * }
+         */
         if (stats.withdrawingPeriodUsed) {
             statsFields.push(`**Withdrawing Period Used**: ${stats.withdrawingPeriodUsed}`);
         }

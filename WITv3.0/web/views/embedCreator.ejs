@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -32,10 +32,10 @@
 
         .main-content {
             display: flex;
-            flex-wrap: wrap; /* Allow wrapping for smaller screens */
+            flex-wrap: wrap;
             gap: 2rem;
             width: 100%;
-            max-width: 1400px;
+            max-width: 1800px; /* Increased max width */
             margin: auto;
         }
 
@@ -48,15 +48,18 @@
         }
 
         .editor-panel {
-            flex: 3;
-            min-width: 500px; /* Minimum width for the editor */
+            flex: 2; /* Reduced flex factor */
+            min-width: 450px;
         }
 
         .preview-panel {
-            flex: 2;
-            min-width: 350px;
+            flex: 3; /* Increased flex factor */
+            min-width: 400px;
             position: sticky;
             top: 2rem;
+            align-self: flex-start; /* Important for sticky positioning in a flex container */
+            max-height: calc(100vh - 4rem); /* Prevents the panel from being taller than the screen */
+            overflow-y: auto; /* Allows the content inside the preview to scroll if needed */
         }
 
         h1, h2 {
@@ -65,36 +68,36 @@
             padding-bottom: 0.5rem;
             margin-top: 0;
         }
-        h2 { font-size: 1.25rem; margin-top: 1.5rem; }
+        h2 { font-size: 1.1rem; margin-top: 1.5rem; }
 
-        .form-group { margin-bottom: 1rem; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; }
+        .form-group { margin-bottom: 0.75rem; } /* Reduced margin */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        label { display: block; margin-bottom: 0.25rem; font-size: 0.8rem; font-weight: 500; }
         input[type="text"], input[type="url"], textarea, select {
             width: 100%;
-            padding: 0.75rem;
+            padding: 0.5rem; /* Reduced padding */
             border-radius: 0.375rem;
             background-color: var(--bg-primary);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            font-size: 1rem;
+            font-size: 0.9rem; /* Reduced font size */
             box-sizing: border-box;
         }
-        textarea { resize: vertical; min-height: 100px; }
+        textarea { resize: vertical; min-height: 80px; }
         
         .color-input-wrapper { display: flex; align-items: center; gap: 0.5rem; }
-        input[type="color"] { padding: 0; height: 40px; border-radius: 0.375rem; cursor: pointer; background-color: transparent; border: none; }
-        input[type="checkbox"] { width: 1.25rem; height: 1.25rem; }
+        input[type="color"] { padding: 0; height: 34px; border-radius: 0.375rem; cursor: pointer; background-color: transparent; border: none; }
+        input[type="checkbox"] { width: 1.1rem; height: 1.1rem; }
         .readonly { background-color: var(--bg-tertiary) !important; cursor: not-allowed; }
 
         .fields-container .field {
             background-color: var(--bg-primary);
-            padding: 1rem;
+            padding: 0.75rem;
             border-radius: 0.5rem;
-            margin-bottom: 1rem;
-            border: 1px solid var(--border-color);
+            margin-bottom: 0.75rem;
+            border: 1px solid #64748b;
         }
-        .field-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .field-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
         .field-header span { font-weight: bold; }
         
         button {
@@ -106,6 +109,12 @@
             cursor: pointer;
             transition: background-color 0.2s;
         }
+
+        .btn-sm, .field-buttons button, .field-header .btn-remove {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+        }
+
         .btn-add { background-color: var(--accent-primary); color: white; }
         .btn-add:hover { background-color: var(--accent-hover); }
         .btn-remove { background-color: var(--danger); color: white; }
@@ -115,7 +124,22 @@
         .btn-send { background-color: var(--success); color: white; }
         .btn-send:hover { background-color: #16a34a; }
 
-        .actions { display: flex; gap: 1rem; margin-top: 2rem; justify-content: flex-end;}
+        .actions { display: flex; gap: 1rem; margin-top: 1.5rem; justify-content: flex-end;}
+
+        .field-buttons { display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem; }
+        .btn-spacer { background-color: var(--bg-tertiary); color: var(--text-primary); }
+        .btn-spacer:hover { background-color: #525f75; }
+        .field.is-spacer { border-style: dashed; border-color: #64748b; }
+        .field.is-spacer .field-name,
+        .field.is-spacer .field-value { background-color: var(--bg-secondary); cursor: not-allowed; }
+        .drag-handle {
+            cursor: move;
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            padding-right: 0.5rem;
+            user-select: none;
+        }
+        .field.dragging { opacity: 0.4; border: 2px dashed var(--accent-primary); }
 
         /* Discord Preview Styles */
         .discord-message { background-color: #313338; padding: 1rem; border-radius: 0.25rem; }
@@ -127,19 +151,29 @@
         .embed-description { font-size: 0.875rem; line-height: 1.4; color: #dcddde; white-space: pre-wrap; word-break: break-word; }
         .embed-fields-container { display: flex; flex-wrap: wrap; gap: 8px; margin: 0.5rem 0; }
         .embed-field { display: flex; flex-direction: column; flex-basis: 100%;}
-        .embed-field.inline { flex-basis: calc(33.33% - 8px); flex-grow: 1; }
+        .embed-field.inline { flex-basis: calc(33.33% - 8px); flex-grow: 1; min-width: 150px; }
         .embed-field-name { font-weight: 600; color: white; font-size: 0.875rem; margin-bottom: 0.25rem; }
         .embed-field-value { color: #dcddde; font-size: 0.875rem; line-height: 1.3; white-space: pre-wrap; word-break: break-word; }
         .embed-image, .embed-thumbnail { max-width: 100%; border-radius: 0.25rem; margin-top: 0.5rem; }
         .embed-thumbnail { float: right; max-width: 80px; max-height: 80px; margin-left: 1rem;}
         .embed-footer { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: #c3c4c7; margin-top: 0.5rem; }
         .embed-footer-icon { width: 20px; height: 20px; border-radius: 50%; }
+        .fields-container .field textarea.field-value {
+            min-height: 60px;
+            resize: vertical;
+        }
+        .embed-description a, .embed-field-value a {
+            color: #00a8fc;
+            text-decoration: none;
+        }
+        .embed-description a:hover, .embed-field-value a:hover {
+            text-decoration: underline;
+        }
 
-        @media (max-width: 900px) {
+        @media (max-width: 1200px) { /* Adjust breakpoint for layout change */
             .main-content { flex-direction: column; }
             .preview-panel { position: static; }
         }
-
     </style>
 </head>
 <body>
@@ -149,18 +183,21 @@
             <form id="embed-form" action="/embed/<%= token %>" method="POST">
                 <input type="hidden" name="embedData" id="embedData">
                 <input type="hidden" name="action" id="action">
-                <input type="hidden" name="embedName" value="<%= embedName %>">
-
+                
                 <div class="form-group">
-                    <label for="embed-name-display">Embed Name</label>
-                    <input type="text" id="embed-name-display" value="<%= embedName %>" readonly class="readonly">
+                    <label for="embedName">Embed Name</label>
+                    <input type="text" id="embedName" name="embedName" value="<%= embedName || '' %>" <%= mode === 'edit' ? 'readonly class="readonly"' : 'required' %>>
                 </div>
                 
                 <div class="form-group">
                     <label for="channelId">Send to Channel (only for "Save & Send")</label>
                     <select name="channelId" id="channelId">
                          <% channels.forEach(channel => { %>
-                            <option value="<%= channel.id %>">#<%= channel.name %></option>
+                            <option value="<%= channel.id %>" 
+                                <% if (embedToEdit && embedToEdit.last_sent_channel_id === channel.id) { %>
+                                    selected
+                                <% } %>
+                            >#<%= channel.name %></option>
                         <% }); %>
                     </select>
                 </div>
@@ -190,7 +227,11 @@
 
                 <h2>Fields</h2>
                 <div id="fields-container"></div>
-                <button type="button" class="btn-add" id="add-field">Add Field</button>
+                <div class="field-buttons">
+                    <button type="button" class="btn-add" id="add-field">Add Field</button>
+                    <button type="button" class="btn-spacer" id="add-spacer-field">Add Inline Spacer</button>
+                </div>
+
 
                 <h2>Images</h2>
                 <div class="form-grid">
@@ -217,32 +258,34 @@
 
         <div class="preview-panel">
             <h1>Live Preview</h1>
-            <div class="discord-message">
-                <div id="preview-content" style="color: #dcddde; margin-bottom: 0.5rem; white-space: pre-wrap; word-break: break-word;"></div>
-                <div class="discord-embed" id="embed-preview">
-                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div class="embed-main-content" style="flex: 1;">
-                            <!-- Author -->
-                            <div class="embed-author" id="preview-author" style="display: none;">
-                                <img id="preview-author-icon" class="embed-author-icon" src="">
-                                <a id="preview-author-name" class="embed-author-name" href="#" target="_blank" rel="noopener noreferrer"></a>
+            <div id="live-preview-container">
+                 <div class="discord-message">
+                    <div id="preview-content" style="color: #dcddde; margin-bottom: 0.5rem; white-space: pre-wrap; word-break: break-word;"></div>
+                    <div class="discord-embed" id="embed-preview">
+                         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div class="embed-main-content" style="flex: 1;">
+                                <!-- Author -->
+                                <div class="embed-author" id="preview-author" style="display: none;">
+                                    <img id="preview-author-icon" class="embed-author-icon" src="">
+                                    <a id="preview-author-name" class="embed-author-name" href="#" target="_blank" rel="noopener noreferrer"></a>
+                                </div>
+                                <!-- Title -->
+                                <a id="preview-title" class="embed-title" href="#" target="_blank" rel="noopener noreferrer" style="display: block;"></a>
+                                <!-- Description -->
+                                <div id="preview-description" class="embed-description"></div>
+                                <!-- Fields -->
+                                <div id="preview-fields" class="embed-fields-container"></div>
                             </div>
-                            <!-- Title -->
-                            <a id="preview-title" class="embed-title" href="#" target="_blank" rel="noopener noreferrer" style="display: block;"></a>
-                            <!-- Description -->
-                            <div id="preview-description" class="embed-description"></div>
-                            <!-- Fields -->
-                            <div id="preview-fields" class="embed-fields-container"></div>
+                            <img id="preview-thumbnail" class="embed-thumbnail" src="" style="display: none;">
                         </div>
-                        <img id="preview-thumbnail" class="embed-thumbnail" src="" style="display: none;">
-                    </div>
-                    <!-- Image -->
-                    <img id="preview-image" class="embed-image" src="" style="display: none;">
-                    <!-- Footer -->
-                    <div class="embed-footer" id="preview-footer" style="display: none;">
-                        <img id="preview-footer-icon" class="embed-footer-icon" src="">
-                        <span id="preview-footer-text"></span>
-                        <span id="preview-timestamp"></span>
+                        <!-- Image -->
+                        <img id="preview-image" class="embed-image" src="" style="display: none;">
+                        <!-- Footer -->
+                        <div class="embed-footer" id="preview-footer" style="display: none;">
+                            <img id="preview-footer-icon" class="embed-footer-icon" src="">
+                            <span id="preview-footer-text"></span>
+                            <span id="preview-timestamp"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -257,34 +300,96 @@
         const embedToEdit = <%- JSON.stringify(embedToEdit) %>;
 
         // Add Field Button
-        const addFieldButton = document.getElementById('add-field');
-        addFieldButton.addEventListener('click', () => addField());
+        document.getElementById('add-field').addEventListener('click', () => addField());
+        
+        // Add Spacer Button
+        document.getElementById('add-spacer-field').addEventListener('click', () => {
+            addField({ name: '\u200B', value: '\u200B', inline: true, isSpacer: true });
+        });
 
-        function addField(fieldData = { name: '', value: '', inline: false }) {
+        function addField(fieldData = { name: '', value: '', inline: false, isSpacer: false }) {
             fieldCount++;
+            const isSpacer = fieldData.isSpacer || false;
+            const readonlyAttr = isSpacer ? 'readonly' : '';
+            const spacerClass = isSpacer ? 'is-spacer' : '';
+
             const fieldHTML = `
-                <div class="field" data-field-id="${fieldCount}">
+                <div class="field ${spacerClass}" data-field-id="${fieldCount}" draggable="true">
                     <div class="field-header">
-                        <span>Field ${fieldCount}</span>
-                        <button type="button" class="btn-remove" onclick="this.parentElement.parentElement.remove(); updatePreview();">Remove</button>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                           <span class="drag-handle" title="Drag to reorder">⠿</span>
+                           <span>${isSpacer ? 'Inline Spacer' : `Field ${fieldCount}`}</span>
+                        </div>
+                        <button type="button" class="btn-remove">Remove</button>
                     </div>
                     <div class="form-grid">
-                        <div class="form-group"><label>Name</label><input type="text" class="field-name" value="${fieldData.name || ''}"></div>
-                        <div class="form-group"><label>Value</label><input type="text" class="field-value" value="${fieldData.value || ''}"></div>
+                        <div class="form-group"><label>Name</label><input type="text" class="field-name" value="${fieldData.name || ''}" ${readonlyAttr}></div>
+                        <div class="form-group"><label>Value</label><textarea class="field-value" ${readonlyAttr}>${fieldData.value || ''}</textarea></div>
                     </div>
                     <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
-                         <input type="checkbox" class="field-inline" ${fieldData.inline ? 'checked' : ''}> <label style="margin:0;">Inline</label>
+                         <input type="checkbox" class="field-inline" ${fieldData.inline ? 'checked' : ''} ${isSpacer ? 'onclick="return false;"' : ''}> <label style="margin:0;">Inline</label>
                     </div>
                 </div>
             `;
             fieldsContainer.insertAdjacentHTML('beforeend', fieldHTML);
+            updatePreview();
         }
+        
+        // Use event delegation for removing fields for reliability
+        fieldsContainer.addEventListener('click', e => {
+            if (e.target && e.target.classList.contains('btn-remove')) {
+                e.target.closest('.field').remove();
+                updatePreview(); // This will now correctly update the preview
+            }
+        });
+
+        // --- Drag and Drop Logic ---
+        fieldsContainer.addEventListener('dragstart', e => {
+            if (e.target.classList.contains('field')) {
+                e.target.classList.add('dragging');
+            }
+        });
+
+        fieldsContainer.addEventListener('dragend', e => {
+            if (e.target.classList.contains('field')) {
+                e.target.classList.remove('dragging');
+                updatePreview(); // Update preview after drop is complete
+            }
+        });
+
+        fieldsContainer.addEventListener('dragover', e => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(fieldsContainer, e.clientY);
+            const dragging = document.querySelector('.dragging');
+            if (dragging) {
+                if (afterElement == null) {
+                    fieldsContainer.appendChild(dragging);
+                } else {
+                    fieldsContainer.insertBefore(dragging, afterElement);
+                }
+            }
+        });
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.field:not(.dragging)')];
+
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
 
         // Sync color pickers
         const colorPicker = document.getElementById('color');
         const colorHex = document.getElementById('color-hex');
-        colorPicker.addEventListener('input', () => { colorHex.value = colorPicker.value; updatePreview(); });
-        colorHex.addEventListener('input', () => { try { colorPicker.value = colorHex.value; } catch(e){} updatePreview(); });
+        colorPicker.addEventListener('input', () => { colorHex.value = colorPicker.value; });
+        colorHex.addEventListener('input', () => { try { colorPicker.value = colorHex.value; } catch(e){} });
 
         // Form submission buttons
         document.getElementById('save-btn').addEventListener('click', () => {
@@ -296,7 +401,7 @@
             form.submit();
         });
 
-        // Update Preview on any change
+        // Update Preview on any change using a single delegated listener on the form
         form.addEventListener('input', updatePreview);
 
         function loadDataForEdit() {
@@ -327,17 +432,58 @@
             if (data.timestamp) document.getElementById('timestamp').checked = true;
 
             if (data.fields && Array.isArray(data.fields)) {
-                data.fields.forEach(field => addField(field));
+                data.fields.forEach(field => {
+                    // Detect if it's a spacer field
+                    const isSpacer = field.name === '\u200B' && field.value === '\u200B';
+                    addField({ ...field, isSpacer });
+                });
             }
 
             updatePreview();
+        }
+
+        /**
+         * Safely parses text for markdown links and returns an array of Text and HTMLAnchorElement nodes.
+         * This prevents direct innerHTML injection.
+         * @param {string} text - The text to parse.
+         * @returns {Array<Node>}
+         */
+        function formatAndSanitize(text) {
+            const linkRegex = /\[([^\]]+?)\]\((https?:\/\/[^\s)]+?)\)/g;
+            const parts = [];
+            let lastIndex = 0;
+            let match;
+
+            while ((match = linkRegex.exec(text)) !== null) {
+                // Push the text before the link (as a text node)
+                if (match.index > lastIndex) {
+                    parts.push(document.createTextNode(text.substring(lastIndex, match.index)));
+                }
+
+                // Create and push the link element
+                const a = document.createElement('a');
+                a.href = match[2];
+                a.textContent = match[1];
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                parts.push(a);
+
+                lastIndex = match.index + match[0].length;
+            }
+
+            // Push the remaining text (as a text node)
+            if (lastIndex < text.length) {
+                parts.push(document.createTextNode(text.substring(lastIndex)));
+            }
+            
+            return parts;
         }
 
         function updatePreview() {
             const embed = {};
             const getVal = id => document.getElementById(id).value.trim();
             
-            const content = document.getElementById('content').value; // Keep whitespace for content
+            const content = document.getElementById('content').value;
             document.getElementById('preview-content').textContent = content;
             document.getElementById('preview-content').style.display = content ? 'block' : 'none';
 
@@ -371,12 +517,14 @@
                 } else { document.getElementById('preview-title').removeAttribute('href'); }
             } else { document.getElementById('preview-title').style.display = 'none'; }
 
-            const description = document.getElementById('description').value; // Keep whitespace
+            const description = document.getElementById('description').value; 
+            const previewDescription = document.getElementById('preview-description');
+            previewDescription.innerHTML = ''; // Clear it
             if(description) {
                 embed.description = description;
-                document.getElementById('preview-description').innerText = description;
-                document.getElementById('preview-description').style.display = 'block';
-            } else { document.getElementById('preview-description').style.display = 'none'; }
+                formatAndSanitize(description).forEach(node => previewDescription.appendChild(node));
+                previewDescription.style.display = 'block';
+            } else { previewDescription.style.display = 'none'; }
             
             const color = getVal('color-hex');
             if (color && /^#[0-9A-F]{6}$/i.test(color)) {
@@ -394,16 +542,20 @@
                 const value = fieldEl.querySelector('.field-value').value;
                 const inline = fieldEl.querySelector('.field-inline').checked;
 
-                if (name.trim() && value.trim()) {
+                if (name && value) {
                     embed.fields.push({ name, value, inline });
+                    
                     const fieldDiv = document.createElement('div');
                     fieldDiv.className = 'embed-field' + (inline ? ' inline' : '');
+                    
                     const nameDiv = document.createElement('div');
                     nameDiv.className = 'embed-field-name';
                     nameDiv.textContent = name;
+                    
                     const valueDiv = document.createElement('div');
                     valueDiv.className = 'embed-field-value';
-                    valueDiv.textContent = value;
+                    formatAndSanitize(value).forEach(node => valueDiv.appendChild(node));
+                    
                     fieldDiv.appendChild(nameDiv);
                     fieldDiv.appendChild(valueDiv);
                     previewFields.appendChild(fieldDiv);
@@ -442,7 +594,7 @@
             const previewTimestamp = document.getElementById('preview-timestamp');
             if (document.getElementById('timestamp').checked) {
                 embed.timestamp = new Date().toISOString();
-                previewTimestamp.textContent = ` � Today at ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                previewTimestamp.textContent = ` • Today at ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
             } else {
                 previewTimestamp.textContent = '';
             }
@@ -455,4 +607,3 @@
     </script>
 </body>
 </html>
-
