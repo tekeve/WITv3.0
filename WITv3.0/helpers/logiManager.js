@@ -34,8 +34,9 @@ async function getSignoffData(options = {}) {
         const totalInProgress = inProgressCountResult.count;
         const totalTrusted = trustedCountResult.count;
 
-        const inProgress = await db.query('SELECT id, pilot_name, history, created_at FROM logi_signoffs WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?', [searchInProgressWildcard, searchInProgressWildcard, limitNum, offsetInProgress]);
-        const trusted = await db.query('SELECT pilot_name, added_at, history FROM trusted_pilots WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY added_at DESC LIMIT ? OFFSET ?', [searchTrustedWildcard, searchTrustedWildcard, limitNum, offsetTrusted]);
+        // Use template literals for LIMIT and OFFSET to avoid placeholder issues with some mysql drivers
+        const inProgress = await db.query(`SELECT id, pilot_name, history, created_at FROM logi_signoffs WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offsetInProgress}`, [searchInProgressWildcard, searchInProgressWildcard]);
+        const trusted = await db.query(`SELECT pilot_name, added_at, history FROM trusted_pilots WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY added_at DESC LIMIT ${limitNum} OFFSET ${offsetTrusted}`, [searchTrustedWildcard, searchTrustedWildcard]);
 
         const parseHistory = (pilot) => {
             try {
