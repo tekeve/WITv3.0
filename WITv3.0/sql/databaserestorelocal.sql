@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS `bot_status` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dumping data for table wit-db.bot_status: ~1 rows (approximately)
+-- Dumping data for table wit-db.bot_status: ~0 rows (approximately)
 REPLACE INTO `bot_status` (`id`, `activity`, `statusText`, `url`, `expiryTimestamp`) VALUES
 	(1, 'Watching', '... always watching ...', NULL, NULL);
 
@@ -68,20 +68,20 @@ CREATE TABLE IF NOT EXISTS `config` (
 REPLACE INTO `config` (`key_name`, `value`) VALUES
 	('actionLogChannelId', '["1418465802247475231"]'),
 	('adminRoles', '["1412546107975929917"]'),
-	('archiveChannelId', '[\r\n  "1411962451439652904"\r\n]'),
-	('auditLogChannelId', '[\r\n  "1413370040245555312"\r\n]'),
-	('authRoles', '[\r\n  "1412546107975929917",\r\n  "1412546080448712826"\r\n]'),
-	('commanderRoles', '[\r\n  "1412545597021622383"\r\n]'),
-	('councilRoles', '[\r\n  "1412546107975929917",\r\n  "1412546080448712826"\r\n]'),
-	('githubBranch', '["master"]'),
+	('archiveChannelId', '["1411962451439652904"]'),
+	('auditLogChannelId', '["1413370040245555312"]'),
+	('authRoles', '["1412546107975929917","1412546080448712826"]'),
+	('commanderRoles', '["1412545597021622383"]'),
+	('councilRoles', '["1412546107975929917","1412546080448712826"]'),
+	('githubBranch', '["master", "v1.1"]'),
 	('githubChannelId', '["1418129590143942718"]'),
 	('githubRepoUrl', '["https://github.com/tekeve/WITv3.0"]'),
 	('incursionChannelId', '["1364223029814759444"]'),
 	('lastCommitSha', '["4154407a6c5d4e2d78ae76138b713342d7ed68e7"]'),
 	('requestChannelId', '[\r\n  "1411962383978725436"\r\n]'),
 	('residentAppChannelId', '["1418925872861155468"]'),
-	('setupLocked', '[\r\n  "true"\r\n]'),
-	('srpChannelId', '["1412210083135225866" ]'),
+	('setupLocked', '["true"]'),
+	('srpChannelId', '["1412210083135225866"]'),
 	('srpMailingListId', '["145241588"]'),
 	('tradeHubs', '{\r\n  "Jita": "30000142",\r\n  "Amarr": "30002187",\r\n  "Dodixie": "30002659",\r\n  "Rens": "30002510",\r\n  "Hek": "30002053"\r\n}');
 
@@ -104,6 +104,8 @@ CREATE TABLE IF NOT EXISTS `google_sheets` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.google_sheets: ~0 rows (approximately)
+REPLACE INTO `google_sheets` (`id`, `alias`, `sheet_id`) VALUES
+	(1, 'anonfeedback', '1Pe_6hyoXVbrFwC0zAohzrF8Y2aubJRC97faqoZMHDbE');
 
 -- Dumping structure for table wit-db.incursion_state
 CREATE TABLE IF NOT EXISTS `incursion_state` (
@@ -116,6 +118,7 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
   `withdrawingTimestamp` bigint(20) DEFAULT NULL,
   `endedTimestamp` bigint(20) DEFAULT NULL,
   `lastIncursionStats` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`lastIncursionStats`)),
+  `route_data` text DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -139,7 +142,7 @@ CREATE TABLE IF NOT EXISTS `incursion_systems` (
   PRIMARY KEY (`Constellation_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dumping data for table wit-db.incursion_systems: ~105 rows (approximately)
+-- Dumping data for table wit-db.incursion_systems: ~93 rows (approximately)
 REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard_systems`, `assault_systems`, `headquarters_system`, `dockup`, `dock_up_system_id`, `is_island`, `region_faction`, `region`, `region_id`) VALUES
 	(20000001, 'San Matar', 'Akpivem, Nirbhi, Tanoo, Yuzier', 'Jark, Sasta', 'Lashesih (0.8)', 'Lisudeh IV - Moon 4 - Theology Council Tribunal', '30000005', 'NOTISLAND', '500007', 'Derelik', 10000003),
 	(20000004, 'Kalangin', 'Eshtah, Kasrasi, Ordize, Rashy', 'Fovihi, Psasa', 'Kiereend (0.8)', 'Kiereend VII - Moon 3 - DED Assembly Plant', '30000024', 'NOTISLAND', '500007', 'Derelik', 10000003),

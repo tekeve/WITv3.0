@@ -13,9 +13,10 @@ module.exports = {
         // Check if config exists and if setupLocked is a truthy value
         const isSetupLocked = config && config.setupLocked && config.setupLocked.includes("true");
 
-        if (isSetupLocked) {
+        // After the first setup, only the server owner or an admin can run this command again.
+        if (isSetupComplete && (interaction.user.id !== interaction.guild.ownerId && !roleManager.isAdmin(interaction.member))) {
             return interaction.reply({
-                content: 'The setup command has already been used and is now locked.',
+                content: 'The initial setup has been completed. Only the server owner or an Admin can run this command again to edit the configuration.',
                 flags: [MessageFlags.Ephemeral]
             });
         }

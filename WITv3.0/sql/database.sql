@@ -38,10 +38,6 @@ CREATE TABLE IF NOT EXISTS `action_log_settings` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
--- Dumping data for table wit-db.action_log_settings: ~1 rows (approximately)
-REPLACE INTO `action_log_settings` (`id`, `log_message_delete`, `log_message_edit`, `log_member_join`, `log_member_leave`, `log_member_role_update`, `log_voice_join`, `log_voice_leave`, `log_voice_move`, `log_image_delete`, `log_nickname_change`, `log_member_ban`, `log_member_unban`, `log_member_timeout`, `log_role_create`, `log_role_delete`, `log_role_update`, `log_channel_create`, `log_channel_delete`, `log_channel_update`, `log_invite_create`, `log_invite_delete`, `ignored_channels`, `ignored_roles`) VALUES
-	(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, '[""]', '[""]');
-
 -- Dumping structure for table wit-db.bot_status
 CREATE TABLE IF NOT EXISTS `bot_status` (
   `id` int(11) NOT NULL DEFAULT 1,
@@ -50,34 +46,14 @@ CREATE TABLE IF NOT EXISTS `bot_status` (
   `url` varchar(255) DEFAULT NULL,
   `expiryTimestamp` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping structure for table wit-db.config
 CREATE TABLE IF NOT EXISTS `config` (
   `key_name` varchar(255) NOT NULL,
   `value` longtext DEFAULT NULL,
   PRIMARY KEY (`key_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
-
--- Dumping data for table wit-db.config: ~17 rows (approximately)
-REPLACE INTO `config` (`key_name`, `value`) VALUES
-	('actionLogChannelId', '[""]'),
-	('adminRoles', '[""]'),
-	('archiveChannelId', ''),
-	('auditLogChannelId', ''),
-	('authRoles', ''),
-	('commanderRoles', '[""]'),
-	('councilRoles', '[""]'),
-	('githubBranch', '[""]'),
-	('githubChannelId', '[""]'),
-	('githubRepoUrl', '[""]'),
-	('incursionChannelId', '[""]'),
-	('lastCommitSha', '[""]'),
-	('requestChannelId', '[""]'),
-	('setupLocked', '[""]'),
-	('srpChannelId', '[""]'),
-	('srpMailingListId', '[""]'),
-	('tradeHubs', '{"Jita": "30000142","Amarr": "30002187","Dodixie": "30002659","Rens": "30002510","Hek": "30002053"}');
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping structure for table wit-db.google_docs
 CREATE TABLE IF NOT EXISTS `google_docs` (
@@ -85,7 +61,7 @@ CREATE TABLE IF NOT EXISTS `google_docs` (
   `alias` varchar(50) NOT NULL,
   `doc_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping structure for table wit-db.google_sheets
 CREATE TABLE IF NOT EXISTS `google_sheets` (
@@ -93,7 +69,7 @@ CREATE TABLE IF NOT EXISTS `google_sheets` (
   `alias` varchar(50) NOT NULL,
   `sheet_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping structure for table wit-db.incursion_state
 CREATE TABLE IF NOT EXISTS `incursion_state` (
@@ -106,8 +82,9 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
   `withdrawingTimestamp` bigint(20) DEFAULT NULL,
   `endedTimestamp` bigint(20) DEFAULT NULL,
   `lastIncursionStats` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`lastIncursionStats`)),
+  `route_data` text DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping structure for table wit-db.incursion_systems
 CREATE TABLE IF NOT EXISTS `incursion_systems` (
@@ -123,9 +100,9 @@ CREATE TABLE IF NOT EXISTS `incursion_systems` (
   `region` varchar(255) DEFAULT NULL,
   `region_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`Constellation_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dumping data for table wit-db.incursion_systems: ~105 rows (approximately)
+-- Dumping data for table wit-db.incursion_systems: ~93 rows (approximately)
 REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard_systems`, `assault_systems`, `headquarters_system`, `dockup`, `dock_up_system_id`, `is_island`, `region_faction`, `region`, `region_id`) VALUES
 	(20000001, 'San Matar', 'Akpivem, Nirbhi, Tanoo, Yuzier', 'Jark, Sasta', 'Lashesih (0.8)', 'Lisudeh IV - Moon 4 - Theology Council Tribunal', '30000005', 'NOTISLAND', '500007', 'Derelik', 10000003),
 	(20000004, 'Kalangin', 'Eshtah, Kasrasi, Ordize, Rashy', 'Fovihi, Psasa', 'Kiereend (0.8)', 'Kiereend VII - Moon 3 - DED Assembly Plant', '30000024', 'NOTISLAND', '500007', 'Derelik', 10000003),
@@ -233,6 +210,43 @@ REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard
 	(20000784, 'Aokinen', 'Onnamon,Tsuruma, Uuhulanen', 'Astoh, Rohamaa, Samanuhi', 'Uchomida (0.5)', 'Samanuni VI - Caldari Navy Anchorage', '30045322', 'NOTISLAND', '500001', 'The Citadel', 10000033),
 	(30000154, 'Onirvura', '', '', '', '', '', 'NOTISLAND', '500001', 'Lonetrek', 10000016);
 
+-- Dumping structure for table wit-db.logi_signoffs
+CREATE TABLE IF NOT EXISTS `logi_signoffs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `pilot_name` varchar(255) NOT NULL,
+  `pilot_id` int(11) DEFAULT NULL,
+  `signoffs` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`signoffs`)),
+  `history` longtext DEFAULT NULL,
+  `status` varchar(50) DEFAULT 'in_progress',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `pilot_name` (`pilot_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4;
+
+-- Dumping structure for table wit-db.mail_queue
+CREATE TABLE IF NOT EXISTS `mail_queue` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `sender_discord_id` varchar(50) NOT NULL,
+  `mailing_list_id` int(11) NOT NULL,
+  `subject` varchar(255) NOT NULL,
+  `body` text NOT NULL,
+  `failed_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Dumping structure for table wit-db.reaction_roles
+CREATE TABLE IF NOT EXISTS `reaction_roles` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `guild_id` varchar(50) NOT NULL,
+  `channel_id` varchar(50) NOT NULL,
+  `message_id` varchar(50) NOT NULL,
+  `role_id` varchar(50) NOT NULL,
+  `emoji` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `message_emoji_role` (`message_id`,`emoji`(100),`role_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4;
+
 -- Dumping structure for table wit-db.reminders
 CREATE TABLE IF NOT EXISTS `reminders` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -244,15 +258,52 @@ CREATE TABLE IF NOT EXISTS `reminders` (
   PRIMARY KEY (`id`),
   KEY `discord_id` (`discord_id`),
   KEY `remind_at` (`remind_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
+
+-- Dumping structure for table wit-db.resident_applications
+CREATE TABLE IF NOT EXISTS `resident_applications` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `character_name` varchar(255) NOT NULL,
+  `alts` text DEFAULT NULL,
+  `forum_identity` varchar(255) NOT NULL,
+  `discord_identity` varchar(255) NOT NULL,
+  `wtm_time` varchar(255) NOT NULL,
+  `logistics_ships` text NOT NULL,
+  `battleship_ships` text NOT NULL,
+  `t2_guns` varchar(255) NOT NULL,
+  `command_time_estimate` varchar(255) NOT NULL,
+  `why_commander` text NOT NULL,
+  `why_wtm` text NOT NULL,
+  `discord_id` varchar(50) NOT NULL,
+  `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping structure for table wit-db.role_hierarchy
 CREATE TABLE IF NOT EXISTS `role_hierarchy` (
   `roleName` varchar(50) NOT NULL,
   `promote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`promote`)),
   `demote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`demote`)),
+  `history` longtext DEFAULT NULL,
   PRIMARY KEY (`roleName`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Dumping structure for table wit-db.saved_embeds
+CREATE TABLE IF NOT EXISTS `saved_embeds` (
+  `embed_name` varchar(100) NOT NULL,
+  `guild_id` varchar(50) NOT NULL,
+  `embed_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`embed_data`)),
+  `content` text DEFAULT NULL,
+  `created_by_id` varchar(50) DEFAULT NULL,
+  `created_by_tag` varchar(100) DEFAULT NULL,
+  `last_edited_by_id` varchar(50) DEFAULT NULL,
+  `last_edited_by_tag` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_edited_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `last_sent_channel_id` varchar(50) DEFAULT NULL,
+  `last_sent_message_id` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`embed_name`,`guild_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Dumping structure for table wit-db.srp_history
 CREATE TABLE IF NOT EXISTS `srp_history` (
@@ -268,7 +319,21 @@ CREATE TABLE IF NOT EXISTS `srp_history` (
   `loss_description` text NOT NULL,
   `loot_status` text NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4;
+
+-- Dumping structure for table wit-db.trusted_pilots
+CREATE TABLE IF NOT EXISTS `trusted_pilots` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `pilot_name` varchar(255) NOT NULL,
+  `pilot_id` int(11) DEFAULT NULL,
+  `final_signoff_by` varchar(255) DEFAULT NULL COMMENT 'Commander who gave the final signoff',
+  `added_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `signoffs` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Full JSON array of signoff objects at the time of passing' CHECK (json_valid(`signoffs`)),
+  `demerits` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'JSON array of demerit objects' CHECK (json_valid(`demerits`)),
+  `history` longtext DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `pilot_name` (`pilot_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping structure for table wit-db.users
 CREATE TABLE IF NOT EXISTS `users` (
@@ -284,4 +349,4 @@ CREATE TABLE IF NOT EXISTS `users` (
   PRIMARY KEY (`character_id`),
   KEY `discord_id` (`discord_id`),
   CONSTRAINT `roles` CHECK (json_valid(`roles`))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
