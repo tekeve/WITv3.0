@@ -16,6 +16,7 @@ async function requestWithRetries(requestFunc, endpoint, caller, retries = 3, de
         try {
             const response = await requestFunc();
             const headers = response.headers;
+            const callerName = caller ? ` called by ${path.basename(caller)}` : '';
 
             // Log Rate Limit info on success
             if (headers && headers['x-esi-error-limit-remain']) {
@@ -26,7 +27,7 @@ async function requestWithRetries(requestFunc, endpoint, caller, retries = 3, de
                 if (limitRemain < 25) logFunc = logger.error;
                 else if (limitRemain < 50) logFunc = logger.warn;
 
-                logFunc(`ESI Rate Limit: ${limitRemain}/100 remaining. Resets in ${limitReset}s.`);
+                logFunc(`ESI Rate Limit: ${limitRemain}/100 remaining. Resets in ${limitReset}s. [${endpoint}${callerName}]`);
             }
 
             // Log Cache Expiry on success
@@ -34,7 +35,6 @@ async function requestWithRetries(requestFunc, endpoint, caller, retries = 3, de
                 const expiryDate = new Date(headers['expires']);
                 const secondsUntilExpiry = Math.round((expiryDate - new Date()) / 1000);
                 if (secondsUntilExpiry > 0) {
-                    const callerName = caller ? ` from ${path.basename(caller)}` : '';
                     logger.info(`ESI Cache for ${endpoint}${callerName} expires in ${secondsUntilExpiry}s.`);
                 }
             }
@@ -42,10 +42,10 @@ async function requestWithRetries(requestFunc, endpoint, caller, retries = 3, de
             return response;
 
         } catch (error) {
-
+            const callerName = caller ? ` called by ${path.basename(caller)}` : '';
             // Handle network errors or code bugs first
             if (!error.response || !error.response.headers) {
-                logger.error(`Request to ${endpoint} failed with no response: ${error.message}`);
+                logger.error(`Request to ${endpoint}${callerName} failed with no response: ${error.message}`);
                 throw error; // No point retrying if the server is unreachable
             }
 
@@ -53,7 +53,8 @@ async function requestWithRetries(requestFunc, endpoint, caller, retries = 3, de
             const errorHeaders = error.response.headers;
             if (errorHeaders && errorHeaders['x-esi-error-limit-remain']) {
                 const limitRemain = parseInt(errorHeaders['x-esi-error-limit-remain'], 10);
-                logger.warn(`ESI Rate Limit on error: ${limitRemain}/100 remaining.`);
+                const limitReset = errorHeaders['x-esi-error-limit-reset'];
+                logger.warn(`ESI Rate Limit on error: ${limitRemain}/100 remaining (resets in ${limitReset}s). Caused by request to ${endpoint}${callerName}.`);
             }
 
             // Handle Retry
@@ -66,13 +67,13 @@ async function requestWithRetries(requestFunc, endpoint, caller, retries = 3, de
 
                 switch (status) {
                     case 420: // Rate Limited
-                        logger.warn(`ESI rate limit hit (420). Retrying in ${waitTime / 1000}s...`);
+                        logger.warn(`ESI rate limit hit (420) on ${endpoint}${callerName}. Retrying in ${waitTime / 1000}s...`);
                         shouldRetry = true;
                         break;
                     case 502: // Bad Gateway
                     case 503: // Service Unavailable
                     case 504: // Gateway Timeout
-                        logger.info(`ESI service unavailable (Status ${status}). Retrying in ${waitTime / 1000}s...`);
+                        logger.info(`ESI service unavailable (Status ${status}) on ${endpoint}${callerName}. Retrying in ${waitTime / 1000}s...`);
                         shouldRetry = true;
                         break;
                 }
@@ -85,7 +86,7 @@ async function requestWithRetries(requestFunc, endpoint, caller, retries = 3, de
 
             // If no retries are left, or the error was not retryable, throw
             const errorData = JSON.stringify(error.response.data);
-            logger.error(`ESI request to ${endpoint} failed after all retries with status ${status}. Data: ${errorData}`);
+            logger.error(`ESI request to ${endpoint}${callerName} failed after all retries with status ${status}. Data: ${errorData}`);
             throw error;
         }
     }
@@ -147,4 +148,3 @@ module.exports = {
         return response.data;
     },
 };
-
