@@ -57,6 +57,94 @@ function calculateLastIncursionStats(state) {
     return stats;
 }
 
+/**
+ * Calculates and formats jump routes to the incursion HQ.
+ * @param {object} highSecIncursion - The active incursion object.
+ * @param {object} state - The current stored state from the database.
+ * @param {object} config - The bot's configuration object.
+ * @returns {Promise<object>} An object containing formatted route strings.
+ */
+async function calculateRoutes(highSecIncursion, state, config) {
+    const incursionSystems = incursionManager.get();
+    const spawnData = incursionSystems.find(c => c.Constellation_id === highSecIncursion.constellation_id);
+    if (!spawnData) return {};
+
+    const currentHqId = spawnData.dock_up_system_id;
+    const hqSystemName = spawnData.headquarters_system.split(' (')[0];
+
+    // 1. Calculate routes from trade hubs
+    const jumpPromises = Object.entries(config.tradeHubs).map(async ([name, id]) => {
+        const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${name}:${hqSystemName}:secure`;
+        const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${name}:${hqSystemName}:shortest`;
+        const secureEsiUrl = `/route/${id}/${currentHqId}/?flag=secure`;
+        const shortestEsiUrl = `/route/${id}/${currentHqId}/?flag=shortest`;
+        try {
+            const [secureResObj, shortestResObj] = await Promise.all([
+                esiService.get({ endpoint: secureEsiUrl, caller: __filename }),
+                esiService.get({ endpoint: shortestEsiUrl, caller: __filename })
+            ]);
+            const secureJumps = Array.isArray(secureResObj.data) ? secureResObj.data.length - 1 : NaN;
+            const shortestJumps = Array.isArray(shortestResObj.data) ? shortestResObj.data.length - 1 : NaN;
+            if (isNaN(secureJumps) || isNaN(shortestJumps)) return { name, jumps: 'N/A' };
+
+            if (secureJumps === shortestJumps) {
+                return { name, jumps: `[${secureJumps}j (safest)](${secureGatecheckUrl})` };
+            }
+            return { name, jumps: `[${secureJumps}j (safest)](${secureGatecheckUrl}) / [${shortestJumps}j (shortest)](${shortestGatecheckUrl})` };
+        } catch { return { name, jumps: 'N/A' }; }
+    });
+
+    const jumpCounts = await Promise.all(jumpPromises);
+    const tradeHubJumpsString = jumpCounts.map(hub => `**${hub.name}**:\n${hub.jumps}`).join('\n');
+
+    // 2. Calculate route from last HQ
+    let routeFromLastHqString = null;
+    if (state.lastHqSystemId && state.lastHqSystemId !== currentHqId) {
+        let routeString = 'N/A';
+        const lastHqNameData = incursionSystems.find(sys => Number(sys.dock_up_system_id) === state.lastHqSystemId);
+
+        if (lastHqNameData) {
+            const lastHqName = lastHqNameData.headquarters_system.split(' (')[0];
+            const secureGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${hqSystemName}:secure`;
+            const shortestGatecheckUrl = `https://eve-gatecheck.space/eve/#${lastHqName}:${hqSystemName}:shortest`;
+            const secureEsiUrl = `/route/${state.lastHqSystemId}/${currentHqId}/?flag=secure`;
+            const shortestEsiUrl = `/route/${state.lastHqSystemId}/${currentHqId}/?flag=shortest`;
+
+            try {
+                const results = await Promise.allSettled([
+                    esiService.get({ endpoint: secureEsiUrl, caller: __filename }),
+                    esiService.get({ endpoint: shortestEsiUrl, caller: __filename })
+                ]);
+
+                const secureRes = results[0].status === 'fulfilled' ? results[0].value.data : null;
+                const shortestRes = results[1].status === 'fulfilled' ? results[1].value.data : null;
+
+                const secureJumps = Array.isArray(secureRes) ? secureRes.length - 1 : null;
+                const shortestJumps = Array.isArray(shortestRes) ? shortestRes.length - 1 : null;
+
+                if (secureJumps !== null && secureJumps === shortestJumps) {
+                    routeString = `**${lastHqName}**: [${secureJumps}j (safest)](${secureGatecheckUrl})`;
+                } else {
+                    const parts = [];
+                    if (secureJumps !== null) parts.push(`[${secureJumps}j (safest)](${secureGatecheckUrl})`);
+                    if (shortestJumps !== null) parts.push(`[${shortestJumps}j (shortest)](${shortestGatecheckUrl})`);
+                    if (parts.length > 0) routeString = `**${lastHqName}**: ${parts.join(' / ')}`;
+                    else routeString = `**${lastHqName}**: No Stargate Route`;
+                }
+            } catch (error) {
+                logger.error(`Unexpected error in route calculation: ${error.message}`);
+                routeString = `**${lastHqName}**: Error`;
+            }
+        }
+        routeFromLastHqString = routeString;
+    }
+
+    return {
+        tradeHubRoutes: tradeHubJumpsString,
+        lastHqRoute: routeFromLastHqString
+    };
+}
+
 
 async function readState() {
     try {
@@ -78,6 +166,18 @@ async function readState() {
                     state.lastIncursionStats = null;
                 }
             }
+
+            if (state.route_data && typeof state.route_data === 'string') {
+                try {
+                    state.routeData = JSON.parse(state.route_data);
+                } catch (e) {
+                    logger.error('Could not parse route_data from database.', e);
+                    state.routeData = null;
+                }
+            } else {
+                state.routeData = null;
+            }
+
             return state;
         }
         return {};
@@ -90,19 +190,22 @@ async function readState() {
 async function writeState(state) {
     try {
         const statsToStore = state.lastIncursionStats ? JSON.stringify(state.lastIncursionStats) : null;
+        const routeDataToStore = state.routeData ? JSON.stringify(state.routeData) : null;
+
         const sql = `
             INSERT INTO incursion_state (id, lastIncursionState, incursionMessageId, lastHqSystemId, 
-                spawnTimestamp, mobilizingTimestamp, withdrawingTimestamp, endedTimestamp, lastIncursionStats) 
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?) 
+                spawnTimestamp, mobilizingTimestamp, withdrawingTimestamp, endedTimestamp, lastIncursionStats, route_data) 
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
             ON DUPLICATE KEY UPDATE 
                 lastIncursionState = VALUES(lastIncursionState), incursionMessageId = VALUES(incursionMessageId), 
                 lastHqSystemId = VALUES(lastHqSystemId), spawnTimestamp = VALUES(spawnTimestamp), 
                 mobilizingTimestamp = VALUES(mobilizingTimestamp), withdrawingTimestamp = VALUES(withdrawingTimestamp), 
-                endedTimestamp = VALUES(endedTimestamp), lastIncursionStats = VALUES(lastIncursionStats)`;
+                endedTimestamp = VALUES(endedTimestamp), lastIncursionStats = VALUES(lastIncursionStats),
+                route_data = VALUES(route_data)`;
         await db.query(sql, [
             state.lastIncursionState || null, state.incursionMessageId || null, state.lastHqSystemId || null,
             state.spawnTimestamp || null, state.mobilizingTimestamp || null, state.withdrawingTimestamp || null,
-            state.endedTimestamp || null, statsToStore
+            state.endedTimestamp || null, statsToStore, routeDataToStore
         ]);
     } catch (error) {
         logger.error('Failed to save incursion state to database:', error);
@@ -262,6 +365,7 @@ async function updateIncursions(client, options = {}) {
                 state.withdrawingTimestamp = null;
                 state.endedTimestamp = null;
                 state.lastIncursionStats = null;
+                state.routeData = null; // Clear old route data
             } else if (currentConstellationId && currentConstellationId === lastConstellationId && currentSimpleState !== lastSimpleState) {
                 if (currentSimpleState === 'mobilizing') state.mobilizingTimestamp = now;
                 if (currentSimpleState === 'withdrawing') state.withdrawingTimestamp = now;
@@ -270,6 +374,7 @@ async function updateIncursions(client, options = {}) {
                 const incursionSystems = incursionManager.get();
                 const lastSpawnData = incursionSystems.find(c => c.Constellation_id === lastConstellationId);
                 if (lastSpawnData) state.lastHqSystemId = lastSpawnData.dock_up_system_id;
+                state.routeData = null; // Clear route data when incursion ends
             }
 
             if (currentSimpleState === 'none' && state.endedTimestamp) {
@@ -277,6 +382,12 @@ async function updateIncursions(client, options = {}) {
             }
         }
         state.lastIncursionState = currentStateKey;
+
+        // Calculate routes only on a new spawn or if they are missing
+        if (highSecIncursion && (isNewSpawn || !state.routeData)) {
+            logger.info('New incursion spawn or missing route data. Calculating routes...');
+            state.routeData = await calculateRoutes(highSecIncursion, state, config);
+        }
 
         let embed;
         if (highSecIncursion) {
@@ -351,4 +462,3 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
-

@@ -115,23 +115,28 @@
             <div class="form-grid">
                 <div class="form-group full-width">
                     <label for="adminRoles">Admin Roles</label>
-                    <input type="text" id="adminRoles" name="adminRoles" required>
+                    <input type="text" id="adminRoles" name="adminRoles" required value="<%= currentConfig.adminRoles || '' %>">
                     <small>Comma-separated list of Role IDs.</small>
                 </div>
                 <div class="form-group">
                     <label for="councilRoles">Council Roles</label>
-                    <input type="text" id="councilRoles" name="councilRoles" required>
+                    <input type="text" id="councilRoles" name="councilRoles" required value="<%= currentConfig.councilRoles || '' %>">
                      <small>Comma-separated list of Role IDs.</small>
                 </div>
                 <div class="form-group">
                     <label for="commanderRoles">Commander Roles</label>
-                    <input type="text" id="commanderRoles" name="commanderRoles" required>
+                    <input type="text" id="commanderRoles" name="commanderRoles" required value="<%= currentConfig.commanderRoles || '' %>">
                      <small>Comma-separated list of Role IDs.</small>
                 </div>
-                 <div class="form-group full-width">
+                 <div class="form-group">
                     <label for="authRoles">Auth Roles</label>
-                    <input type="text" id="authRoles" name="authRoles" required>
+                    <input type="text" id="authRoles" name="authRoles" required value="<%= currentConfig.authRoles || '' %>">
                     <small>Comma-separated list of Role IDs that can use /auth.</small>
+                </div>
+                <div class="form-group">
+                    <label for="removeAllRoles">"Remove All" Roles</label>
+                    <input type="text" id="removeAllRoles" name="removeAllRoles" value="<%= currentConfig.removeAllRoles || '' %>">
+                    <small>Optional: Role IDs that SHOULD be removed by the /demote "Remove All" command.</small>
                 </div>
             </div>
 
@@ -139,27 +144,27 @@
              <div class="form-grid">
                 <div class="form-group">
                     <label for="requestChannelId">Request Channel ID</label>
-                    <input type="text" id="requestChannelId" name="requestChannelId" required>
+                    <input type="text" id="requestChannelId" name="requestChannelId" required value="<%= currentConfig.requestChannelId || '' %>">
                 </div>
                 <div class="form-group">
                     <label for="archiveChannelId">Archive Channel ID</label>
-                    <input type="text" id="archiveChannelId" name="archiveChannelId" required>
+                    <input type="text" id="archiveChannelId" name="archiveChannelId" required value="<%= currentConfig.archiveChannelId || '' %>">
                 </div>
                 <div class="form-group">
                     <label for="auditLogChannelId">Audit Log Channel ID</label>
-                    <input type="text" id="auditLogChannelId" name="auditLogChannelId" required>
+                    <input type="text" id="auditLogChannelId" name="auditLogChannelId" required value="<%= currentConfig.auditLogChannelId || '' %>">
                 </div>
                 <div class="form-group">
                     <label for="incursionChannelId">Incursion Channel ID</label>
-                    <input type="text" id="incursionChannelId" name="incursionChannelId" required>
+                    <input type="text" id="incursionChannelId" name="incursionChannelId" required value="<%= currentConfig.incursionChannelId || '' %>">
                 </div>
                  <div class="form-group">
                     <label for="srpChannelId">SRP Channel ID</label>
-                    <input type="text" id="srpChannelId" name="srpChannelId" required>
+                    <input type="text" id="srpChannelId" name="srpChannelId" required value="<%= currentConfig.srpChannelId || '' %>">
                 </div>
             </div>
 
-            <button type="submit">Save Configuration & Lock Setup</button>
+            <button type="submit">Save Configuration</button>
         </form>
     </div>
 </body>

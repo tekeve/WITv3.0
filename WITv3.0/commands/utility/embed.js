@@ -173,19 +173,74 @@ module.exports = {
 
         } else if (subcommand === 'list') {
             await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
-            const embeds = await db.query('SELECT embed_name, last_edited_at FROM saved_embeds WHERE guild_id = ? ORDER BY embed_name', [interaction.guild.id]);
+            const embedsFromDb = await db.query('SELECT embed_name, last_edited_at, last_sent_channel_id, last_sent_message_id FROM saved_embeds WHERE guild_id = ? ORDER BY embed_name', [interaction.guild.id]);
 
-            if (!embeds || embeds.length === 0) {
+            if (!embedsFromDb || embedsFromDb.length === 0) {
                 return interaction.editReply('There are no saved embeds for this server.');
             }
 
-            const description = embeds.map(e => `🔹 **${e.embed_name}** (Last edited: <t:${Math.floor(new Date(e.last_edited_at).getTime() / 1000)}:R>)`).join('\n');
+            const validationPromises = embedsFromDb.map(async (embed) => {
+                // If the embed has never been sent, it's valid to be listed.
+                if (!embed.last_sent_channel_id || !embed.last_sent_message_id) {
+                    return { ...embed, isValid: true };
+                }
+
+                try {
+                    const channel = await interaction.client.channels.fetch(embed.last_sent_channel_id);
+                    // Fetching the message will throw an error if it doesn't exist.
+                    await channel.messages.fetch(embed.last_sent_message_id);
+                    return { ...embed, isValid: true };
+                } catch (error) {
+                    // 10008 is the error code for "Unknown Message".
+                    // 10003 is the error code for "Unknown Channel".
+                    if (error.code === 10008 || error.code === 10003) {
+                        logger.info(`Message for embed '${embed.embed_name}' not found. Marking for DB cleanup.`);
+                        return { ...embed, isValid: false };
+                    }
+                    // For other errors (like permissions), we'll assume the message exists for now.
+                    logger.warn(`Could not verify message for embed '${embed.embed_name}':`, error.message);
+                    return { ...embed, isValid: true };
+                }
+            });
+
+            const validationResults = await Promise.all(validationPromises);
+
+            const validEmbeds = [];
+            const cleanupPromises = [];
+
+            for (const result of validationResults) {
+                if (result.isValid) {
+                    validEmbeds.push(result);
+                } else {
+                    // If the message is not valid (deleted), queue a DB update to clear the message/channel IDs.
+                    const promise = db.query(
+                        'UPDATE saved_embeds SET last_sent_channel_id = NULL, last_sent_message_id = NULL WHERE embed_name = ? AND guild_id = ?',
+                        [result.embed_name, interaction.guild.id]
+                    );
+                    cleanupPromises.push(promise);
+                }
+            }
+
+            // Perform the database cleanup in the background.
+            if (cleanupPromises.length > 0) {
+                Promise.all(cleanupPromises).then(() => {
+                    logger.info(`Cleaned up ${cleanupPromises.length} invalid embed message links from the database.`);
+                }).catch(err => {
+                    logger.error('Failed to clean up invalid embed message links:', err);
+                });
+            }
+
+            if (validEmbeds.length === 0) {
+                return interaction.editReply('There are no saved embeds for this server (some may have been removed from the list because their last sent message was deleted).');
+            }
+
+            const description = validEmbeds.map(e => `🔹 **${e.embed_name}** (Last edited: <t:${Math.floor(new Date(e.last_edited_at).getTime() / 1000)}:R>)`).join('\n');
 
             const embed = new EmbedBuilder()
                 .setTitle('Saved Embeds')
                 .setDescription(description)
                 .setColor(0x5865F2)
-                .setFooter({ text: `Found ${embeds.length} embeds.` });
+                .setFooter({ text: `Found ${validEmbeds.length} embeds.` });
 
             await interaction.editReply({ embeds: [embed] });
         } else if (subcommand === 'delete') {

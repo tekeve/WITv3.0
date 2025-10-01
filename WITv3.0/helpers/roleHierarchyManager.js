@@ -1,5 +1,6 @@
 const db = require('@helpers/database');
 const logger = require('@helpers/logger');
+const configManager = require('@helpers/configManager');
 
 let hierarchyCache = null;
 
@@ -87,5 +88,6 @@ module.exports = {
     get: getHierarchy,
     getRankNames,
     reloadHierarchy,
-    getAllManageableRoleIds, // Export the new helper
+    getAllManageableRoleIds,
 };
+

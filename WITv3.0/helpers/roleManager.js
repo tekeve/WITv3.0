@@ -182,29 +182,61 @@ async function manageRoles(interaction, action) {
     }
 
     try {
+        // Special handling for Remove All Roles
+        if (isRemoveAllAction) {
+            // Find the 'removeAllRoles' key case-insensitively from the config object.
+            const removeAllRolesKey = Object.keys(config).find(k => k.toLowerCase() === 'removeallroles');
+            const additionalRolesToRemove = removeAllRolesKey ? config[removeAllRolesKey] : [];
+
+            // Get all roles defined within the promotion/demotion hierarchy.
+            const manageableRoles = await roleHierarchyManager.getAllManageableRoleIds();
+
+            // Combine both lists into a single Set to ensure uniqueness.
+            const rolesToRemoveIds = new Set([...manageableRoles, ...additionalRolesToRemove]);
+            logger.info("Combined manageable roles and 'removeAllRoles' list for deletion.");
+
+            const rolesToRemove = member.roles.cache.filter(role => rolesToRemoveIds.has(role.id));
+
+            if (rolesToRemove.size === 0) {
+                return interaction.editReply({ content: `${targetUser.tag} has no roles from the target list to remove.` });
+            }
+
+            // For registered users, we also update their DB record.
+            const userData = await charManager.getChars(member.id);
+            if (userData && userData.main) {
+                const currentDbRoles = new Set(userData.main.roles || []);
+                const newDbRoles = Array.from(currentDbRoles).filter(id => !rolesToRemoveIds.has(id));
+                await charManager.updateUserRoles(member.id, newDbRoles);
+                logger.info(`Updated database roles for ${member.user.tag} after 'Remove All'.`);
+            }
+
+            const removedRoleNames = rolesToRemove.map(r => r.name);
+            await member.roles.remove(rolesToRemove, `Demote command by ${interaction.user.tag}: Remove All Roles`);
+
+            await auditLogger.logRoleChange(interaction, targetUser, 'demote', [], removedRoleNames);
+            await interaction.editReply({ content: `Removed roles from ${targetUser.tag}:\n> **Removed:** ${removedRoleNames.join(', ')}` });
+            return; // Exit after handling this special case.
+        }
+
+        // Standard promotion/demotion logic continues here...
         const userData = await charManager.getChars(member.id);
         if (!userData || !userData.main) {
             return interaction.editReply({ content: `Error: ${targetUser.tag} is not registered with a main character. Cannot manage roles.` });
         }
         let newRoleIds = new Set(userData.main.roles || []);
 
-        if (action === 'demote' && targetRankName === 'Remove All Roles') {
-            const allManageableRoleIds = await roleHierarchyManager.getAllManageableRoleIds();
-            newRoleIds = new Set([...newRoleIds].filter(id => !allManageableRoleIds.has(id)));
-        } else {
-            const rankConfig = hierarchy[targetRankName];
-            if (!rankConfig) {
-                return interaction.editReply({ content: `The rank "${targetRankName}" is not defined in the role hierarchy.` });
-            }
-
-            const actionConfig = rankConfig[action];
-            if (!actionConfig) {
-                return interaction.editReply({ content: `No configuration found for the "${action}" action on the "${targetRankName}" rank.` });
-            }
-
-            if (actionConfig.add) actionConfig.add.forEach(id => newRoleIds.add(id));
-            if (actionConfig.remove) actionConfig.remove.forEach(id => newRoleIds.delete(id));
+        const rankConfig = hierarchy[targetRankName];
+        if (!rankConfig) {
+            return interaction.editReply({ content: `The rank "${targetRankName}" is not defined in the role hierarchy.` });
         }
+
+        const actionConfig = rankConfig[action];
+        if (!actionConfig) {
+            return interaction.editReply({ content: `No configuration found for the "${action}" action on the "${targetRankName}" rank.` });
+        }
+
+        if (actionConfig.add) actionConfig.add.forEach(id => newRoleIds.add(id));
+        if (actionConfig.remove) actionConfig.remove.forEach(id => newRoleIds.delete(id));
 
         await charManager.updateUserRoles(member.id, Array.from(newRoleIds));
         logger.info(`Updated database roles for ${member.user.tag}.`);
@@ -272,4 +304,6 @@ module.exports = {
     isCommanderOrAdmin,
     isCouncilOrAdmin,
 };
+
+
 

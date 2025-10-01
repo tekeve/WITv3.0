@@ -33,27 +33,59 @@ exports.showForm = (client) => async (req, res) => {
             .map(c => ({ id: c.id, name: c.name }))
             .sort((a, b) => a.name.localeCompare(b.name));
 
-        const existingSetups = await reactionRoleManager.getGuildReactionRoles(guild.id);
+        const existingSetupsMap = await reactionRoleManager.getGuildReactionRoles(guild.id);
 
-        // Convert Map to array and fetch message content for each
-        const setupsArray = await Promise.all(Array.from(existingSetups.entries()).map(async ([messageId, data]) => {
-            let content = '[Could not fetch message content]';
+        // Validate each setup and filter out those with deleted messages
+        const validationPromises = Array.from(existingSetupsMap.entries()).map(async ([messageId, data]) => {
             try {
                 const channel = await client.channels.fetch(data.channelId);
                 const message = await channel.messages.fetch(messageId);
-                content = message.content;
-            } catch (e) {
-                logger.warn(`Could not fetch message ${messageId} for reaction role form.`);
+                // If fetch is successful, return the setup data with content
+                return { ...data, messageId, content: message.content, isValid: true };
+            } catch (error) {
+                if (error.code === 10008 || error.code === 10003) { // Unknown Message or Unknown Channel
+                    logger.info(`Message ${messageId} for reaction role setup not found. Marking for cleanup.`);
+                    return { messageId, isValid: false }; // Mark as invalid
+                }
+                logger.warn(`Could not verify message ${messageId} for reaction role setup:`, error.message);
+                // If it's a different error (e.g., permissions), we'll still show it for now.
+                return { ...data, messageId, content: '[Could not verify message]', isValid: true };
             }
-            return { messageId, ...data, content };
-        }));
+        });
+
+        const validationResults = await Promise.all(validationPromises);
+
+        const validSetups = [];
+        const cleanupPromises = [];
+
+        for (const result of validationResults) {
+            if (result.isValid) {
+                validSetups.push(result);
+            } else {
+                // If the message is not valid (deleted), queue a DB deletion for that setup.
+                const promise = db.query('DELETE FROM reaction_roles WHERE message_id = ? AND guild_id = ?', [result.messageId, guild.id]);
+                cleanupPromises.push(promise);
+            }
+        }
+
+        // Perform the database cleanup in the background.
+        if (cleanupPromises.length > 0) {
+            Promise.all(cleanupPromises).then(() => {
+                logger.info(`Cleaned up ${cleanupPromises.length} invalid reaction role setups from the database.`);
+                // Invalidate the cache after cleaning up so the changes are reflected immediately.
+                reactionRoleManager.loadReactionRoles();
+            }).catch(err => {
+                logger.error('Failed to clean up invalid reaction role setups:', err);
+            });
+        }
+
 
         res.render('reactionRoleForm', {
             token,
             roles,
             emojis,
             channels,
-            existingSetups: setupsArray
+            existingSetups: validSetups
         });
     } catch (error) {
         logger.error('Error preparing reaction roles page:', error);
@@ -166,4 +198,3 @@ exports.handleSubmission = (client) => async (req, res) => {
         res.status(500).render('error', { title: 'Error', message: 'An internal error occurred.' });
     }
 };
-

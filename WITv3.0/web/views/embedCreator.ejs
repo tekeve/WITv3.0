@@ -158,6 +158,17 @@
         .embed-thumbnail { float: right; max-width: 80px; max-height: 80px; margin-left: 1rem;}
         .embed-footer { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: #c3c4c7; margin-top: 0.5rem; }
         .embed-footer-icon { width: 20px; height: 20px; border-radius: 50%; }
+        .fields-container .field textarea.field-value {
+            min-height: 60px;
+            resize: vertical;
+        }
+        .embed-description a, .embed-field-value a {
+            color: #00a8fc;
+            text-decoration: none;
+        }
+        .embed-description a:hover, .embed-field-value a:hover {
+            text-decoration: underline;
+        }
 
         @media (max-width: 1200px) { /* Adjust breakpoint for layout change */
             .main-content { flex-direction: column; }
@@ -313,7 +324,7 @@
                     </div>
                     <div class="form-grid">
                         <div class="form-group"><label>Name</label><input type="text" class="field-name" value="${fieldData.name || ''}" ${readonlyAttr}></div>
-                        <div class="form-group"><label>Value</label><input type="text" class="field-value" value="${fieldData.value || ''}" ${readonlyAttr}></div>
+                        <div class="form-group"><label>Value</label><textarea class="field-value" ${readonlyAttr}>${fieldData.value || ''}</textarea></div>
                     </div>
                     <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
                          <input type="checkbox" class="field-inline" ${fieldData.inline ? 'checked' : ''} ${isSpacer ? 'onclick="return false;"' : ''}> <label style="margin:0;">Inline</label>
@@ -431,6 +442,43 @@
             updatePreview();
         }
 
+        /**
+         * Safely parses text for markdown links and returns an array of Text and HTMLAnchorElement nodes.
+         * This prevents direct innerHTML injection.
+         * @param {string} text - The text to parse.
+         * @returns {Array<Node>}
+         */
+        function formatAndSanitize(text) {
+            const linkRegex = /\[([^\]]+?)\]\((https?:\/\/[^\s)]+?)\)/g;
+            const parts = [];
+            let lastIndex = 0;
+            let match;
+
+            while ((match = linkRegex.exec(text)) !== null) {
+                // Push the text before the link (as a text node)
+                if (match.index > lastIndex) {
+                    parts.push(document.createTextNode(text.substring(lastIndex, match.index)));
+                }
+
+                // Create and push the link element
+                const a = document.createElement('a');
+                a.href = match[2];
+                a.textContent = match[1];
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                parts.push(a);
+
+                lastIndex = match.index + match[0].length;
+            }
+
+            // Push the remaining text (as a text node)
+            if (lastIndex < text.length) {
+                parts.push(document.createTextNode(text.substring(lastIndex)));
+            }
+            
+            return parts;
+        }
+
         function updatePreview() {
             const embed = {};
             const getVal = id => document.getElementById(id).value.trim();
@@ -470,11 +518,13 @@
             } else { document.getElementById('preview-title').style.display = 'none'; }
 
             const description = document.getElementById('description').value; 
+            const previewDescription = document.getElementById('preview-description');
+            previewDescription.innerHTML = ''; // Clear it
             if(description) {
                 embed.description = description;
-                document.getElementById('preview-description').innerText = description;
-                document.getElementById('preview-description').style.display = 'block';
-            } else { document.getElementById('preview-description').style.display = 'none'; }
+                formatAndSanitize(description).forEach(node => previewDescription.appendChild(node));
+                previewDescription.style.display = 'block';
+            } else { previewDescription.style.display = 'none'; }
             
             const color = getVal('color-hex');
             if (color && /^#[0-9A-F]{6}$/i.test(color)) {
@@ -492,16 +542,20 @@
                 const value = fieldEl.querySelector('.field-value').value;
                 const inline = fieldEl.querySelector('.field-inline').checked;
 
-                if (name && value) { // Allow blank characters to pass
+                if (name && value) {
                     embed.fields.push({ name, value, inline });
+                    
                     const fieldDiv = document.createElement('div');
                     fieldDiv.className = 'embed-field' + (inline ? ' inline' : '');
+                    
                     const nameDiv = document.createElement('div');
                     nameDiv.className = 'embed-field-name';
                     nameDiv.textContent = name;
+                    
                     const valueDiv = document.createElement('div');
                     valueDiv.className = 'embed-field-value';
-                    valueDiv.textContent = value;
+                    formatAndSanitize(value).forEach(node => valueDiv.appendChild(node));
+                    
                     fieldDiv.appendChild(nameDiv);
                     fieldDiv.appendChild(valueDiv);
                     previewFields.appendChild(fieldDiv);
@@ -553,4 +607,3 @@
     </script>
 </body>
 </html>
-
