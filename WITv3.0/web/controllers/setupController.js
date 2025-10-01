@@ -4,7 +4,7 @@ const configManager = require('@helpers/configManager');
 const db = require('@helpers/database'); // Import database helper for direct queries
 
 /**
- * Renders the Setup form if the token is valid.
+ * Renders the Setup form, pre-filling it with existing data if available.
  * @param {Map<string, any>} activeSetupTokens - The map storing valid tokens.
  * @returns An async function to handle the GET request.
  */
@@ -19,13 +19,43 @@ exports.showSetupForm = (activeSetupTokens) => async (req, res) => {
         });
     }
 
-    // Render the form and pass the token to it so the form `action` can be set correctly
-    res.render('setupForm', { token });
+    try {
+        const dbConfig = await db.query('SELECT key_name, value FROM config');
+        const currentConfig = {};
+
+        // Process the database rows to pre-fill the form
+        for (const row of dbConfig) {
+            try {
+                // Values are stored as JSON arrays, e.g., '["123", "456"]'
+                const parsedValue = JSON.parse(row.value);
+                // Join array elements to create a comma-separated string for the form input
+                if (Array.isArray(parsedValue)) {
+                    currentConfig[row.key_name] = parsedValue.join(', ');
+                }
+            } catch (e) {
+                // If it's not valid JSON (or an empty array string), just use the raw value.
+                currentConfig[row.key_name] = row.value;
+            }
+        }
+
+        // Render the form, passing the token and the current configuration data
+        res.render('setupForm', {
+            token,
+            currentConfig
+        });
+    } catch (error) {
+        logger.error('Error fetching config for setup form:', error);
+        res.status(500).render('error', {
+            title: 'Database Error',
+            message: 'Could not load current configuration from the database.'
+        });
+    }
 };
+
 
 /**
  * Handles the submission of the Setup form.
- * @param {Client} client - The Discord client instance.
+ * @param {import('discord.js').Client} client - The Discord client instance.
  * @param {Map<string, any>} activeSetupTokens - The map storing valid tokens.
  * @returns An async function to handle the POST request.
  */
@@ -56,12 +86,12 @@ exports.handleSetupSubmission = (client, activeSetupTokens) => async (req, res) 
             const arrayValue = value.split(',').map(item => item.trim()).filter(Boolean);
             const valueToStore = JSON.stringify(arrayValue);
 
-            // Using a direct and specific query for the config table.
+            // Using ON DUPLICATE KEY UPDATE handles both initial setup and subsequent edits.
             const sql = 'INSERT INTO config (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?';
             await db.query(sql, [key, valueToStore, valueToStore]);
         }
 
-        // Lock the setup command after successful submission
+        // Mark the setup as complete (or re-affirm it)
         const lockSql = 'INSERT INTO config (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?';
         await db.query(lockSql, ['setupLocked', JSON.stringify(["true"]), JSON.stringify(["true"])]);
 
@@ -91,4 +121,3 @@ exports.handleSetupSubmission = (client, activeSetupTokens) => async (req, res) 
         });
     }
 };
-

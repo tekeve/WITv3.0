@@ -1,5 +1,6 @@
 const db = require('@helpers/database');
 const logger = require('@helpers/logger');
+const configManager = require('@helpers/configManager');
 
 let hierarchyCache = null;
 
@@ -64,9 +65,29 @@ async function reloadHierarchy() {
     await loadHierarchy();
 }
 
+/**
+ * Gets a set of all role IDs that are managed by the promotion/demotion system.
+ * @returns {Promise<Set<string>>}
+ */
+async function getAllManageableRoleIds() {
+    const hierarchy = await getHierarchy();
+    const allIds = new Set();
+    if (!hierarchy) return allIds;
+
+    Object.values(hierarchy).forEach(rank => {
+        rank.promote?.add?.forEach(id => allIds.add(id));
+        rank.promote?.remove?.forEach(id => allIds.add(id));
+        rank.demote?.add?.forEach(id => allIds.add(id));
+        rank.demote?.remove?.forEach(id => allIds.add(id));
+    });
+
+    return allIds;
+}
+
 module.exports = {
     get: getHierarchy,
     getRankNames,
     reloadHierarchy,
+    getAllManageableRoleIds,
 };
 

@@ -1,4 +1,4 @@
-const { MessageFlags } = require('discord.js');
+const { MessageFlags, ThreadAutoArchiveDuration, ChannelType } = require('discord.js');
 const logger = require('@helpers/logger');
 const { buildSrpEmbed } = require('@embeds/srpEmbed.js');
 const configManager = require('@helpers/configManager');
@@ -72,11 +72,21 @@ module.exports = {
                 // Continue to attempt EVE mail even if Discord part fails
             } else {
                 const srpChannel = await client.channels.fetch(srpChannelId);
-                if (srpChannel) {
+                if (srpChannel && (srpChannel.type === ChannelType.GuildText || srpChannel.type === ChannelType.GuildAnnouncement)) {
                     const srpEmbed = await buildSrpEmbed(payload);
-                    await srpChannel.send({ embeds: [srpEmbed] });
+
+                    // Create a new thread for the SRP request
+                    const thread = await srpChannel.threads.create({
+                        name: `SRP: ${formData.pilot_name} - ${formData.ship_type}`,
+                        autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
+                        reason: `New SRP request for ${formData.pilot_name}`,
+                    });
+
+                    // Send the embed to the new thread
+                    await thread.send({ embeds: [srpEmbed] });
+
                 } else {
-                    logger.error(`Could not find the SRP channel with ID: ${srpChannelId}`);
+                    logger.error(`Could not find the SRP channel with ID: ${srpChannelId} or it's not a text-based channel.`);
                 }
             }
 
@@ -98,9 +108,9 @@ module.exports = {
                         const mailSubject = `SRP Request: ${formData.pilot_name} - ${formData.ship_type}`;
                         const mailBody = formatEveMailBody(formData, submitterName);
 
-                        await esiService.post(
-                            `/characters/${authData.character_id}/mail/`,
-                            {
+                        await esiService.post({
+                            endpoint: `/characters/${authData.character_id}/mail/`,
+                            data: {
                                 approved_cost: 0,
                                 body: mailBody,
                                 recipients: [{
@@ -109,8 +119,12 @@ module.exports = {
                                 }],
                                 subject: mailSubject,
                             },
-                            { 'Authorization': `Bearer ${accessToken}` }
-                        );
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            caller: __filename
+                        });
                         logger.success(`Successfully sent SRP EVE mail for ${formData.pilot_name} from ${authData.character_name}.`);
                     } catch (esiError) {
                         logger.error('Failed to send SRP EVE mail via ESI:', esiError);
@@ -120,7 +134,7 @@ module.exports = {
 
             // --- Final Confirmation to User ---
             await interaction.followUp({
-                content: 'Your SRP request has been successfully submitted and posted!',
+                content: 'Your SRP request has been successfully submitted and a thread has been created!',
                 flags: [MessageFlags.Ephemeral]
             });
 

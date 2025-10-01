@@ -1,5 +1,5 @@
 const logger = require('@helpers/logger');
-const { ChannelType } = require('discord.js');
+const { ChannelType, EmbedBuilder, MessageFlags } = require('discord.js');
 const db = require('@helpers/database');
 
 /**
@@ -24,18 +24,31 @@ exports.showCreator = (client) => async (req, res) => {
             .map(c => ({ id: c.id, name: c.name }))
             .sort((a, b) => a.name.localeCompare(b.name));
 
-        let embedToEdit = {
-            embed_data: {},
-            content: ''
-        };
+        let embedToEdit = null;
 
         if (mode === 'edit') {
-            const [embedRow] = await db.query('SELECT content, embed_data FROM saved_embeds WHERE guild_id = ? AND embed_name = ?', [guild.id, embedName]);
+            const [embedRow] = await db.query('SELECT content, embed_data, last_sent_channel_id FROM saved_embeds WHERE guild_id = ? AND embed_name = ?', [guild.id, embedName]);
             if (embedRow) {
-                // The data is already a JS object from mysql2, no need to parse
+                let parsedData = {};
+                // Defensively parse the embed_data, as it could be a string or an object.
+                if (typeof embedRow.embed_data === 'string') {
+                    try {
+                        if (embedRow.embed_data) { // Ensure it's not an empty string
+                            parsedData = JSON.parse(embedRow.embed_data);
+                        }
+                    } catch (e) {
+                        logger.error(`Failed to parse embed_data JSON for embed '${embedName}':`, e);
+                        // Proceed with an empty object to prevent a crash.
+                    }
+                } else if (embedRow.embed_data && typeof embedRow.embed_data === 'object') {
+                    // It's already a valid object.
+                    parsedData = embedRow.embed_data;
+                }
+
                 embedToEdit = {
-                    embed_data: embedRow.embed_data || {},
-                    content: embedRow.content || ''
+                    embed_data: parsedData,
+                    content: embedRow.content || '',
+                    last_sent_channel_id: embedRow.last_sent_channel_id
                 };
             }
         }
@@ -45,7 +58,7 @@ exports.showCreator = (client) => async (req, res) => {
             channels,
             embedName,
             mode,
-            embedToEdit // Pass the data to the view
+            embedToEdit
         });
     } catch (error) {
         logger.error('Error preparing embed creator page:', error);
@@ -70,67 +83,130 @@ exports.handleCreatorSubmission = (client) => async (req, res) => {
         });
     }
 
-    // Don't delete the token here so the user can be notified of success/failure via the original interaction
-    // client.activeEmbedTokens.delete(token);
-
-    const { interaction, guild, user } = tokenData;
-    const { channelId, embedData, content, embedName, action } = req.body;
+    const { interaction, guild, user, mode, embedName: originalName } = tokenData;
+    const { channelId, embedData, content, embedName: newEmbedName, action } = req.body;
 
     try {
+        if (!newEmbedName) {
+            const errorMsg = 'An embed name is required.';
+            await interaction.followUp({ content: errorMsg, flags: [MessageFlags.Ephemeral] });
+            return res.status(400).render('error', { title: 'Missing Information', message: errorMsg });
+        }
+
         let parsedEmbed;
         try {
-            // The embedData is coming from a hidden input, so it's a string. Parse it.
             parsedEmbed = JSON.parse(embedData);
         } catch (error) {
             logger.error('Embed submission failed: Invalid JSON.', error);
-            return res.status(400).render('error', { title: 'Invalid Data', message: 'The embed data was not valid JSON and could not be saved.' });
+            const errorMsg = 'There was an error processing the embed data from the form. It might be invalid JSON.';
+            await interaction.followUp({ content: errorMsg, flags: [MessageFlags.Ephemeral] });
+            return res.status(400).render('error', { title: 'Invalid Data', message: errorMsg });
         }
 
+        const embedDataString = JSON.stringify(parsedEmbed);
+        let lastSentMessageInfo = {};
 
-        // Save to database
-        const sql = `
-            INSERT INTO saved_embeds (embed_name, guild_id, embed_data, content, creator_id, creator_tag)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                embed_data = VALUES(embed_data),
-                content = VALUES(content),
-                creator_id = VALUES(creator_id),
-                creator_tag = VALUES(creator_tag),
-                updated_at = NOW()
-        `;
+        // In edit mode, fetch the last sent message details first
+        if (mode === 'edit') {
+            const [existing] = await db.query('SELECT last_sent_channel_id, last_sent_message_id FROM saved_embeds WHERE guild_id = ? AND embed_name = ?', [guild.id, originalName]);
+            if (existing) {
+                lastSentMessageInfo = {
+                    channelId: existing.last_sent_channel_id,
+                    messageId: existing.last_sent_message_id
+                };
+            }
+        }
 
-        // mysql2 will automatically handle the JS object to JSON conversion for the `embed_data` column
-        await db.query(sql, [embedName, guild.id, parsedEmbed, content, user.id, user.tag]);
-        logger.success(`Saved embed '${embedName}' for guild ${guild.id}`);
+        if (mode === 'create') {
+            const sql = `
+                INSERT INTO saved_embeds (embed_name, guild_id, embed_data, content, created_by_id, created_by_tag, last_edited_by_id, last_edited_by_tag)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            await db.query(sql, [newEmbedName, guild.id, embedDataString, content, user.id, user.tag, user.id, user.tag]);
+            logger.success(`Saved new embed '${newEmbedName}' for guild ${guild.id}`);
+        } else { // mode === 'edit'
+            const isRenaming = newEmbedName !== originalName;
+            if (isRenaming) {
+                const [existing] = await db.query('SELECT embed_name FROM saved_embeds WHERE embed_name = ? AND guild_id = ?', [newEmbedName, guild.id]);
+                if (existing) {
+                    const errorMsg = `An embed with the name \`${newEmbedName}\` already exists. Please choose a different name.`;
+                    await interaction.followUp({ content: errorMsg, flags: [MessageFlags.Ephemeral] });
+                    return res.status(409).render('error', { title: 'Name Conflict', message: errorMsg });
+                }
+            }
+            const sql = `
+                UPDATE saved_embeds 
+                SET embed_name = ?, embed_data = ?, content = ?, last_edited_by_id = ?, last_edited_by_tag = ?
+                WHERE embed_name = ? AND guild_id = ?
+            `;
+            await db.query(sql, [newEmbedName, embedDataString, content, user.id, user.tag, originalName, guild.id]);
+            logger.success(`Updated embed '${originalName}' (now '${newEmbedName}') for guild ${guild.id}`);
+        }
 
-        let successMessage = `Embed \`${embedName}\` has been successfully saved.`;
+        let successMessage = `Embed \`${newEmbedName || originalName}\` has been saved successfully.`;
 
-        // If the action is to send, also emit the event
+        // --- SEND/EDIT LOGIC ---
         if (action === 'send') {
-            client.emit('embedSubmission', {
-                interaction,
-                channelId,
-                embedData: parsedEmbed, // Send the parsed object
-                content
-            });
-            // The success message for sending is handled in the event handler now
-        } else {
-            await interaction.followUp({
-                content: successMessage,
-                flags: [MessageFlags.Ephemeral]
-            });
-        }
+            if (!channelId) {
+                successMessage += ` but was not sent because no channel was selected.`;
+                logger.warn(`Embed '${newEmbedName}' saved but not sent as no channel was provided.`);
+            } else {
+                let sentMessage = null;
+                const newChannel = await client.channels.fetch(channelId);
 
-        client.activeEmbedTokens.delete(token); // Clean up token after successful processing
-        res.render('success', {
-            title: 'Success!',
-            message: `Embed '${embedName}' has been saved.` + (action === 'send' ? ' It will be sent to the selected channel shortly.' : '') + ' You can now close this window.',
-        });
+                // If we are in edit mode, have info on the old message, and are sending to a NEW channel, delete the old message.
+                if (mode === 'edit' && lastSentMessageInfo.messageId && lastSentMessageInfo.channelId !== channelId) {
+                    try {
+                        const oldChannel = await client.channels.fetch(lastSentMessageInfo.channelId);
+                        const oldMessage = await oldChannel.messages.fetch(lastSentMessageInfo.messageId);
+                        await oldMessage.delete();
+                        logger.info(`Deleted old embed message ${lastSentMessageInfo.messageId} from ${oldChannel.name} because it was moved.`);
+                        successMessage += ` The old message in ${oldChannel} was also deleted.`
+                    } catch (deleteError) {
+                        logger.warn(`Could not delete old embed message ${lastSentMessageInfo.messageId}. It might have been deleted already. Error: ${deleteError.message}`);
+                    }
+                }
+
+                // Check if we should edit an existing message (only if it's in the same channel)
+                if (mode === 'edit' && lastSentMessageInfo.messageId && lastSentMessageInfo.channelId === channelId) {
+                    try {
+                        const messageToEdit = await newChannel.messages.fetch(lastSentMessageInfo.messageId);
+                        sentMessage = await messageToEdit.edit({ content: content, embeds: [new EmbedBuilder(parsedEmbed)] });
+                        successMessage += ` and its existing message in ${newChannel} was updated.`;
+                    } catch (editError) {
+                        logger.warn(`Could not edit original message ${lastSentMessageInfo.messageId}, sending a new one. Error: ${editError.message}`);
+                        // Fallback to sending a new message if editing fails
+                        sentMessage = await newChannel.send({ content: content, embeds: [new EmbedBuilder(parsedEmbed)] });
+                        successMessage += ` and a new message was sent to ${newChannel} (the old one couldn't be found).`;
+                    }
+                } else {
+                    // Send a new message if this is a 'create' action or if the channel has changed.
+                    sentMessage = await newChannel.send({ content: content, embeds: [new EmbedBuilder(parsedEmbed)] });
+                    successMessage += ` and sent to ${newChannel}.`;
+                }
+
+                // If a message was sent or edited, update its ID in the database
+                if (sentMessage) {
+                    await db.query(
+                        'UPDATE saved_embeds SET last_sent_channel_id = ?, last_sent_message_id = ? WHERE embed_name = ? AND guild_id = ?',
+                        [sentMessage.channel.id, sentMessage.id, newEmbedName, guild.id]
+                    );
+                }
+            }
+        }
+        // --- END OF LOGIC ---
+
+        await interaction.followUp({ content: successMessage, flags: [MessageFlags.Ephemeral] });
+
+        res.render('success', { title: 'Success!', message: successMessage + ' You can now close this window.' });
 
     } catch (error) {
-        logger.error(`Error saving embed '${embedName}':`, error);
-        res.status(500).render('error', { title: 'Database Error', message: 'Failed to save the embed to the database.' });
-        client.activeEmbedTokens.delete(token); // Clean up token on failure
+        logger.error(`Error saving/sending embed '${newEmbedName || originalName}':`, error);
+        const errorMsg = `A critical error occurred while trying to save or send the embed. Error: ${error.message}`;
+        await interaction.followUp({ content: errorMsg, flags: [MessageFlags.Ephemeral] });
+        res.status(500).render('error', { title: 'Database Error', message: `Failed to save the embed to the database. Please check the bot's logs.` });
+    } finally {
+        client.activeEmbedTokens.delete(token);
     }
 };
 
