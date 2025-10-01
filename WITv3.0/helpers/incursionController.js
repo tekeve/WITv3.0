@@ -140,17 +140,16 @@ async function fetchAndScheduleHighSecIncursion(client) {
     // Schedule the next check immediately after getting the expiry header.
     if (incursionsExpiry) {
         const timeUntilExpiry = incursionsExpiry - Date.now();
-        // The goal is to check again immediately after the ESI cache expires.
-        // A small buffer is added to account for any minor clock drift or network latency,
-        // ensuring the old cache is truly gone when we make the next request.
         const refreshBuffer = 1000; // 1 second in milliseconds
         nextCheckDelay = timeUntilExpiry + refreshBuffer;
     }
     scheduleNextIncursionCheck(client, nextCheckDelay);
 
+    // **NEW SAFEGUARD**: Ensure the ESI response is a valid array.
     if (!Array.isArray(allIncursions)) {
         // This is an unexpected ESI response format, not a standard HTTP error.
-        throw new Error(`ESI /incursions/ endpoint did not return an array. Response: ${JSON.stringify(allIncursions)}`);
+        // Throw an error to abort the update cycle in the main handler.
+        throw new Error(`ESI /incursions/ endpoint returned a 200 OK status but was not a valid array. Response: ${JSON.stringify(allIncursions)}`);
     }
 
     const incursionSystems = incursionManager.get();
@@ -158,20 +157,21 @@ async function fetchAndScheduleHighSecIncursion(client) {
 
     for (const incursion of allIncursions) {
         if (highSecConstellationIds.has(incursion.constellation_id)) {
-            // This inner try/catch remains to handle cases where a single system lookup fails,
-            // which shouldn't halt the entire process.
-            try {
-                const { data: systemData } = await esiService.get({
-                    endpoint: `/universe/systems/${incursion.staging_solar_system_id}/`,
-                    caller: __filename
-                });
+            // By removing the inner try/catch, any failure here will propagate up and be caught
+            // by the main handler in updateIncursions, preventing an incorrect state change.
+            const { data: systemData } = await esiService.get({
+                endpoint: `/universe/systems/${incursion.staging_solar_system_id}/`,
+                caller: __filename
+            });
 
-                if (systemData && systemData.security_status > 0.45) {
-                    const highSecIncursion = { ...incursion, systemData };
-                    return { highSecIncursion };
-                }
-            } catch (e) {
-                logger.warn(`Could not resolve system ID ${incursion.staging_solar_system_id} for potential HS incursion. Error: ${e.message}`);
+            // **NEW SAFEGUARD**: Ensure the system data was actually returned.
+            if (!systemData) {
+                throw new Error(`ESI /universe/systems/ endpoint returned a 200 OK status but the body was empty for system ID ${incursion.staging_solar_system_id}.`);
+            }
+
+            if (systemData.security_status > 0.45) {
+                const highSecIncursion = { ...incursion, systemData };
+                return { highSecIncursion };
             }
         }
     }
@@ -318,7 +318,7 @@ async function updateIncursions(client, options = {}) {
         await writeState(state);
 
     } catch (error) {
-        // --- NEW CATCH BLOCK LOGIC ---
+        // --- CATCH BLOCK LOGIC ---
         // Check if the error is from an ESI/HTTP response. Any non-200 status will have this.
         if (error.response) {
             const status = error.response.status;
@@ -327,7 +327,7 @@ async function updateIncursions(client, options = {}) {
             // Just reschedule and do nothing else. The state remains untouched.
             scheduleNextIncursionCheck(client, 60 * 1000);
         } else {
-            // This is a non-ESI error (e.g., Discord API, database, internal logic).
+            // This is a non-ESI error (e.g., Discord API, database, internal logic, or our new custom error).
             const channelId = config.incursionChannelId ? config.incursionChannelId[0] : 'NOT CONFIGURED';
             if (error.code === 50001) { // Missing Access
                 logger.error(`FATAL: Bot is missing access to the configured incursion channel (ID: ${channelId}). The incursion updater will stop.`);
@@ -340,8 +340,8 @@ async function updateIncursions(client, options = {}) {
                 return; // Do not reschedule
             }
 
-            // For other unexpected errors, log them fully and try again later.
-            logger.error(`An unexpected, non-ESI error occurred during incursion update: ${error.message}`, error.stack);
+            // For other unexpected errors, including our new custom ones, log them fully and try again later.
+            logger.error(`An unexpected error occurred during incursion update: ${error.message}`, error.stack);
             scheduleNextIncursionCheck(client, 60 * 1000);
         }
     } finally {
@@ -351,3 +351,4 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
+

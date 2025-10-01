@@ -184,9 +184,11 @@ function buildNoIncursionEmbed(state) {
         if (stats.establishedPhase) {
             statsFields.push(`**Established Phase**: ${stats.establishedPhase}`);
         }
-        if (stats.mobilizingPhase) {
-            statsFields.push(`**Mobilizing Phase**: ${stats.mobilizingPhase}`);
-        }
+        /**
+         * if (stats.mobilizingPhase) {
+         * statsFields.push(`**Mobilizing Phase**: ${stats.mobilizingPhase}`);
+         * }
+         */
         if (stats.withdrawingPeriodUsed) {
             statsFields.push(`**Withdrawing Period Used**: ${stats.withdrawingPeriodUsed}`);
         }
