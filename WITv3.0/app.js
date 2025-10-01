@@ -11,6 +11,7 @@ const incursionManager = require('@helpers/incursionManager');
 const db = require('@helpers/database');
 const { startServer } = require('./web/server.js');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
+const reactionRoleManager = require('@helpers/reactionRoleManager');
 
 // ... (deployCommands function remains the same) ...
 async function deployCommands() {
@@ -68,6 +69,7 @@ async function initializeApp() {
     await configManager.reloadConfig();
     await incursionManager.loadIncursionSystems();
     await roleHierarchyManager.reloadHierarchy();
+    await reactionRoleManager.loadReactionRoles(); // Load reaction roles on startup
 
     const client = new Client({
         intents: [
@@ -78,8 +80,15 @@ async function initializeApp() {
             GatewayIntentBits.GuildVoiceStates,
             GatewayIntentBits.GuildInvites,
             GatewayIntentBits.GuildModeration,
+            GatewayIntentBits.GuildMessageReactions, // Added for reaction roles
         ],
-        partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
+        partials: [
+            Partials.Message,
+            Partials.Channel,
+            Partials.GuildMember,
+            Partials.Reaction, // Added for reaction roles
+            Partials.User      // Added for reaction roles
+        ],
     });
 
     client.activeSrpTokens = new Map();
@@ -87,6 +96,7 @@ async function initializeApp() {
     client.activeWebEditTokens = new Map();
     client.activeResidentAppTokens = new Map();
     client.activeEmbedTokens = new Map();
+    client.activeReactionRoleTokens = new Map(); // Added for reaction roles
     client.esiStateMap = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null;
@@ -119,15 +129,19 @@ async function initializeApp() {
     const interactionCreateHandler = require('./events/interactionCreate');
     const srpSubmissionHandler = require('./events/srpSubmission');
     const residentAppSubmissionHandler = require('./events/residentAppSubmission');
+    const { registerActionLogEvents } = require('./events/actionLogHandler');
+    const { registerReactionEvents } = require('./events/reactionHandler'); // Added for reaction roles
 
     client.once(clientReadyHandler.name, (...args) => clientReadyHandler.execute(...args, client));
     client.on(interactionCreateHandler.name, (...args) => interactionCreateHandler.execute(...args, client));
     client.on(srpSubmissionHandler.name, (...args) => srpSubmissionHandler.execute(...args, client));
     client.on(residentAppSubmissionHandler.name, (...args) => residentAppSubmissionHandler.execute(...args, client));
 
-    // Register all action log event listeners from the consolidated handler
-    const { registerActionLogEvents } = require('./events/actionLogHandler');
+    // Register all action log event listeners
     registerActionLogEvents(client);
+    // Register reaction role event listeners
+    registerReactionEvents(client);
+
 
     logger.info('Loaded all event handlers.');
     // --- END OF NEW LOADING LOGIC ---
