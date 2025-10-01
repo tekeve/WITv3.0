@@ -154,6 +154,14 @@
                     <label for="auditLogChannelId">Audit Log Channel ID</label>
                     <input type="text" id="auditLogChannelId" name="auditLogChannelId" required value="<%= currentConfig.auditLogChannelId || '' %>">
                 </div>
+                 <div class="form-group">
+                    <label for="actionLogChannelId">Action Log Channel ID</label>
+                    <input type="text" id="actionLogChannelId" name="actionLogChannelId" required value="<%= currentConfig.actionLogChannelId || '' %>">
+                </div>
+            </div>
+            
+            <h2>EVE Integration</h2>
+            <div class="form-grid">
                 <div class="form-group">
                     <label for="incursionChannelId">Incursion Channel ID</label>
                     <input type="text" id="incursionChannelId" name="incursionChannelId" required value="<%= currentConfig.incursionChannelId || '' %>">
@@ -162,6 +170,34 @@
                     <label for="srpChannelId">SRP Channel ID</label>
                     <input type="text" id="srpChannelId" name="srpChannelId" required value="<%= currentConfig.srpChannelId || '' %>">
                 </div>
+                 <div class="form-group">
+                    <label for="srpMailingListId">SRP Mailing List ID</label>
+                    <input type="text" id="srpMailingListId" name="srpMailingListId" required value="<%= currentConfig.srpMailingListId || '' %>">
+                </div>
+                 <div class="form-group">
+                    <label for="residentAppChannelId">Resident Application Channel ID</label>
+                    <input type="text" id="residentAppChannelId" name="residentAppChannelId" required value="<%= currentConfig.residentAppChannelId || '' %>">
+                </div>
+                 <div class="form-group">
+                    <label for="logiSignoffChannelId">Logi Signoff Channel ID</label>
+                    <input type="text" id="logiSignoffChannelId" name="logiSignoffChannelId" required value="<%= currentConfig.logiSignoffChannelId || '' %>">
+                </div>
+            </div>
+
+            <h2>GitHub Integration</h2>
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label for="githubRepoUrl">GitHub Repository URL</label>
+                    <input type="url" id="githubRepoUrl" name="githubRepoUrl" value="<%= currentConfig.githubRepoUrl || '' %>" placeholder="e.g., https://github.com/user/repo">
+                </div>
+                <div class="form-group">
+                    <label for="githubBranch">Branch to Watch</label>
+                    <input type="text" id="githubBranch" name="githubBranch" value="<%= currentConfig.githubBranch || '' %>" placeholder="e.g., main">
+                </div>
+                <div class="form-group">
+                    <label for="githubChannelId">GitHub Notification Channel ID</label>
+                    <input type="text" id="githubChannelId" name="githubChannelId" value="<%= currentConfig.githubChannelId || '' %>">
+                </div>
             </div>
 
             <button type="submit">Save Configuration</button>
@@ -169,4 +205,3 @@
     </div>
 </body>
 </html>
-
