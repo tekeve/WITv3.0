@@ -451,6 +451,11 @@
             background-color: var(--accent-red);
             color: white;
         }
+        
+        .toast.info {
+            background-color: var(--accent-blue);
+            color: white;
+        }
 
         .pagination {
             display: flex;
@@ -570,6 +575,7 @@
         </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const isAdmin = <%- isAdmin %>;
@@ -1060,10 +1066,27 @@
                 }
             }
 
+            // --- WebSocket Logic ---
+            const socket = io();
+
+            socket.on('connect', () => {
+                console.log('Successfully connected to WebSocket server.');
+            });
+
+            socket.on('logi-update', () => {
+                console.log('Received logi-update event. Fetching new data.');
+                showToast('Data updated by another user. Refreshing lists...', 'info');
+                fetchData('all');
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Disconnected from WebSocket server.');
+            });
+
             // --- INITIAL SETUP & LISTENERS ---
             newPilotNameInput.addEventListener('input', () => {
                 clearTimeout(state.validationTimeout);
-                state.validationTimeout = setTimeout(validateNewPilot, 500);
+                state.validationTimeout = setTimeout(validateNewPilot, 750);
             });
 
             searchInProgressInput.addEventListener('input', () =>

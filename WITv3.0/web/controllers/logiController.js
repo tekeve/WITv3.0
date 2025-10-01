@@ -59,8 +59,9 @@ exports.showForm = (client) => async (req, res) => {
 /**
  * Handles submission for a new signoff (in-progress pilots).
  * @param {import('discord.js').Client} client - The Discord client instance.
+ * @param {import('socket.io').Server} io - The Socket.IO server instance.
  */
-exports.handleSignoff = (client) => async (req, res) => {
+exports.handleSignoff = (client, io) => async (req, res) => {
     const { token } = req.params;
     const tokenData = client.activeLogiTokens?.get(token);
 
@@ -73,6 +74,9 @@ exports.handleSignoff = (client) => async (req, res) => {
 
     try {
         const result = await logiManager.addSignoff(pilotName, commanderName, comment, client);
+        if (result.success) {
+            io.emit('logi-update'); // Notify all clients of the change
+        }
         res.json(result);
     } catch (error) {
         logger.error('Error in handleSignoff:', error);
@@ -83,8 +87,9 @@ exports.handleSignoff = (client) => async (req, res) => {
 /**
  * Handles submission for a new demerit (trusted pilots).
  * @param {import('discord.js').Client} client - The Discord client instance.
+ * @param {import('socket.io').Server} io - The Socket.IO server instance.
  */
-exports.handleDemerit = (client) => async (req, res) => {
+exports.handleDemerit = (client, io) => async (req, res) => {
     const { token } = req.params;
     const tokenData = client.activeLogiTokens?.get(token);
 
@@ -97,6 +102,9 @@ exports.handleDemerit = (client) => async (req, res) => {
 
     try {
         const result = await logiManager.addDemerit(pilotName, commanderName, comment, client);
+        if (result.success) {
+            io.emit('logi-update'); // Notify all clients
+        }
         res.json(result);
     } catch (error) {
         logger.error('Error in handleDemerit:', error);
@@ -107,8 +115,9 @@ exports.handleDemerit = (client) => async (req, res) => {
 /**
  * Handles submission for a positive comment for a trusted pilot.
  * @param {import('discord.js').Client} client - The Discord client instance.
+ * @param {import('socket.io').Server} io - The Socket.IO server instance.
  */
-exports.handleTrustedComment = (client) => async (req, res) => {
+exports.handleTrustedComment = (client, io) => async (req, res) => {
     const { token } = req.params;
     const tokenData = client.activeLogiTokens?.get(token);
 
@@ -121,6 +130,9 @@ exports.handleTrustedComment = (client) => async (req, res) => {
 
     try {
         const result = await logiManager.addTrustedComment(pilotName, commanderName, comment);
+        if (result.success) {
+            io.emit('logi-update'); // Notify all clients
+        }
         res.json(result);
     } catch (error) {
         logger.error('Error in handleTrustedComment:', error);
@@ -131,8 +143,9 @@ exports.handleTrustedComment = (client) => async (req, res) => {
 /**
  * Handles deleting a pilot from a list (admin only).
  * @param {import('discord.js').Client} client - The Discord client instance.
+ * @param {import('socket.io').Server} io - The Socket.IO server instance.
  */
-exports.handleDeletePilot = (client) => async (req, res) => {
+exports.handleDeletePilot = (client, io) => async (req, res) => {
     const { token } = req.params;
     const tokenData = client.activeLogiTokens?.get(token);
 
@@ -149,6 +162,9 @@ exports.handleDeletePilot = (client) => async (req, res) => {
 
     try {
         const result = await logiManager.deletePilot(pilotName, listType);
+        if (result.success) {
+            io.emit('logi-update'); // Notify all clients
+        }
         res.json(result);
     } catch (error) {
         logger.error('Error in handleDeletePilot:', error);

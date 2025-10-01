@@ -3,6 +3,7 @@ const actionLog = require('@helpers/actionLog');
 const logger = require('@helpers/logger');
 const characterManager = require('@helpers/characterManager');
 const ErrorHandler = require('@helpers/errorHandler');
+const { diffWords } = require('diff');
 
 // --- Utility Functions ---
 
@@ -484,30 +485,54 @@ async function handleMessageDelete(message) {
 }
 
 async function handleMessageUpdate(oldMessage, newMessage) {
-    // Basic checks to prevent logging unnecessary events
     if (newMessage.partial || !newMessage.guild || !newMessage.author || newMessage.author.bot) return;
-    // Ignore updates that don't change content (e.g., embed loading)
     if (oldMessage.content === newMessage.content) return;
 
     try {
-        // Fetch the member object to ensure we have the most up-to-date server-specific info
         const member = newMessage.member || await newMessage.guild.members.fetch(newMessage.author.id);
+
+        const diff = diffWords(oldMessage.content || '', newMessage.content || '');
+
+        // ANSI color codes for use in code blocks
+        const BG_RED = '\u001b[41m';      // Red Background
+        const BG_GREEN = '\u001b[42m';    // Green Background
+        const FG_WHITE = '\u001b[1;37m';  // Bold White Foreground
+        const RESET = '\u001b[0m';       // Resets all formatting
+
+        let beforeContent = '';
+        let afterContent = '';
+
+        diff.forEach(part => {
+            const value = part.value;
+            if (part.added) {
+                afterContent += `${BG_GREEN}${FG_WHITE}${value}${RESET}`;
+            } else if (part.removed) {
+                beforeContent += `${BG_RED}${FG_WHITE}${value}${RESET}`;
+            } else {
+                beforeContent += value;
+                afterContent += value;
+            }
+        });
+
+        // Truncate if the content is too long for an embed field.
+        if (beforeContent.length > 1020) {
+            beforeContent = beforeContent.substring(0, 1020) + '...';
+        }
+        if (afterContent.length > 1020) {
+            afterContent = afterContent.substring(0, 1020) + '...';
+        }
 
         const embed = new EmbedBuilder()
             .setColor(0xFAA61A) // Orange color for edits
-            .setAuthor({ name: member.displayName, iconURL: member.user.displayAvatarURL() })
+            .setAuthor({ name: `${member.user.tag} (${member.displayName})`, iconURL: member.user.displayAvatarURL() })
             .setDescription(`Message edited in ${newMessage.channel}. [Jump to Message](${newMessage.url})`)
             .addFields(
-                // Shows the user's full tag and makes them clickable
-                { name: 'User', value: `${newMessage.author} (${newMessage.author.tag})`, inline: false },
-                // Shows the original content
-                { name: 'Before', value: `\`\`\`${(oldMessage.content || '*Empty or an embed*').substring(0, 1020)}\`\`\`` },
-                // Shows the new, updated content
-                { name: 'After', value: `\`\`\`${(newMessage.content || '*Empty*').substring(0, 1020)}\`\`\`` }
+                { name: 'Before', value: `\`\`\`ansi\n- ${beforeContent}\n\`\`\`` },
+                { name: 'After', value: `\`\`\`ansi\n+ ${afterContent}\n\`\`\`` }
             )
             .setTimestamp();
 
-        actionLog.postLog(newMessage.guild, 'log_message_edit', embed, { channel: newMessage.channel, member: newMessage.member });
+        actionLog.postLog(newMessage.guild, 'log_message_edit', embed, { channel: newMessage.channel, member });
     } catch (error) {
         await ErrorHandler.handleDiscordError(error, `handling message edit event`);
     }
