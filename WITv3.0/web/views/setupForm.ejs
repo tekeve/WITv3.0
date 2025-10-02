@@ -138,6 +138,11 @@
                     <input type="text" id="removeAllRoles" name="removeAllRoles" value="<%= currentConfig.removeAllRoles || '' %>">
                     <small>Optional: Role IDs that SHOULD be removed by the /demote "Remove All" command.</small>
                 </div>
+                <div class="form-group">
+                    <label for="newMemberRoleId">New Member Role</label>
+                    <input type="text" id="newMemberRoleId" name="newMemberRoleId" value="<%= currentConfig.newMemberRoleId || '' %>">
+                    <small>Optional: Role ID to assign to new members after 1 minute.</small>
+                </div>
             </div>
 
             <h2>Channel Configuration</h2>
