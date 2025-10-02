@@ -4,6 +4,7 @@ const logger = require('@helpers/logger');
 const characterManager = require('@helpers/characterManager');
 const ErrorHandler = require('@helpers/errorHandler');
 const { diffWords } = require('diff');
+const configManager = require('@helpers/configManager');
 
 // --- Utility Functions ---
 
@@ -254,6 +255,35 @@ async function handleMemberAdd(member) {
             .setTimestamp();
 
         actionLog.postLog(member.guild, 'log_member_join', embed, { member });
+
+        // Assign role to new member after 1 minute
+        const config = configManager.get();
+        const newMemberRoleId = config.newMemberRoleId ? config.newMemberRoleId[0] : null;
+
+        if (newMemberRoleId) {
+            setTimeout(async () => {
+                try {
+                    // Re-fetch the member to ensure they are still in the server
+                    const freshMember = await member.guild.members.fetch(member.id).catch(() => null);
+                    if (!freshMember) {
+                        logger.info(`User ${member.user.tag} left before the new member role could be assigned.`);
+                        return;
+                    }
+
+                    const role = await member.guild.roles.fetch(newMemberRoleId).catch(() => null);
+                    if (role) {
+                        if (!freshMember.roles.cache.has(role.id)) {
+                            await freshMember.roles.add(role, 'Automatic role assignment for new member.');
+                            logger.success(`Assigned role '${role.name}' to new member ${freshMember.user.tag}.`);
+                        }
+                    } else {
+                        logger.warn(`Configured newMemberRoleId '${newMemberRoleId}' not found in the guild.`);
+                    }
+                } catch (error) {
+                    logger.error(`Failed to assign new member role to ${member.user.tag}:`, error);
+                }
+            }, 60 * 1000); // 1 minute in milliseconds
+        }
     } catch (error) {
         await ErrorHandler.handleDiscordError(error, `handling member join event for ${member.user.tag}`);
     }
@@ -665,3 +695,4 @@ function registerActionLogEvents(client) {
 }
 
 module.exports = { registerActionLogEvents };
+

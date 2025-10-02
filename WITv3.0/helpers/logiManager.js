@@ -21,8 +21,9 @@ async function getSignoffData(options = {}) {
         limit = 10
     } = options;
 
-    const offsetInProgress = (pageInProgress - 1) * limit;
-    const offsetTrusted = (pageTrusted - 1) * limit;
+    const limitNum = Number(limit);
+    const offsetInProgress = (Number(pageInProgress) - 1) * limitNum;
+    const offsetTrusted = (Number(pageTrusted) - 1) * limitNum;
     const searchInProgressWildcard = `%${searchInProgress}%`;
     const searchTrustedWildcard = `%${searchTrusted}%`;
 
@@ -33,8 +34,9 @@ async function getSignoffData(options = {}) {
         const totalInProgress = inProgressCountResult.count;
         const totalTrusted = trustedCountResult.count;
 
-        const inProgress = await db.query('SELECT id, pilot_name, history, created_at FROM logi_signoffs WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?', [searchInProgressWildcard, searchInProgressWildcard, limit, offsetInProgress]);
-        const trusted = await db.query('SELECT pilot_name, added_at, history FROM trusted_pilots WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY added_at DESC LIMIT ? OFFSET ?', [searchTrustedWildcard, searchTrustedWildcard, limit, offsetTrusted]);
+        // Use template literals for LIMIT and OFFSET to avoid placeholder issues with some mysql drivers
+        const inProgress = await db.query(`SELECT id, pilot_name, history, created_at FROM logi_signoffs WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offsetInProgress}`, [searchInProgressWildcard, searchInProgressWildcard]);
+        const trusted = await db.query(`SELECT pilot_name, added_at, history FROM trusted_pilots WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY added_at DESC LIMIT ${limitNum} OFFSET ${offsetTrusted}`, [searchTrustedWildcard, searchTrustedWildcard]);
 
         const parseHistory = (pilot) => {
             try {
@@ -317,12 +319,52 @@ async function validateCharacter(characterName) {
     return charManager.getCharacterDetails(characterName);
 }
 
+/**
+ * Adds a pilot directly to the trusted list, bypassing the normal sign-off process. Admin only.
+ * @param {string} pilotName - The name of the pilot.
+ * @param {string} commanderName - The name of the admin performing the action.
+ * @param {string} comment - The comment for the action.
+ * @param {import('discord.js').Client} client - The Discord client.
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+async function addPilotDirectlyToTrusted(pilotName, commanderName, comment, client) {
+    try {
+        // Check if pilot is already trusted
+        const [isTrusted] = await db.query('SELECT 1 FROM trusted_pilots WHERE pilot_name = ?', [pilotName]);
+        if (isTrusted) {
+            return { success: false, message: `**${pilotName}** is already a trusted pilot.` };
+        }
+
+        // Check if they are in progress and remove them if so, to avoid duplication.
+        await db.query('DELETE FROM logi_signoffs WHERE pilot_name = ?', [pilotName]);
+
+        // Create the history record for this action
+        const history = [{
+            type: 'comment',
+            commander: commanderName,
+            comment: `Admin Override: Added directly to trusted list. Original comment: ${comment || 'N/A'}`,
+            date: new Date().toISOString()
+        }];
+
+        // Add to trusted pilots table
+        await db.query('INSERT INTO trusted_pilots (pilot_name, history) VALUES (?, ?)', [pilotName, JSON.stringify(history)]);
+
+        // Notify council
+        await notifyCouncilOfPass(pilotName, history, client);
+
+        return { success: true, message: `**${pilotName}** has been added directly to the trusted pilot list via admin override.` };
+    } catch (error) {
+        logger.error(`Error in addPilotDirectlyToTrusted for ${pilotName}:`, error);
+        return { success: false, message: 'A database error occurred during the admin override process.' };
+    }
+}
+
 module.exports = {
     getSignoffData,
     addSignoff,
     addDemerit,
     addTrustedComment,
     deletePilot,
-    validateCharacter
+    validateCharacter,
+    addPilotDirectlyToTrusted
 };
-

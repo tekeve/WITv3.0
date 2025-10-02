@@ -70,10 +70,19 @@ exports.handleSignoff = (client, io) => async (req, res) => {
         return res.status(403).json({ success: false, message: 'This form session has expired. Please generate a new link in Discord.' });
     }
 
-    const { pilotName, commanderName, comment } = req.body;
+    const { pilotName, commanderName, comment, adminOverride } = req.body;
+    const isAdmin = roleManager.isAdmin(tokenData.member);
 
     try {
-        const result = await logiManager.addSignoff(pilotName, commanderName, comment, client);
+        let result;
+        if (adminOverride && isAdmin) {
+            // If the override checkbox is checked and the user is an admin, add directly to trusted.
+            result = await logiManager.addPilotDirectlyToTrusted(pilotName, commanderName, comment, client);
+        } else {
+            // Otherwise, follow the normal signoff process.
+            result = await logiManager.addSignoff(pilotName, commanderName, comment, client);
+        }
+
         if (result.success) {
             io.emit('logi-update'); // Notify all clients of the change
         }
@@ -233,4 +242,3 @@ exports.getPaginatedData = (client) => async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to fetch updated data.' });
     }
 };
-
