@@ -27,7 +27,7 @@ async function handleTicketButton(interaction) {
 }
 
 async function handleRequestModal(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
 
     const config = configManager.get();
     const requestChannelId = config.requestChannelId ? config.requestChannelId[0] : null;

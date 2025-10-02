@@ -26,7 +26,7 @@ exports.showForm = (client) => async (req, res) => {
             .sort((a, b) => a.name.localeCompare(b.name));
 
         const emojis = guild.emojis.cache
-            .map(e => ({ id: e.id, name: e.name, identifier: e.toString() }));
+            .map(e => ({ id: e.id, name: e.name, identifier: e.toString(), url: e.url }));
 
         const channels = guild.channels.cache
             .filter(c => c.isTextBased() && !c.isThread())
@@ -41,7 +41,7 @@ exports.showForm = (client) => async (req, res) => {
                 const channel = await client.channels.fetch(data.channelId);
                 const message = await channel.messages.fetch(messageId);
                 // If fetch is successful, return the setup data with content
-                return { ...data, messageId, content: message.content, isValid: true };
+                return { ...data, messageId, content: message.content || '[Embed]', isValid: true };
             } catch (error) {
                 if (error.code === 10008 || error.code === 10003) { // Unknown Message or Unknown Channel
                     logger.info(`Message ${messageId} for reaction role setup not found. Marking for cleanup.`);
@@ -198,3 +198,4 @@ exports.handleSubmission = (client) => async (req, res) => {
         res.status(500).render('error', { title: 'Error', message: 'An internal error occurred.' });
     }
 };
+
