@@ -67,8 +67,10 @@ async function getSignoffData(options = {}) {
  * @param {string} pilotName - The name of the pilot who passed.
  * @param {Array} history - The pilot's full history array.
  * @param {import('discord.js').Client} client - The Discord client instance.
+ * @param {object} [options={ ping: true }] - Options for the notification.
+ * @param {boolean} [options.ping=true] - Whether to ping roles in the notification.
  */
-async function notifyCouncilOfPass(pilotName, history, client) {
+async function notifyCouncilOfPass(pilotName, history, client, options = { ping: true }) {
     const config = configManager.get();
     const channelId = config.logiSignoffChannelId ? config.logiSignoffChannelId[0] : null;
 
@@ -99,8 +101,9 @@ async function notifyCouncilOfPass(pilotName, history, client) {
             )
             .setTimestamp();
 
-        await channel.send({ content: roleMentions, embeds: [embed] });
-        logger.success(`Sent pass notification for ${pilotName}.`);
+        const content = options.ping ? roleMentions : null;
+        await channel.send({ content, embeds: [embed] });
+        logger.success(`Sent pass notification for ${pilotName}. Ping: ${options.ping}`);
     } catch (error) {
         logger.error('Failed to send pass notification:', error);
     }
@@ -349,8 +352,8 @@ async function addPilotDirectlyToTrusted(pilotName, commanderName, comment, clie
         // Add to trusted pilots table
         await db.query('INSERT INTO trusted_pilots (pilot_name, history) VALUES (?, ?)', [pilotName, JSON.stringify(history)]);
 
-        // Notify council
-        await notifyCouncilOfPass(pilotName, history, client);
+        // Notify council without a ping
+        await notifyCouncilOfPass(pilotName, history, client, { ping: false });
 
         return { success: true, message: `**${pilotName}** has been added directly to the trusted pilot list via admin override.` };
     } catch (error) {
@@ -368,3 +371,4 @@ module.exports = {
     validateCharacter,
     addPilotDirectlyToTrusted
 };
+
