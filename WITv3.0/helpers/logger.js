@@ -220,7 +220,6 @@ function error(...args) {
 
 function audit(...args) {
     const line = `[AUDIT] ${args.map(formatValue).join(' ')}`;
-    logToFile(logPath, line);
     if (isAudit || isVerbose) console.log(chalk.magenta(line));
 }
 
