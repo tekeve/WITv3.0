@@ -62,6 +62,12 @@ module.exports = {
                         .setDescription('The constellation name (required for active states).')
                         .setRequired(false)
                         .setAutocomplete(true)) // Enable autocomplete
+                .addNumberOption(option =>
+                    option.setName('influence')
+                        .setDescription('Mock influence value (a decimal from 0.0 to 1.0).')
+                        .setRequired(false)
+                        .setMinValue(0.0)
+                        .setMaxValue(1.0))
                 .addStringOption(option =>
                     option.setName('spawntimestamp')
                         .setDescription('Mock spawn time (e.g., "2d 12h ago").')
@@ -106,6 +112,7 @@ module.exports = {
         } else if (subcommand === 'setstate') {
             const state = interaction.options.getString('state');
             const constellationName = interaction.options.getString('constellation');
+            const influence = interaction.options.getNumber('influence'); // Can be null if not provided
             const spawnTimestampStr = interaction.options.getString('spawntimestamp');
             const mobilizingTimestampStr = interaction.options.getString('mobilizingtimestamp');
             const withdrawingTimestampStr = interaction.options.getString('withdrawingtimestamp');
@@ -122,7 +129,8 @@ module.exports = {
             interaction.client.mockOverride = {
                 state: state,
                 constellationName: constellationName,
-                expires: Date.now() + (10 * 60 * 1000)
+                expires: Date.now() + (10 * 60 * 1000),
+                influence: influence // Add influence to the mock object
             };
 
             if (spawnTimestampStr) interaction.client.mockOverride.spawnTimestamp = parseTimestring(spawnTimestampStr);

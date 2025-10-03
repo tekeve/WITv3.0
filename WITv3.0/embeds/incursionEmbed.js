@@ -2,6 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const esiService = require('@helpers/esiService');
 const logger = require('@helpers/logger');
 const incursionManager = require('@helpers/incursionManager');
+const { createProgressBar } = require('@helpers/progressBar'); // Import the progress bar helper
 
 // Color map for incursion states
 const stateColors = {
@@ -85,8 +86,12 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
         fields.push({ name: 'Route from Last HQ', value: routeFromLastHqString, inline: true });
     }
 
-    embed.addFields(fields)
-        .setFooter({ text: 'WIT v3.0 Incursion Tracker | Data from ESI' }).setTimestamp();
+    embed.addFields(fields);
+
+    // Add the influence progress bar as a new, non-inline field at the bottom
+    embed.addFields({ name: 'Influence', value: createProgressBar(highSecIncursion.influence * 100, 100) });
+
+    embed.setFooter({ text: 'WIT v3.0 Incursion Tracker | Data from ESI' }).setTimestamp();
 
     return embed;
 }
@@ -137,3 +142,4 @@ function buildNoIncursionEmbed(state) {
 }
 
 module.exports = { buildActiveIncursionEmbed, buildNoIncursionEmbed, formatDuration };
+

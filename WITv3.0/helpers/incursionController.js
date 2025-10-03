@@ -320,7 +320,8 @@ async function updateIncursions(client, options = {}) {
                         state: mockOverride.state,
                         staging_solar_system_id: parseInt(spawnData.dock_up_system_id, 10),
                         faction_id: parseInt(spawnData.region_faction, 10),
-                        systemData: { security_status: 0.8 }
+                        systemData: { security_status: 0.8 },
+                        influence: 0.5 // Add a default influence for mocks
                     };
                 }
             }
@@ -335,7 +336,8 @@ async function updateIncursions(client, options = {}) {
         }
 
 
-        const currentStateKey = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}` : 'none';
+        // Include influence in the state key to trigger updates when it changes.
+        const currentStateKey = highSecIncursion ? `${highSecIncursion.constellation_id}-${highSecIncursion.state}-${highSecIncursion.influence}` : 'none';
 
         if (currentStateKey === state.lastIncursionState && !isManualRefresh) {
             logger.info('No change in high-sec incursion state.');
@@ -462,3 +464,4 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
+

@@ -6,7 +6,7 @@ const configManager = require('@helpers/configManager');
 
 async function handleTicketButton(interaction) {
     // Permission check
-    if (!roleManager.isAdmin(interaction.member)) {
+    if (!roleManager.isCouncilOrAdmin(interaction.member)) {
         return interaction.reply({ content: 'You do not have permission to resolve tickets.', flags: [MessageFlags.Ephemeral] });
     }
 
