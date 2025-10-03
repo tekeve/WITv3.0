@@ -85,38 +85,78 @@ scheduleMidnightRollover();
  * Renames the 'latest.log' files with a precise timestamp.
  * This is used for clean shutdowns and crashes.
  */
+let isShuttingDown = false;
+
+/**
+ * The main shutdown handler. It archives logs and can be expanded for other cleanup tasks
+ * (e.g., closing database connections).
+ * @param {string} signal - The signal that triggered the shutdown.
+ */
+async function shutdown(signal) {
+    // Prevent the function from running multiple times if signals are received in quick succession
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    console.log(chalk.yellow(`\n[LOGGER] Signal received: ${signal}. Starting graceful shutdown.`));
+
+    // --- Perform all cleanup tasks here ---
+    console.log(chalk.yellow('[LOGGER] Archiving logs...'));
+    archiveLogsOnExit();
+    console.log(chalk.green('[LOGGER] Logs archived.'));
+
+    // You could add other async cleanup tasks here, e.g.:
+    // console.log(chalk.yellow('[DB] Closing database connection...'));
+    // await database.close();
+    // console.log(chalk.green('[DB] Database connection closed.'));
+
+    console.log(chalk.cyan('[LOGGER] Shutdown complete. Exiting.'));
+    process.exit(0);
+}
+
+
+/**
+ * Renames the 'latest.log' files with a precise timestamp. This is a synchronous operation.
+ */
 function archiveLogsOnExit() {
-    // Generates a timestamp like YYYY-MM-DDTHH-MM-SS
     const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
     const archiveLogPath = path.join(logDir, `${timestamp}.log`);
     const archiveErrorPath = path.join(errorDir, `${timestamp}.log`);
 
-    if (fs.existsSync(logPath)) fs.renameSync(logPath, archiveLogPath);
-    if (fs.existsSync(errorPath)) fs.renameSync(errorPath, archiveErrorPath);
+    try {
+        if (fs.existsSync(logPath)) fs.renameSync(logPath, archiveLogPath);
+        if (fs.existsSync(errorPath)) fs.renameSync(errorPath, archiveErrorPath);
+    } catch (e) {
+        // This is a last-ditch effort to see an error during shutdown
+        console.error(chalk.red('[LOGGER] CRITICAL: Could not archive logs during shutdown:'), e);
+    }
 }
 
-// Handle clean exit
-process.on('exit', () => {
-    console.log(chalk.yellow('[LOGGER] Archiving logs on exit...'));
-    archiveLogsOnExit();
-});
 
-// Handle Ctrl+C
-process.on('SIGINT', () => {
-    console.log(chalk.yellow('\n[LOGGER] SIGINT received. Shutting down.'));
-    process.exit(0); // Triggers the 'exit' event
-});
+// --- Process Signal Listeners ---
 
-// Handle uncaught exceptions (crashes)
+// Catches Ctrl+C
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Catches "kill" signals (e.g., from Docker, PM2, or other process managers)
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// Catches uncaught exceptions (crashes)
 process.on('uncaughtException', (err, origin) => {
-    const crashLine = `[CRASH] Uncaught Exception at: ${origin}, error: ${err.stack || err}`;
-    console.error(chalk.red(crashLine));
+    console.error(chalk.red('[CRASH] Uncaught Exception. The application will now terminate.'));
+    console.error(err);
 
-    // Synchronously log the crash to 'latest.log' before archiving it
-    if (fs.existsSync(logDir)) fs.appendFileSync(logPath, `${crashLine}\n`);
-    if (fs.existsSync(errorDir)) fs.appendFileSync(errorPath, `${crashLine}\n`);
+    const crashLine = `[CRASH] Uncaught Exception at: ${origin}\n${err.stack || err}`;
 
-    process.exit(1); // Triggers the 'exit' event
+    // Synchronously write crash info to the log before attempting to archive
+    try {
+        fs.appendFileSync(logPath, `${crashLine}\n`);
+    } catch (e) {
+        console.error(chalk.red('[LOGGER] CRITICAL: Could not write crash info to log file.'), e);
+    }
+
+    // Now, perform the standard log archiving
+    archiveLogsOnExit();
+    process.exit(1); // Exit with a non-zero code to indicate an error
 });
 
 
