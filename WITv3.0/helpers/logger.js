@@ -42,7 +42,7 @@ if (args.includes('--quiet') || args.includes('-q')) {
  * This function is called automatically at midnight.
  */
 function rolloverLogs() {
-    console.log(chalk.cyan('[LOGGER] Performing midnight log rollover...'));
+    info('[LOGGER] Performing midnight log rollover...');
     // Get the date of the day that just ended
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -70,15 +70,11 @@ function scheduleMidnightRollover() {
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const msUntilMidnight = tomorrow.getTime() - now.getTime();
 
-    console.log(chalk.cyan(`[LOGGER] Next log rollover scheduled in ${Math.round(msUntilMidnight / 1000 / 60)} minutes.`));
+    info(`[LOGGER] Next log rollover scheduled in ${Math.round(msUntilMidnight / 1000 / 60)} minutes.`);
 
     // Set the timer for the rollover
     setTimeout(rolloverLogs, msUntilMidnight);
 }
-
-// Schedule the first rollover when the application starts
-scheduleMidnightRollover();
-
 
 // --- SHUTDOWN & CRASH HANDLING ---
 /**
@@ -97,7 +93,7 @@ async function shutdown(signal) {
     if (isShuttingDown) return;
     isShuttingDown = true;
 
-    console.log(chalk.yellow(`\n[LOGGER] Signal received: ${signal}. Starting graceful shutdown.`));
+    info(`[LOGGER] Signal received: ${signal}. Starting graceful shutdown.`);
 
     // --- Perform all cleanup tasks here ---
     console.log(chalk.yellow('[LOGGER] Archiving logs...'));
@@ -142,8 +138,8 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // Catches uncaught exceptions (crashes)
 process.on('uncaughtException', (err, origin) => {
-    console.error(chalk.red('[CRASH] Uncaught Exception. The application will now terminate.'));
-    console.error(err);
+    error('[CRASH] Uncaught Exception. The application will now terminate.');
+    error(err);
 
     const crashLine = `[CRASH] Uncaught Exception at: ${origin}\n${err.stack || err}`;
 
@@ -229,6 +225,9 @@ function table(label, data) {
         console.table(data);
     }
 }
+
+// Schedule the first rollover when the application starts
+scheduleMidnightRollover();
 
 module.exports = {
     info,
