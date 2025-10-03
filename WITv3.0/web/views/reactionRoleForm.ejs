@@ -311,6 +311,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- FORM UI LOGIC ---
     const reactionsContainer = document.getElementById('reactions-container');
+    const messageContentTextarea = document.getElementById('message_content');
+    const messageContentLabel = document.querySelector('label[for="message_content"]');
     let reactionCounter = 0;
 
     function addReactionMapper(data = { emoji: '', role: '' }) {
@@ -370,7 +372,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             document.getElementById('existing_message_id').value = messageId;
             document.getElementById('channel_id').value = setup.channelId;
-            document.getElementById('message_content').value = setup.content ? setup.content.replace(/\[Embed:.+\]/, '').trim() : '';
+            // When editing, the content might just be '[Embed]'. We don't want to pre-fill that.
+            // If the content is not the placeholder, we can assume it's real text and pre-fill it.
+            const contentToEdit = (setup.content && setup.content !== '[Embed]') ? setup.content : '';
+            messageContentTextarea.value = contentToEdit;
 
             reactionsContainer.innerHTML = '';
             reactionCounter = 0;
@@ -399,8 +404,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const isNew = radio.value === 'new';
             document.getElementById('existing-message-fields').classList.toggle('hidden', isNew);
             document.getElementById('existing_message_id').required = !isNew;
+            
+            // --- FIX ---
+            // Toggle the 'required' attribute on the message content textarea
             messageContentTextarea.required = isNew;
-            messageContentLabel.textContent = isNew ? 'Message Content' : 'Message Content (Leave blank to keep existing)';
+            // Update label and placeholder text for clarity
+            messageContentLabel.textContent = isNew ? 'Message Content' : 'Message Content (Optional: Overwrite existing text)';
+            messageContentTextarea.placeholder = isNew 
+                ? 'Enter the text for your new message here...' 
+                : 'Leave blank to keep the message\'s current text.';
         });
     });
     
