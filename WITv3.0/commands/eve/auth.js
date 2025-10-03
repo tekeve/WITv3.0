@@ -28,15 +28,23 @@ module.exports = {
         if (subcommand === 'login') {
             const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
             const ESI_CALLBACK_URL = `http://${process.env.HOST_NAME}/callback`;
-            const ESI_SCOPES = process.env.ESI_DEFAULT_SCOPES;
+            const ESI_SCOPES = process.env.ESI_DEFAULT_SCOPES || '';
 
-            if (!ESI_CLIENT_ID || !ESI_CALLBACK_URL || !ESI_SCOPES) {
+            if (!ESI_CLIENT_ID || !ESI_CALLBACK_URL) {
                 logger.warn('ESI configuration is missing from the .env file. A user tried to run /auth login.');
                 return interaction.reply({
                     content: 'The bot has not been configured for ESI authentication. Please contact the bot administrator.',
                     flags: [MessageFlags.Ephemeral]
                 });
             }
+            
+            // --- FIX START ---
+            // Ensure the required scope for authenticated search is always included.
+            const requiredScope = 'esi-search.search_structures.v1';
+            const scopes = new Set(ESI_SCOPES.split(' '));
+            scopes.add(requiredScope);
+            const finalScopes = Array.from(scopes).join(' ');
+            // --- FIX END ---
 
             const state = crypto.randomBytes(16).toString('hex');
             interaction.client.esiStateMap.set(state, interaction.user.id);

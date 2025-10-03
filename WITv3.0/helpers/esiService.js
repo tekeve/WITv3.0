@@ -103,20 +103,23 @@ module.exports = {
      * @returns {Promise<{data: any, expires: number|null}>} The data and expiry timestamp from the ESI response.
      */
     get: async ({ endpoint, params, headers, caller }) => {
-        // Create a unique key for the request based on endpoint and params
-        const cacheKey = `${endpoint}?${JSON.stringify(params || {})}`;
+        // Sanitize the endpoint to ensure it doesn't start with a slash
+        const sanitizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+
+        // Create a unique key for the request based on the sanitized endpoint and params
+        const cacheKey = `${sanitizedEndpoint}?${JSON.stringify(params || {})}`;
         const cachedItem = esiCache.get(cacheKey);
         const callerName = caller ? path.basename(caller) : 'Unknown';
 
         // Check if a valid, non-expired item is in the cache
         if (cachedItem && cachedItem.expires > Date.now()) {
-            logger.info(`ESI Cache HIT for ${endpoint} from ${callerName}.`);
+            logger.info(`ESI Cache HIT for ${sanitizedEndpoint} from ${callerName}.`);
             return { data: cachedItem.data, expires: cachedItem.expires }; // Return cached data
         }
 
         // If not in cache or expired, make the request
-        logger.info(`ESI Cache MISS for ${endpoint} from ${callerName}. Making a real ESI call...`);
-        const response = await requestWithRetries(() => esi.get(endpoint, { params, headers }), endpoint, caller);
+        logger.info(`ESI Cache MISS for ${sanitizedEndpoint} from ${callerName}. Making a real ESI call...`);
+        const response = await requestWithRetries(() => esi.get(sanitizedEndpoint, { params, headers }), sanitizedEndpoint, caller);
 
         // After a successful request, update the cache if an expires header is present
         let expiryTimestamp = null;
@@ -142,9 +145,11 @@ module.exports = {
      * @returns {Promise<any>} The data from the ESI response.
      */
     post: async ({ endpoint, data, headers, caller }) => {
+        // Sanitize the endpoint to ensure it doesn't start with a slash
+        const sanitizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
         const callerName = caller ? path.basename(caller) : 'Unknown';
-        logger.info(`Making a real ESI POST call to ${endpoint} from ${callerName}...`);
-        const response = await requestWithRetries(() => esi.post(endpoint, data, { headers }), endpoint, caller);
+        logger.info(`Making a real ESI POST call to ${sanitizedEndpoint} from ${callerName}...`);
+        const response = await requestWithRetries(() => esi.post(sanitizedEndpoint, data, { headers }), sanitizedEndpoint, caller);
         return response.data;
     },
 };

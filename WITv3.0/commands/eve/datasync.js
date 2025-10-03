@@ -20,7 +20,7 @@ module.exports = {
             await interaction.reply({ content: 'Starting verification and sync for `incursion_systems` table. This may take a moment...', flags: [MessageFlags.Ephemeral] });
 
             try {
-                const report = await incursionManager.verifyAndSyncIncursionSystems();
+                const report = await incursionManager.verifyAndSyncIncursionSystems(interaction);
 
                 const embed = new EmbedBuilder()
                     .setColor(0x57F287)
