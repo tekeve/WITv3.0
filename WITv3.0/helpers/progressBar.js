@@ -6,7 +6,7 @@
  * @param {number} [size=20] - The width of the progress bar in characters.
  * @returns {string} The formatted progress bar string.
  */
-function createProgressBar(value, maxValue, size = 20) {
+function createProgressBar(value, maxValue, size = 30) {
     // Ensure value is not greater than maxValue
     const percentage = Math.max(0, Math.min(1, value / maxValue));
     const filledBlocks = Math.round(size * percentage);
