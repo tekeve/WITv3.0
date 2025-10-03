@@ -2,15 +2,20 @@ const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 
+// --- PATH SETUP ---
+// Directories for logs and errors
 const logDir = path.join(__dirname, '../logs');
 const errorDir = path.join(logDir, 'errors');
-const today = new Date().toISOString().slice(0, 10);
-const logPath = path.join(logDir, `${today}.log`);
-const errorPath = path.join(errorDir, `${today}.log`);
+// The active log files will always be named 'latest.log'
+const logPath = path.join(logDir, 'latest.log');
+const errorPath = path.join(errorDir, 'latest.log');
 
+// Create directories if they don't exist
 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
 if (!fs.existsSync(errorDir)) fs.mkdirSync(errorDir);
 
+
+// --- LOG LEVEL SETUP ---
 // Determine the logging level based on command-line arguments
 const args = process.argv.slice(2);
 let isQuiet = false;
@@ -19,17 +24,103 @@ let isAudit = false;
 
 if (args.includes('--quiet') || args.includes('-q')) {
     isQuiet = true;
-    console.log(chalk.blue('[INFO] Logging quiet, only errors will be shown, log|error files will still be updated'));
+    console.log(chalk.blue('[INFO] Logging quiet, only errors will be shown, log files will still be updated'));
 } else if (args.includes('--verbose') || args.includes('-v') || args.includes('--loud') || args.includes('-l')) {
     isVerbose = true;
     console.log(chalk.blue('[INFO] Logging loud, all debugging messages will be shown'));
 } else if (args.includes('--audit')) {
     isAudit = true;
     console.log(chalk.blue('[INFO] Logging audit, all audit messages will be shown'));
+} else {
+    console.log(chalk.blue('[INFO] Logging default, only errors and warnings will be shown, log files will still be updated'));
 }
-else {
-    console.log(chalk.blue('[INFO] Logging default, only errors and warning will be shown, log|error files will still be updated'));
+
+
+// --- MIDNIGHT LOG ROTATION ---
+/**
+ * Renames the 'latest.log' files to a date-stamped file from the previous day.
+ * This function is called automatically at midnight.
+ */
+function rolloverLogs() {
+    console.log(chalk.cyan('[LOGGER] Performing midnight log rollover...'));
+    // Get the date of the day that just ended
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateString = yesterday.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const newLogPath = path.join(logDir, `${dateString}.log`);
+    const newErrorPath = path.join(errorDir, `${dateString}.log`);
+
+    try {
+        if (fs.existsSync(logPath)) fs.renameSync(logPath, newLogPath);
+        if (fs.existsSync(errorPath)) fs.renameSync(errorPath, newErrorPath);
+    } catch (e) {
+        console.error(chalk.red('[LOGGER] Could not rollover log files:'), e);
+    }
+
+    // Schedule the next rollover
+    scheduleMidnightRollover();
 }
+
+/**
+ * Calculates the time until the next midnight and sets a timer to call rolloverLogs.
+ */
+function scheduleMidnightRollover() {
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+
+    console.log(chalk.cyan(`[LOGGER] Next log rollover scheduled in ${Math.round(msUntilMidnight / 1000 / 60)} minutes.`));
+
+    // Set the timer for the rollover
+    setTimeout(rolloverLogs, msUntilMidnight);
+}
+
+// Schedule the first rollover when the application starts
+scheduleMidnightRollover();
+
+
+// --- SHUTDOWN & CRASH HANDLING ---
+/**
+ * Renames the 'latest.log' files with a precise timestamp.
+ * This is used for clean shutdowns and crashes.
+ */
+function archiveLogsOnExit() {
+    // Generates a timestamp like YYYY-MM-DDTHH-MM-SS
+    const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
+    const archiveLogPath = path.join(logDir, `${timestamp}.log`);
+    const archiveErrorPath = path.join(errorDir, `${timestamp}.log`);
+
+    if (fs.existsSync(logPath)) fs.renameSync(logPath, archiveLogPath);
+    if (fs.existsSync(errorPath)) fs.renameSync(errorPath, archiveErrorPath);
+}
+
+// Handle clean exit
+process.on('exit', () => {
+    console.log(chalk.yellow('[LOGGER] Archiving logs on exit...'));
+    archiveLogsOnExit();
+});
+
+// Handle Ctrl+C
+process.on('SIGINT', () => {
+    console.log(chalk.yellow('\n[LOGGER] SIGINT received. Shutting down.'));
+    process.exit(0); // Triggers the 'exit' event
+});
+
+// Handle uncaught exceptions (crashes)
+process.on('uncaughtException', (err, origin) => {
+    const crashLine = `[CRASH] Uncaught Exception at: ${origin}, error: ${err.stack || err}`;
+    console.error(chalk.red(crashLine));
+
+    // Synchronously log the crash to 'latest.log' before archiving it
+    if (fs.existsSync(logDir)) fs.appendFileSync(logPath, `${crashLine}\n`);
+    if (fs.existsSync(errorDir)) fs.appendFileSync(errorPath, `${crashLine}\n`);
+
+    process.exit(1); // Triggers the 'exit' event
+});
+
+
+// --- LOGGING UTILITIES & FUNCTIONS (Largely unchanged) ---
 
 /**
  * A replacer function for JSON.stringify to handle circular structures.
@@ -38,9 +129,7 @@ const getCircularReplacer = () => {
     const seen = new WeakSet();
     return (key, value) => {
         if (typeof value === 'object' && value !== null) {
-            if (seen.has(value)) {
-                return '[Circular Reference]';
-            }
+            if (seen.has(value)) return '[Circular Reference]';
             seen.add(value);
         }
         return value;
@@ -48,13 +137,9 @@ const getCircularReplacer = () => {
 };
 
 function formatValue(val) {
+    if (val instanceof Error) return val.stack || val.message;
     if (typeof val === 'object' && val !== null) {
-        // Handle specific error properties for better logging
-        if (val instanceof Error) {
-            return val.stack || val.message;
-        }
         try {
-            // Use the circular replacer to safely stringify objects
             return JSON.stringify(val, getCircularReplacer(), 2);
         } catch {
             return '[Unserializable Object]';
@@ -64,31 +149,26 @@ function formatValue(val) {
 }
 
 function logToFile(filepath, line) {
+    // appendFileSync will create the file if it does not exist
     fs.appendFileSync(filepath, `[${new Date().toLocaleTimeString()}] ${line}\n`);
 }
 
 function info(...args) {
     const line = `[INFO] ${args.map(formatValue).join(' ')}`;
     logToFile(logPath, line);
-    if (isVerbose) {
-        console.log(chalk.blue(line));
-    }
+    if (isVerbose) console.log(chalk.blue(line));
 }
 
 function success(...args) {
     const line = `[SUCCESS] ${args.map(formatValue).join(' ')}`;
     logToFile(logPath, line);
-    if (isVerbose) {
-        console.log(chalk.green(line));
-    }
+    if (isVerbose) console.log(chalk.green(line));
 }
 
 function warn(...args) {
     const line = `[WARN] ${args.map(formatValue).join(' ')}`;
     logToFile(logPath, line);
-    if (!isQuiet) {
-        console.log(chalk.yellow(line));
-    }
+    if (!isQuiet) console.log(chalk.yellow(line));
 }
 
 function error(...args) {
@@ -101,9 +181,7 @@ function error(...args) {
 function audit(...args) {
     const line = `[AUDIT] ${args.map(formatValue).join(' ')}`;
     logToFile(logPath, line);
-    if (isAudit || isVerbose) {
-        console.log(chalk.magenta(line));
-    }
+    if (isAudit || isVerbose) console.log(chalk.magenta(line));
 }
 
 function table(label, data) {
@@ -121,4 +199,3 @@ module.exports = {
     table,
     audit,
 };
-
