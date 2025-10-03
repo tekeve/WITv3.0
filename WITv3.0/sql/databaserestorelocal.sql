@@ -1,22 +1,5 @@
--- --------------------------------------------------------
--- Host:                         localhost
--- Server version:               11.8.3-MariaDB - mariadb.org binary distribution
--- Server OS:                    Win64
--- HeidiSQL Version:             12.11.0.7065
--- --------------------------------------------------------
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET NAMES utf8 */;
-/*!50503 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-
-
 -- Dumping database structure for wit-db
-CREATE DATABASE IF NOT EXISTS `wit-db` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci */;
+CREATE DATABASE IF NOT EXISTS `wit-db`;
 USE `wit-db`;
 
 -- Dumping structure for table wit-db.action_log_settings
@@ -71,7 +54,7 @@ CREATE TABLE IF NOT EXISTS `config` (
   `key_name` varchar(255) NOT NULL,
   `value` longtext DEFAULT NULL,
   PRIMARY KEY (`key_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.config: ~21 rows (approximately)
 REPLACE INTO `config` (`key_name`, `value`) VALUES
@@ -103,7 +86,7 @@ CREATE TABLE IF NOT EXISTS `google_docs` (
   `alias` varchar(50) NOT NULL,
   `doc_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.google_docs: ~0 rows (approximately)
 
@@ -113,7 +96,7 @@ CREATE TABLE IF NOT EXISTS `google_sheets` (
   `alias` varchar(50) NOT NULL,
   `sheet_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.google_sheets: ~0 rows (approximately)
 REPLACE INTO `google_sheets` (`id`, `alias`, `sheet_id`) VALUES
@@ -132,7 +115,7 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
   `lastIncursionStats` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`lastIncursionStats`)),
   `route_data` text DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.incursion_state: ~1 rows (approximately)
 REPLACE INTO `incursion_state` (`id`, `lastIncursionState`, `incursionMessageId`, `lastHqSystemId`, `spawnTimestamp`, `mobilizingTimestamp`, `withdrawingTimestamp`, `endedTimestamp`, `lastIncursionStats`, `route_data`) VALUES
@@ -152,7 +135,7 @@ CREATE TABLE IF NOT EXISTS `incursion_systems` (
   `region` varchar(255) DEFAULT NULL,
   `region_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`Constellation_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.incursion_systems: ~105 rows (approximately)
 REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard_systems`, `assault_systems`, `headquarters_system`, `dockup`, `dock_up_system_id`, `is_island`, `region_faction`, `region`, `region_id`) VALUES
@@ -274,7 +257,7 @@ CREATE TABLE IF NOT EXISTS `logi_signoffs` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `pilot_name` (`pilot_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.logi_signoffs: ~27 rows (approximately)
 REPLACE INTO `logi_signoffs` (`id`, `pilot_name`, `pilot_id`, `signoffs`, `history`, `status`, `created_at`, `updated_at`) VALUES
@@ -329,7 +312,7 @@ CREATE TABLE IF NOT EXISTS `reaction_roles` (
   `emoji` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `message_emoji_role` (`message_id`,`emoji`(100),`role_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.reaction_roles: ~2 rows (approximately)
 REPLACE INTO `reaction_roles` (`id`, `guild_id`, `channel_id`, `message_id`, `role_id`, `emoji`) VALUES
@@ -347,7 +330,7 @@ CREATE TABLE IF NOT EXISTS `reminders` (
   PRIMARY KEY (`id`),
   KEY `discord_id` (`discord_id`),
   KEY `remind_at` (`remind_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.reminders: ~0 rows (approximately)
 
@@ -368,7 +351,7 @@ CREATE TABLE IF NOT EXISTS `resident_applications` (
   `discord_id` varchar(50) NOT NULL,
   `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.resident_applications: ~22 rows (approximately)
 REPLACE INTO `resident_applications` (`id`, `character_name`, `alts`, `forum_identity`, `discord_identity`, `wtm_time`, `logistics_ships`, `battleship_ships`, `t2_guns`, `command_time_estimate`, `why_commander`, `why_wtm`, `discord_id`, `submitted_at`) VALUES
@@ -402,7 +385,7 @@ CREATE TABLE IF NOT EXISTS `role_hierarchy` (
   `demote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`demote`)),
   `history` longtext DEFAULT NULL,
   PRIMARY KEY (`roleName`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.role_hierarchy: ~8 rows (approximately)
 REPLACE INTO `role_hierarchy` (`roleName`, `promote`, `demote`, `history`) VALUES
@@ -435,7 +418,7 @@ CREATE TABLE IF NOT EXISTS `saved_embeds` (
 -- Dumping data for table wit-db.saved_embeds: ~4 rows (approximately)
 REPLACE INTO `saved_embeds` (`embed_name`, `guild_id`, `embed_data`, `content`, `created_by_id`, `created_by_tag`, `last_edited_by_id`, `last_edited_by_tag`, `created_at`, `last_edited_at`, `last_sent_channel_id`, `last_sent_message_id`) VALUES
 	('focusgroups', '366076789438808064', '{"title":"Reaction Roles Test","color":16744512,"fields":[{"name":"Leadership","value":"<:Isis_titan:1422870698866642964>","inline":true},{"name":"Officer","value":"<:Isis_supercarrier:1422870696488599552>","inline":false}],"timestamp":"2025-10-01T11:58:00.398Z"}', '', '107396590653698048', 'teknick', '107396590653698048', 'teknick', '2025-10-01 11:54:11', '2025-10-01 11:58:03', '1412213555150716948', '1422914494027268127'),
-	('Founders', '366076789438808064', '{"title":"Founders & Current Leadership","description":"Sparta93 & Canyon Vjourytant","color":16478517,"fields":[{"name":"Octerdo Xir","value":"<@483337426341724202> <t:1767189600:D>","inline":true},{"name":"Ezabella","value":"<@107396590653698048> <t:1782828000:D>","inline":true},{"name":"​","value":"​","inline":true},{"name":"Bella Cadelanne","value":"<@368778318415265792>","inline":true},{"name":"Skeltek","value":"<@266657286355681280>","inline":true},{"name":"Tani Makia","value":"<@211238849349812225>","inline":true}],"timestamp":"2025-09-25T04:36:40.011Z"}', '', '107396590653698048', 'teknick', '107396590653698048', 'teknick', '2025-09-24 03:29:33', '2025-09-25 04:36:43', '1412213555150716948', '1420630080568295577'),
+	('Founders', '366076789438808064', '{"title":"Founders & Current Leadership","description":"Sparta93 & Canyon Vjourytant","color":16478517,"fields":[{"name":"Octerdo Xir","value":"<@483337426341724202> <t:1767189600:D>","inline":true},{"name":"Ezabella","value":"<@107396590653698048> <t:1782828000:D>","inline":true},{"name":"â€‹","value":"â€‹","inline":true},{"name":"Bella Cadelanne","value":"<@368778318415265792>","inline":true},{"name":"Skeltek","value":"<@266657286355681280>","inline":true},{"name":"Tani Makia","value":"<@211238849349812225>","inline":true}],"timestamp":"2025-09-25T04:36:40.011Z"}', '', '107396590653698048', 'teknick', '107396590653698048', 'teknick', '2025-09-24 03:29:33', '2025-09-25 04:36:43', '1412213555150716948', '1420630080568295577'),
 	('masterlist', '366076789438808064', '{"title":"Master List","color":3718648,"fields":[{"name":"Commander Tools","value":"[Waitlist](https://wl.warptome.net/)\\n[Fitting Website](https://wl.warptome.net/fits/)\\n[Forums](http://forums.warptome.net/)\\n[Rookie Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=301)\\n[R&R](http://tinyurl.com/WTMRR)\\n[Bylaws](https://docs.google.com/document/d/1DTlsl3UHMsHGA01pyLXw4-FOO1hdsVibOrKIjb2_iDM)","inline":true},{"name":"TS/Discord","value":"[Channel Command](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=2564&tab=comments#comment-26699)\\n[TS Badges Explained](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=27)\\n[Discord Responder](https://docs.google.com/spreadsheets/d/159qZ0nJW8DwIYCaf362DN2LiqPnz1gsmkzs3BIqeS4Y/)\\n[Hammer Time](https://hammertime.cyou) ","inline":true},{"name":"LC+","value":"[New Pilot Speech](https://tinyurl.com/y7u36mvl)\\n[Upgrade Policy Exceptions](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=1921)\\n[Scouting Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=2261)\\n[Booster Guide](https://tinyurl.com/yyr79nqr)\\n[Evac Guide](https://docs.google.com/spreadsheets/u/4/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=1557297835&single=true)\\n[MOTDs](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=141)\\n\\n[LC AS Application](https://tinyurl.com/2p9yjbuv) ","inline":true},{"name":"Resident","value":"[Resident/TFC Tracker](https://tinyurl.com/WTMCommanderTracker)\\n[Resident Overview](https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml)\\n[Resident Orientation](https://docs.google.com/spreadsheets/u/1/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=800172255&single=true)\\n[Resident Sign-Off Form](http://tinyurl.com/WTMRSignOFF)\\n[Resident App](https://tinyurl.com/yy5z4jyl)","inline":true},{"name":"Training FC","value":"[Resident/TFC Tracker](https://tinyurl.com/WTMCommanderTracker)\\n[TFC Overview](https://tinyurl.com/WTMFCOverview)\\n[TFC Sign-Off Form](http://tinyurl.com/WTMTFCSignOff)\\n[TFC Application](https://docs.google.com/forms/d/e/1FAIpQLSeSF3pi9deEmmEq-d5l-hNcZQ-fIwl1Krz2ZKsu4WL9Dzeu3Q/viewform)","inline":true},{"name":"FC","value":"[Tagging Guide](https://docs.google.com/spreadsheets/u/1/d/1zPSoNN5v8h6HqNkhx-boUc2GQYClwXOUik3fNXs7LQo/pubhtml)\\n[Adaptive Tagging Guide](http://tinyurl.com/AdaptiveTaggingGuide)\\n[Contesting Guide](https://tinyurl.com/3ptvp4vu)\\n[TCRC Guide](https://tinyurl.com/TCRCguide)\\n\\n[VG Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=1613)\\n[AS Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=143)","inline":true},{"name":"Bastion","value":"[Bastion Tracker](https://tinyurl.com/BastionTracking)\\n[Bastion Quiz](https://forms.gle/6csxb84L7iasdz3k9)\\n[Bastion Sign-Off Form](https://tinyurl.com/AddBastion)\\n[Bastion Info](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=1952)\\n[Bastion Training Guide](https://tinyurl.com/BastionTraining)","inline":true},{"name":"DL/TL","value":"[TL Tracker](https://tinyurl.com/CurrentTL)\\n[TL +1 Sign-Off](https://tinyurl.com/AddTL)\\n[TL -1 Form](https://tinyurl.com/RemTL)\\n[DL Tracker/Overview](https://tinyurl.com/y58kbwgs)\\n[DL Sign-Off Form](https://forms.gle/9ByeuZN4NhRAHDJg7)\\n[DL Application](https://forms.gle/JnYFqYMRZdLXLmTF9)","inline":true},{"name":"isk/hr & SRP","value":"[Loss Report Form](https://docs.google.com/forms/d/e/1FAIpQLSebpTDPK82WtKpWdsSOctabngrwRGaJwPscoskryYJ3YNRECg/viewform)\\n[Loss Report Guide](http://tinyurl.com/yyaye8bb)\\n[isk/hr Guide](https://tinyurl.com/2p8dtby2)\\n[isk/hr Submission Form](https://tinyurl.com/iskPhSubmit)\\n[isk/hr AVG Overview](https://tinyurl.com/2b7xbkr6)\\n[isk/hr Calculator](https://isk.warptome.net/)","inline":true}],"timestamp":"2025-10-01T12:19:15.959Z"}', '', '107396080869593088', 'teknickk', '107396590653698048', 'teknick', '2025-10-01 12:09:05', '2025-10-01 12:19:17', '1412575503746990232', '1422918244829761720'),
 	('residentmasterlist', '366076789438808064', '{"title":"Resident Master List","color":3718648,"fields":[{"name":"Commander Tools","value":"[Waitlist](https://wl.warptome.net/)\\n[Fitting Website](https://wl.warptome.net/fits/)\\n[Forums](http://forums.warptome.net/)\\n[R&R](http://tinyurl.com/WTMRR)\\n[Bylaws](https://docs.google.com/document/d/1DTlsl3UHMsHGA01pyLXw4-FOO1hdsVibOrKIjb2_iDM)","inline":true},{"name":"TS/Discord","value":"[Channel Command](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=2564&tab=comments#comment-26699)\\n[TS Badges Explained](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=27)","inline":true},{"name":"LC+","value":"[New Pilot Speech](https://tinyurl.com/y7u36mvl)\\n[Upgrade Policy Exceptions](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=1921)\\n[Scouting Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=2261)\\n[Booster Guide](https://tinyurl.com/yyr79nqr)\\n[Evac Guide](https://docs.google.com/spreadsheets/u/4/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=1557297835&single=true)","inline":true},{"name":"Resident","value":"[Resident/TFC Tracker](https://tinyurl.com/WTMCommanderTracker)\\n[Resident Sign-Off Descriptions](https://docs.google.com/spreadsheets/u/1/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=1910953629&single=true)\\n[Resident Orientation](https://docs.google.com/spreadsheets/u/1/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=800172255&single=true)\\n[Resident App](https://tinyurl.com/yy5z4jyl)","inline":true},{"name":"Rezident Quizes","value":"[Fitting Quiz](https://tinyurl.com/FittingQ)\\n[Fleet Roles Quiz](https://tinyurl.com/FleetRolesQ)\\n[Scouting Quiz](https://tinyurl.com/ScoutingQ)\\n[Site Mechanics Quiz](https://tinyurl.com/SiteMechQ)","inline":true},{"name":"Resident Study Tools","value":"Resident Study Guides (coming soon:tm:)\\n[Tagging Guide](https://docs.google.com/spreadsheets/u/1/d/1zPSoNN5v8h6HqNkhx-boUc2GQYClwXOUik3fNXs7LQo/pubhtml)","inline":true}],"timestamp":"2025-10-01T12:58:32.307Z"}', '', '107396590653698048', 'teknick', '107396590653698048', 'teknick', '2025-10-01 12:58:33', '2025-10-01 12:58:34', '1412388512149409792', '1422930697491845131');
 
@@ -453,7 +436,7 @@ CREATE TABLE IF NOT EXISTS `srp_history` (
   `loss_description` text NOT NULL,
   `loot_status` text NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.srp_history: ~21 rows (approximately)
 REPLACE INTO `srp_history` (`id`, `pilot_name`, `kill_report_link`, `fc_name`, `fc_status`, `backseat_details`, `ship_type`, `srpable`, `srp_paid`, `loss_description`, `loot_status`) VALUES
@@ -491,7 +474,7 @@ CREATE TABLE IF NOT EXISTS `trusted_pilots` (
   `history` longtext DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `pilot_name` (`pilot_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.trusted_pilots: ~11 rows (approximately)
 REPLACE INTO `trusted_pilots` (`id`, `pilot_name`, `pilot_id`, `final_signoff_by`, `added_at`, `signoffs`, `demerits`, `history`) VALUES
@@ -521,7 +504,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   PRIMARY KEY (`character_id`),
   KEY `discord_id` (`discord_id`),
   CONSTRAINT `roles` CHECK (json_valid(`roles`))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dumping data for table wit-db.users: ~8 rows (approximately)
 REPLACE INTO `users` (`character_id`, `discord_id`, `character_name`, `roles`, `access_token`, `refresh_token`, `token_expiry`, `is_main`, `is_mailing_char`) VALUES
@@ -534,9 +517,3 @@ REPLACE INTO `users` (`character_id`, `discord_id`, `character_name`, `roles`, `
 	(163565361, '266657286355681280', 'Skeltek', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwuc2VuZF9tYWlsLnYxIiwiZXNpLW1haWwucmVhZF9tYWlsLnYxIl0sImp0aSI6IjM1ODY3NmQyLWQ4NzEtNDdiOS1iYjUzLWRiZWNiZDYzNGNhNiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5Iiwic3ViIjoiQ0hBUkFDVEVSOkVWRToxNjM1NjUzNjEiLCJhenAiOiI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsInRlbmFudCI6InRyYW5xdWlsaXR5IiwidGllciI6ImxpdmUiLCJyZWdpb24iOiJ3b3JsZCIsImF1ZCI6WyI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsIkVWRSBPbmxpbmUiXSwibmFtZSI6IlNrZWx0ZWsiLCJvd25lciI6IlNPN3F3dHpGOUY0eFE5c29kTEk1dVFjd0E3ST0iLCJleHAiOjE3NTgxNzA2ODEsImlhdCI6MTc1ODE2OTQ4MSwiaXNzIjoiaHR0cHM6Ly9sb2dpbi5ldmVvbmxpbmUuY29tIn0.W3DUD8CLjPaQNVXH-k1ddQ7lLRTjMVNWBX0Gtc33yGGUjKjkcjo5J203rzWhpXZsx49ySNoWI4NCL4ddeSmSrx2Bv-35uCpDhBSq65Z76O5YUrBGewDbM9Oxe3AXcPPNrN7sKxdvt7mu7eFyIgERwSF-RI4wRbeRKqxSIUmK3e93RwplPXiRl3dQf3xw2T3-MBb0j1byDXc07O6Y2Vppjh1ALVfIf10DJcjmg9NQrjoCAfaEGP77ABVbXK6IVR_NwFG0XDg-PQniQFszVu1pcA8cLsQpp4gVpQWg0e-X52PrWWnBKWsjS1l89raTJ10ZkHlZWIyZ_cDrThGukNYGWg', '4sVwNTj7ykOtLjBvPcTTtg==', 1758170679890, 1, 1),
 	(1945530066, '524711946268835840', 'Tee Gun', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546080448712826","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
 	(2122568365, '473893999376334848', 'Emerald Volpe', '["1055468376866168853","1412545597021622383","1412545877163118704","366076789438808064"]', NULL, NULL, NULL, 1, 0);
-
-/*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
-/*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
-/*!40014 SET FOREIGN_KEY_CHECKS=IFNULL(@OLD_FOREIGN_KEY_CHECKS, 1) */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40111 SET SQL_NOTES=IFNULL(@OLD_SQL_NOTES, 1) */;
