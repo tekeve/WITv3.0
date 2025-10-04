@@ -94,7 +94,7 @@ async function runCommanderListUpdate(client) {
 }
 
 module.exports = {
-    permission: 'admin',
+    permission: 'council',
     data: new SlashCommandBuilder()
         .setName('commanderlist')
         .setDescription('Updates the Google Sheet with the current list of commanders and provides a report.'),
