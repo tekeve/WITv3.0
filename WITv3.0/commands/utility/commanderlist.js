@@ -31,6 +31,12 @@ module.exports = {
                 return interaction.editReply('Error: Could not find the target Discord server.');
             }
 
+            // Force fetch all members to ensure the cache is complete before accessing role members.
+            // This is necessary on large servers where not all members are cached by default.
+            logger.info('Fetching all guild members to ensure a complete list...');
+            await wtmGuild.members.fetch();
+            logger.success('Successfully fetched all members.');
+
             const roleListArray = ["fleet commander", "training fc", "line commander", "resident", "commander"];
             const roleOutput = [];
 
@@ -93,3 +99,4 @@ module.exports = {
         }
     },
 };
+
