@@ -12,8 +12,8 @@ const db = require('@helpers/database');
 const { startServer } = require('./web/server.js');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 const reactionRoleManager = require('@helpers/reactionRoleManager');
+const scheduler = require('@helpers/scheduler'); // Added for scheduled tasks
 
-// ... (deployCommands function remains the same) ...
 async function deployCommands() {
     const commandsToDeploy = [];
     const client = { commands: new Collection() }; // Mock client for command loading
@@ -132,7 +132,11 @@ async function initializeApp() {
     const { registerActionLogEvents } = require('./events/actionLogHandler');
     const { registerReactionEvents } = require('./events/reactionHandler'); // Added for reaction roles
 
-    client.once(clientReadyHandler.name, (...args) => clientReadyHandler.execute(...args, client));
+    client.once(clientReadyHandler.name, (...args) => {
+        clientReadyHandler.execute(...args, client);
+        // Initialize scheduled tasks once the client is ready
+        scheduler.initialize(client);
+    });
     client.on(interactionCreateHandler.name, (...args) => interactionCreateHandler.execute(...args, client));
     client.on(srpSubmissionHandler.name, (...args) => srpSubmissionHandler.execute(...args, client));
     client.on(residentAppSubmissionHandler.name, (...args) => residentAppSubmissionHandler.execute(...args, client));
@@ -150,3 +154,4 @@ async function initializeApp() {
 }
 
 initializeApp();
+
