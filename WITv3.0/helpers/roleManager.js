@@ -130,6 +130,60 @@ async function syncRolesFromDb(member) {
     return { added: intendedAdd, removed: intendedRemove, discrepancies };
 }
 
+/**
+ * Gets the highest hierarchy level a member has based on their roles.
+ * @param {import('discord.js').GuildMember} member - The guild member.
+ * @returns {Promise<{level: number, rankName: string}>} The member's highest hierarchy level and rank name.
+ */
+async function getMemberHierarchyInfo(member) {
+    const hierarchy = await roleHierarchyManager.get();
+    const config = configManager.get();
+    if (!hierarchy || !config) return { level: 0, rankName: 'Unranked' };
+
+    let maxLevel = 0;
+    let highestRankName = 'Unranked';
+
+    const roleIdToRank = new Map();
+
+    // Manually add admin and council with high levels to ensure they always win ties
+    if (config.adminRoles) {
+        config.adminRoles.forEach(id => roleIdToRank.set(id, { name: 'admin', level: 999 }));
+    }
+    if (config.councilRoles) {
+        config.councilRoles.forEach(id => roleIdToRank.set(id, { name: 'council', level: 900 }));
+    }
+
+    // Map all configured role IDs from the hierarchy to their rank name and level
+    for (const rankName in hierarchy) {
+        // Construct the key name, e.g., 'fleet_commander' -> 'fleetcommanderRoles', 'ct' -> 'ctRoles'
+        const configKey = `${rankName.replace(/_/g, '')}Roles`;
+        // Find the key case-insensitively from the loaded config
+        const foundKey = Object.keys(config).find(k => k.toLowerCase() === configKey.toLowerCase());
+
+        if (foundKey && Array.isArray(config[foundKey])) {
+            config[foundKey].forEach(roleId => {
+                // Don't overwrite higher-level special roles we just set
+                if (!roleIdToRank.has(roleId)) {
+                    roleIdToRank.set(roleId, { name: rankName, level: hierarchy[rankName].level });
+                }
+            });
+        }
+    }
+
+    // Iterate over the member's roles to find their highest level
+    member.roles.cache.forEach(role => {
+        if (roleIdToRank.has(role.id)) {
+            const rankInfo = roleIdToRank.get(role.id);
+            if (rankInfo.level > maxLevel) {
+                maxLevel = rankInfo.level;
+                highestRankName = rankInfo.name;
+            }
+        }
+    });
+
+    return { level: maxLevel, rankName: highestRankName };
+}
+
 
 /**
  * Manages role changes for a user based on the defined hierarchy.
@@ -144,17 +198,12 @@ async function manageRoles(interaction, action) {
     const isLeadershipAction = targetRankName.toLowerCase() === 'leadership';
     const isRemoveAllAction = action === 'demote' && targetRankName === 'Remove All Roles';
 
+    // This is the specific check for this action.
+    // The general 'council' permission is already checked before this command runs.
     if (isLeadershipAction || isRemoveAllAction) {
         if (!isAdmin(interaction.member)) {
             return interaction.reply({
                 content: 'You must be an Admin to manage the Leadership rank or remove all roles.',
-                flags: [MessageFlags.Ephemeral]
-            });
-        }
-    } else {
-        if (!isCouncilOrAdmin(interaction.member)) {
-            return interaction.reply({
-                content: 'You must have the Council role to use this command.',
                 flags: [MessageFlags.Ephemeral]
             });
         }
@@ -163,7 +212,43 @@ async function manageRoles(interaction, action) {
     await interaction.deferReply({});
 
     const member = await interaction.guild.members.fetch(targetUser.id);
+    const executor = interaction.member;
+
+    // --- HIERARCHY CHECKS ---
+    const executorInfo = await getMemberHierarchyInfo(executor);
+    const targetInfo = await getMemberHierarchyInfo(member);
     const hierarchy = await roleHierarchyManager.get();
+    const targetRankLevel = hierarchy[targetRankName]?.level ?? 0;
+
+    // Rule 0: Cannot manage your own roles
+    if (executor.id === member.id) {
+        return interaction.editReply({ content: 'You cannot manage your own roles.', flags: [MessageFlags.Ephemeral] });
+    }
+
+    // Rule 1: Executor must have a higher rank than the target. Admins are exempt.
+    if (executorInfo.level <= targetInfo.level && executorInfo.rankName !== 'admin') {
+        return interaction.editReply({
+            content: `You cannot manage roles for **${targetUser.tag}**. Your rank level (${executorInfo.level}) is not higher than theirs (${targetInfo.level}).`,
+            flags: [MessageFlags.Ephemeral]
+        });
+    }
+
+    // Rule 2 for Promotion: Executor's rank must be >= rank they are promoting to. Admins are exempt.
+    if (action === 'promote' && executorInfo.level < targetRankLevel && executorInfo.rankName !== 'admin') {
+        return interaction.editReply({
+            content: `You cannot promote someone to **${targetRankName}**. Your rank level (${executorInfo.level}) is lower than the target rank's level (${targetRankLevel}).`,
+            flags: [MessageFlags.Ephemeral]
+        });
+    }
+
+    // Rule 3 for Demotion: Executor cannot demote from a rank higher than their own. This is covered by Rule 1.
+
+    // Rule 4: Special check for 'Remove All' - only Admins
+    if (isRemoveAllAction && executorInfo.rankName !== 'admin') {
+        return interaction.editReply({ content: 'Only Admins can use the "Remove All Roles" option.', flags: [MessageFlags.Ephemeral] });
+    }
+    // --- END HIERARCHY CHECKS ---
+
     const config = configManager.get();
 
     if (action === 'promote') {
@@ -184,14 +269,9 @@ async function manageRoles(interaction, action) {
     try {
         // Special handling for Remove All Roles
         if (isRemoveAllAction) {
-            // Find the 'removeAllRoles' key case-insensitively from the config object.
             const removeAllRolesKey = Object.keys(config).find(k => k.toLowerCase() === 'removeallroles');
             const additionalRolesToRemove = removeAllRolesKey ? config[removeAllRolesKey] : [];
-
-            // Get all roles defined within the promotion/demotion hierarchy.
             const manageableRoles = await roleHierarchyManager.getAllManageableRoleIds();
-
-            // Combine both lists into a single Set to ensure uniqueness.
             const rolesToRemoveIds = new Set([...manageableRoles, ...additionalRolesToRemove]);
             logger.info("Combined manageable roles and 'removeAllRoles' list for deletion.");
 
@@ -201,7 +281,6 @@ async function manageRoles(interaction, action) {
                 return interaction.editReply({ content: `${targetUser.tag} has no roles from the target list to remove.` });
             }
 
-            // For registered users, we also update their DB record.
             const userData = await charManager.getChars(member.id);
             if (userData && userData.main) {
                 const currentDbRoles = new Set(userData.main.roles || []);
@@ -215,7 +294,7 @@ async function manageRoles(interaction, action) {
 
             await auditLogger.logRoleChange(interaction, targetUser, 'demote', [], removedRoleNames);
             await interaction.editReply({ content: `Removed roles from ${targetUser.tag}:\n> **Removed:** ${removedRoleNames.join(', ')}` });
-            return; // Exit after handling this special case.
+            return;
         }
 
         // Standard promotion/demotion logic continues here...
@@ -279,7 +358,8 @@ async function manageRoles(interaction, action) {
 const hasRole = (member, roleListName) => {
     const config = configManager.get();
     if (!config || !config[roleListName]) {
-        logger.warn(`Permission check failed: "${roleListName}" not found in config.`);
+        // This is not an error, just means the role isn't configured.
+        // logger.warn(`Permission check failed: "${roleListName}" not found in config.`);
         return false;
     }
     const requiredRoleIds = config[roleListName];
@@ -290,20 +370,26 @@ const isAdmin = (member) => hasRole(member, 'adminRoles');
 const isCouncil = (member) => hasRole(member, 'councilRoles');
 const isCommander = (member) => hasRole(member, 'commanderRoles');
 const canAuth = (member) => hasRole(member, 'authRoles');
+const isFc = (member) => hasRole(member, 'fcRoles');
+const isCt = (member) => hasRole(member, 'ctRoles');
 
 const isCommanderOrAdmin = (member) => isCommander(member) || isAdmin(member);
 const isCouncilOrAdmin = (member) => isCouncil(member) || isAdmin(member);
+const isFcOrHigher = (member) => isFc(member) || isCouncilOrAdmin(member);
+const isCtOrHigher = (member) => isCt(member) || isFcOrHigher(member);
 
 module.exports = {
     manageRoles,
     syncRolesFromDb,
+    getMemberHierarchyInfo,
     isAdmin,
     isCouncil,
     isCommander,
     canAuth,
+    isFc,
+    isCt,
     isCommanderOrAdmin,
     isCouncilOrAdmin,
+    isFcOrHigher,
+    isCtOrHigher,
 };
-
-
-

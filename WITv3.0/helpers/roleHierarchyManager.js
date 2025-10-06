@@ -10,12 +10,13 @@ let hierarchyCache = null;
 async function loadHierarchy() {
     try {
         const newHierarchy = {};
-        const rows = await db.query('SELECT roleName, promote, demote FROM role_hierarchy');
+        const rows = await db.query('SELECT roleName, hierarchy_level, promote, demote FROM role_hierarchy');
 
         for (const row of rows) {
             try {
                 // Each row represents a rank.
                 newHierarchy[row.roleName] = {
+                    level: row.hierarchy_level, // Store the level
                     promote: JSON.parse(row.promote || '{}'),
                     demote: JSON.parse(row.demote || '{}')
                 };
@@ -90,4 +91,3 @@ module.exports = {
     reloadHierarchy,
     getAllManageableRoleIds,
 };
-
