@@ -14,6 +14,7 @@ module.exports = {
         const commands = interaction.client.commands;
         const permissionsMap = {
             admin: [],
+            leadership: [],
             council: [],
             commander: [],
             auth: [],

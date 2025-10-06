@@ -146,8 +146,8 @@ async function getMemberHierarchyInfo(member) {
     const roleIdToRank = new Map();
 
     // Manually add admin and council with high levels to ensure they always win ties
-    if (config.adminRoles) {
-        config.adminRoles.forEach(id => roleIdToRank.set(id, { name: 'admin', level: 999 }));
+    if (config.leadershipRoles) {
+        config.leadershipRoles.forEach(id => roleIdToRank.set(id, { name: 'leadership', level: 999 }));
     }
     if (config.councilRoles) {
         config.councilRoles.forEach(id => roleIdToRank.set(id, { name: 'council', level: 900 }));
@@ -226,7 +226,7 @@ async function manageRoles(interaction, action) {
     }
 
     // Rule 1: Executor must have a higher rank than the target. Admins are exempt.
-    if (executorInfo.level <= targetInfo.level && executorInfo.rankName !== 'admin') {
+    if (executorInfo.level <= targetInfo.level && !isAdmin(executor)) {
         return interaction.editReply({
             content: `You cannot manage roles for **${targetUser.tag}**. Your rank level (${executorInfo.level}) is not higher than theirs (${targetInfo.level}).`,
             flags: [MessageFlags.Ephemeral]
@@ -234,7 +234,7 @@ async function manageRoles(interaction, action) {
     }
 
     // Rule 2 for Promotion: Executor's rank must be >= rank they are promoting to. Admins are exempt.
-    if (action === 'promote' && executorInfo.level < targetRankLevel && executorInfo.rankName !== 'admin') {
+    if (action === 'promote' && executorInfo.level < targetRankLevel && !isAdmin(executor)) {
         return interaction.editReply({
             content: `You cannot promote someone to **${targetRankName}**. Your rank level (${executorInfo.level}) is lower than the target rank's level (${targetRankLevel}).`,
             flags: [MessageFlags.Ephemeral]
@@ -244,7 +244,7 @@ async function manageRoles(interaction, action) {
     // Rule 3 for Demotion: Executor cannot demote from a rank higher than their own. This is covered by Rule 1.
 
     // Rule 4: Special check for 'Remove All' - only Admins
-    if (isRemoveAllAction && executorInfo.rankName !== 'admin') {
+    if (isRemoveAllAction && !isAdmin(executor)) {
         return interaction.editReply({ content: 'Only Admins can use the "Remove All Roles" option.', flags: [MessageFlags.Ephemeral] });
     }
     // --- END HIERARCHY CHECKS ---
@@ -358,24 +358,32 @@ async function manageRoles(interaction, action) {
 const hasRole = (member, roleListName) => {
     const config = configManager.get();
     if (!config || !config[roleListName]) {
-        // This is not an error, just means the role isn't configured.
-        // logger.warn(`Permission check failed: "${roleListName}" not found in config.`);
         return false;
     }
     const requiredRoleIds = config[roleListName];
+    if (!member || !member.roles) return false;
     return member.roles.cache.some(role => requiredRoleIds.includes(role.id));
 };
 
-const isAdmin = (member) => hasRole(member, 'adminRoles');
+const isAdmin = (member) => {
+    if (!member) return false;
+    // Server owner is always an admin
+    if (member.id === member.guild.ownerId) return true;
+    const config = configManager.get();
+    const adminUsers = config && config.adminUsers ? config.adminUsers : [];
+    return adminUsers.includes(member.id);
+};
+
+const isLeadership = (member) => hasRole(member, 'leadershipRoles');
 const isCouncil = (member) => hasRole(member, 'councilRoles');
 const isCommander = (member) => hasRole(member, 'commanderRoles');
 const canAuth = (member) => hasRole(member, 'authRoles');
 const isFc = (member) => hasRole(member, 'fleetcommanderRoles');
 const isCt = (member) => hasRole(member, 'certifiedtrainerRoles');
 
-const isCommanderOrAdmin = (member) => isCommander(member) || isAdmin(member);
-const isCouncilOrAdmin = (member) => isCouncil(member) || isAdmin(member);
-const isFcOrHigher = (member) => isFc(member) || isCouncilOrAdmin(member);
+const isCommanderOrLeadership = (member) => isCommander(member) || isLeadership(member) || isAdmin(member);
+const isCouncilOrLeadership = (member) => isCouncil(member) || isLeadership(member) || isAdmin(member);
+const isFcOrHigher = (member) => isFc(member) || isCouncilOrLeadership(member); // isAdmin is included via isCouncilOrLeadership
 const isCtOrHigher = (member) => isCt(member) || isFcOrHigher(member);
 
 module.exports = {
@@ -383,13 +391,14 @@ module.exports = {
     syncRolesFromDb,
     getMemberHierarchyInfo,
     isAdmin,
+    isLeadership,
     isCouncil,
     isCommander,
     canAuth,
     isFc,
     isCt,
-    isCommanderOrAdmin,
-    isCouncilOrAdmin,
+    isCommanderOrLeadership,
+    isCouncilOrLeadership,
     isFcOrHigher,
     isCtOrHigher,
 };

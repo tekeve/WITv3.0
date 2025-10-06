@@ -17,8 +17,9 @@ module.exports = {
         // An object mapping permission levels to checking functions from roleManager
         const permissionChecks = {
             admin: roleManager.isAdmin,
-            council: roleManager.isCouncilOrAdmin,
-            commander: roleManager.isCommanderOrAdmin,
+            leadership: roleManager.isLeadership,
+            council: roleManager.isCouncilOrLeadership,
+            commander: roleManager.isCommanderOrLeadership,
             fleet_commander: roleManager.isFcOrHigher,
             certified_trainer: roleManager.isCtOrHigher,
             auth: roleManager.canAuth,
