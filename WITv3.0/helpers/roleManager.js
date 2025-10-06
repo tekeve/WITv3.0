@@ -370,8 +370,8 @@ const isAdmin = (member) => hasRole(member, 'adminRoles');
 const isCouncil = (member) => hasRole(member, 'councilRoles');
 const isCommander = (member) => hasRole(member, 'commanderRoles');
 const canAuth = (member) => hasRole(member, 'authRoles');
-const isFc = (member) => hasRole(member, 'fcRoles');
-const isCt = (member) => hasRole(member, 'ctRoles');
+const isFc = (member) => hasRole(member, 'fleetcommanderRoles');
+const isCt = (member) => hasRole(member, 'certifiedtrainerRoles');
 
 const isCommanderOrAdmin = (member) => isCommander(member) || isAdmin(member);
 const isCouncilOrAdmin = (member) => isCouncil(member) || isAdmin(member);

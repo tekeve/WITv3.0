@@ -19,8 +19,8 @@ module.exports = {
             admin: roleManager.isAdmin,
             council: roleManager.isCouncilOrAdmin,
             commander: roleManager.isCommanderOrAdmin,
-            fc: roleManager.isFcOrHigher,
-            ct: roleManager.isCtOrHigher,
+            fleet_commander: roleManager.isFcOrHigher,
+            certified_trainer: roleManager.isCtOrHigher,
             auth: roleManager.canAuth,
             public: () => true, // Everyone can use public commands
         };
