@@ -68,7 +68,7 @@ async function handleCreateEdit(interaction) {
 
 
 module.exports = {
-    permission: 'council',
+    permissions: ['council', 'officer', 'leadership', 'founder', 'admin'],
     data: new SlashCommandBuilder()
         .setName('embed')
         .setDescription('Manage, create, and send custom embeds.')

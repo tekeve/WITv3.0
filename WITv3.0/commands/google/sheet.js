@@ -5,7 +5,7 @@ const logger = require('@helpers/logger');
 const tableManager = require('@helpers/managers/tableManager');
 
 module.exports = {
-    permission: 'leadership',
+    permission: ['leadership'],
     data: new SlashCommandBuilder()
         .setName('sheet')
         .setDescription('Interact with Google Sheets (Leadership Only)')

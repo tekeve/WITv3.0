@@ -4,7 +4,7 @@ const mailManager = require('@helpers/mailManager');
 const crypto = require('crypto');
 
 module.exports = {
-    permission: 'leadership',
+    permission: ['leadership'],
     data: new SlashCommandBuilder()
         .setName('sendmail')
         .setDescription('Send an in-game EVE Mail via an authenticated character.')

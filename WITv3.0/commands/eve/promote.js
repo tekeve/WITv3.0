@@ -3,7 +3,7 @@ const roleManager = require('@helpers/roleManager');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 
 module.exports = {
-    permission: 'certified_trainer',
+    permission: ['certified_trainer'],
     data: new SlashCommandBuilder()
         .setName('promote')
         .setDescription('Promotes a user to a specified rank.')
@@ -39,7 +39,7 @@ module.exports = {
                 });
             }
         }
-
+        
         // All other logic is now handled directly by the role manager.
         await roleManager.manageRoles(interaction, 'promote');
     },

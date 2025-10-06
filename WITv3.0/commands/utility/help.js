@@ -4,8 +4,7 @@ const roleManager = require('@helpers/roleManager');
 module.exports = {
     // Each command should export a 'permission' property.
     // This allows the help command and interaction handler to check permissions dynamically.
-    // Possible values: 'admin', 'council', 'commander', 'auth', 'public'
-    permission: 'public',
+    permission: ['public'],
     data: new SlashCommandBuilder()
         .setName('help')
         .setDescription('Lists all available commands you have permission to use.'),
@@ -17,11 +16,18 @@ module.exports = {
         // An object mapping permission levels to checking functions from roleManager
         const permissionChecks = {
             admin: roleManager.isAdmin,
-            leadership: roleManager.isLeadership,
-            council: roleManager.isCouncilOrLeadership,
-            commander: roleManager.isCommanderOrLeadership,
-            fleet_commander: roleManager.isFcOrHigher,
-            certified_trainer: roleManager.isCtOrHigher,
+            founder: roleManager.isFounderOrHigher,
+            leadership: roleManager.isLeadershipOrHigher,
+            officer: roleManager.isOfficerOrHigher,
+            council: roleManager.isCouncilOrHigher,
+            certified_trainer: roleManager.isCertifiedTrainerOrHigher,
+            training_ct: roleManager.isTrainingCtOrHigher,
+            fleet_commander: roleManager.isFleetCommanderOrHigher,
+            training_fc: roleManager.isTrainingFcOrHigher,
+            assault_line_commander: roleManager.isAssaultLineCommanderOrHigher,
+            line_commander: roleManager.isLineCommanderOrHigher,
+            resident: roleManager.isResidentOrHigher,
+            commander: roleManager.isCommanderOrHigher,
             auth: roleManager.canAuth,
             public: () => true, // Everyone can use public commands
         };
@@ -49,3 +55,4 @@ module.exports = {
         });
     },
 };
+

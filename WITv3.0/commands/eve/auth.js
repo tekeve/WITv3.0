@@ -1,11 +1,10 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, MessageFlags } = require('discord.js');
 const crypto = require('crypto');
 const authManager = require('@helpers/authManager.js');
-const roleManager = require('@helpers/roleManager');
 const logger = require('@helpers/logger');
 
 module.exports = {
-    permission: 'auth',
+    permissions: ['auth'],
     data: new SlashCommandBuilder()
         .setName('auth')
         .setDescription('Authenticate your EVE Online character with the bot.')

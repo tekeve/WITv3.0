@@ -7,6 +7,44 @@ const { buildPromotionEmbed } = require('@embeds/promoteEmbed');
 const charManager = require('@helpers/characterManager');
 
 /**
+ * Checks if a member has at least one of the required permissions.
+ * This is a direct check and does not use hierarchy.
+ * @param {import('discord.js').GuildMember} member The member to check.
+ * @param {string[]} requiredPermissions An array of permission strings (e.g., ['admin', 'leadership']).
+ * @returns {boolean} True if the member has at least one of the permissions, false otherwise.
+ */
+function hasPermission(member, requiredPermissions) {
+    if (!member || !requiredPermissions || !Array.isArray(requiredPermissions)) {
+        return false;
+    }
+
+    // A map of permission names to their checking functions.
+    const permissionChecks = {
+        admin: isAdmin,
+        founder: isFounder,
+        leadership: isLeadership,
+        officer: isOfficer,
+        council: isCouncil,
+        certified_trainer: isCertifiedTrainer,
+        training_ct: isTrainingCt,
+        fleet_commander: isFleetCommander,
+        training_fc: isTrainingFc,
+        assault_line_commander: isAssaultLineCommander,
+        line_commander: isLineCommander,
+        resident: isResident,
+        commander: isCommander,
+        auth: canAuth,
+        public: () => true,
+    };
+
+    // Check if the user has any of the required permissions.
+    return requiredPermissions.some(permission => {
+        const check = permissionChecks[permission];
+        return check ? check(member) : false;
+    });
+}
+
+/**
  * Finds a role in a guild by its ID.
  * @param {import('discord.js').Guild} guild - The guild object.
  * @param {string} roleId - The ID of the role to find.
@@ -140,20 +178,31 @@ async function getMemberHierarchyInfo(member) {
     const config = configManager.get();
     if (!hierarchy || !config) return { level: 0, rankName: 'Unranked' };
 
+    // Handle Admin separately as it's user ID based.
+    if (isAdmin(member)) {
+        return { level: 1000, rankName: 'admin' };
+    }
+
     let maxLevel = 0;
     let highestRankName = 'Unranked';
 
     const roleIdToRank = new Map();
 
-    // Manually add admin and council with high levels to ensure they always win ties
-    if (config.leadershipRoles) {
-        config.leadershipRoles.forEach(id => roleIdToRank.set(id, { name: 'leadership', level: 999 }));
-    }
-    if (config.councilRoles) {
-        config.councilRoles.forEach(id => roleIdToRank.set(id, { name: 'council', level: 900 }));
+    // Special roles that aren't in role_hierarchy table but have a level
+    const specialRoles = {
+        founderRoles: { name: 'founder', level: 999 },
+        leadershipRoles: { name: 'leadership', level: 950 },
+        officerRoles: { name: 'officer', level: 900 },
+        councilRoles: { name: 'council', level: 850 }
+    };
+
+    for (const [configKey, rankInfo] of Object.entries(specialRoles)) {
+        if (config[configKey]) {
+            config[configKey].forEach(id => roleIdToRank.set(id, rankInfo));
+        }
     }
 
-    // Map all configured role IDs from the hierarchy to their rank name and level
+    // Map all configured role IDs from the hierarchy table
     for (const rankName in hierarchy) {
         // Construct the key name, e.g., 'fleet_commander' -> 'fleetcommanderRoles', 'ct' -> 'ctRoles'
         const configKey = `${rankName.replace(/_/g, '')}Roles`;
@@ -199,7 +248,7 @@ async function manageRoles(interaction, action) {
     const isRemoveAllAction = action === 'demote' && targetRankName === 'Remove All Roles';
 
     // This is the specific check for this action.
-    // The general 'council' permission is already checked before this command runs.
+    // The general permission is already checked before this command runs.
     if (isLeadershipAction || isRemoveAllAction) {
         if (!isAdmin(interaction.member)) {
             return interaction.reply({
@@ -358,6 +407,8 @@ async function manageRoles(interaction, action) {
 const hasRole = (member, roleListName) => {
     const config = configManager.get();
     if (!config || !config[roleListName]) {
+        // This is not an error, just means the role isn't configured.
+        // logger.warn(`Permission check failed: "${roleListName}" not found in config.`);
         return false;
     }
     const requiredRoleIds = config[roleListName];
@@ -374,31 +425,38 @@ const isAdmin = (member) => {
     return adminUsers.includes(member.id);
 };
 
+const isFounder = (member) => hasRole(member, 'founderRoles');
 const isLeadership = (member) => hasRole(member, 'leadershipRoles');
+const isOfficer = (member) => hasRole(member, 'officerRoles');
 const isCouncil = (member) => hasRole(member, 'councilRoles');
+const isCertifiedTrainer = (member) => hasRole(member, 'certifiedtrainerRoles');
+const isTrainingCt = (member) => hasRole(member, 'trainingCtRoles');
+const isFleetCommander = (member) => hasRole(member, 'fleetcommanderRoles');
+const isTrainingFc = (member) => hasRole(member, 'trainingFcRoles');
+const isAssaultLineCommander = (member) => hasRole(member, 'assaultLineCommanderRoles');
+const isLineCommander = (member) => hasRole(member, 'lineCommanderRoles');
+const isResident = (member) => hasRole(member, 'residentRoles');
 const isCommander = (member) => hasRole(member, 'commanderRoles');
 const canAuth = (member) => hasRole(member, 'authRoles');
-const isFc = (member) => hasRole(member, 'fleetcommanderRoles');
-const isCt = (member) => hasRole(member, 'certifiedtrainerRoles');
-
-const isCommanderOrLeadership = (member) => isCommander(member) || isLeadership(member) || isAdmin(member);
-const isCouncilOrLeadership = (member) => isCouncil(member) || isLeadership(member) || isAdmin(member);
-const isFcOrHigher = (member) => isFc(member) || isCouncilOrLeadership(member); // isAdmin is included via isCouncilOrLeadership
-const isCtOrHigher = (member) => isCt(member) || isFcOrHigher(member);
 
 module.exports = {
+    hasPermission,
     manageRoles,
     syncRolesFromDb,
     getMemberHierarchyInfo,
     isAdmin,
+    isFounder,
     isLeadership,
+    isOfficer,
     isCouncil,
+    isCertifiedTrainer,
+    isTrainingCt,
+    isFleetCommander,
+    isTrainingFc,
+    isAssaultLineCommander,
+    isLineCommander,
+    isResident,
     isCommander,
     canAuth,
-    isFc,
-    isCt,
-    isCommanderOrLeadership,
-    isCouncilOrLeadership,
-    isFcOrHigher,
-    isCtOrHigher,
 };
+

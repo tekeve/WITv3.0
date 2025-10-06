@@ -4,7 +4,7 @@ const logger = require('@helpers/logger');
 const esiService = require('@helpers/esiService');
 
 module.exports = {
-    permission: 'admin',
+    permissions: ['admin'],
     data: new SlashCommandBuilder()
         .setName('maillists')
         .setDescription('Lists your character\'s EVE Online mailing lists and their IDs. (Admin Only)')

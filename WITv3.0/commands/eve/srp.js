@@ -4,7 +4,7 @@ const logger = require('@helpers/logger');
 const authManager = require('@helpers/authManager');
 
 module.exports = {
-    permission: 'commander',
+    permissions: ['commander', 'resident', 'line_commander', 'assault_line_commander', 'training_fc', 'fleet_commander', 'training_ct', 'certified_trainer', 'council', 'officer', 'leadership', 'founder', 'admin'],
     data: new SlashCommandBuilder()
         .setName('srp')
         .setDescription('Generates a unique link to file a Ship Replacement Program (SRP) request.'),

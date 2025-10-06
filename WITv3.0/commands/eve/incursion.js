@@ -35,7 +35,7 @@ function parseTimestring(timestring) {
 
 
 module.exports = {
-    permission: 'admin',
+    permission: ['leadership'],
     data: new SlashCommandBuilder()
         .setName('incursion')
         .setDescription('Manage and view EVE Online Incursion information.')

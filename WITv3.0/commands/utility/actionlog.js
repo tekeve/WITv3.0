@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('@helpers/logger');
 
 module.exports = {
-    permission: 'admin',
+    permissions: ['admin'],
     data: new SlashCommandBuilder()
         .setName('actionlog')
         .setDescription('Manage the action log settings.')

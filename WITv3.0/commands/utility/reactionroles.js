@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('@helpers/logger');
 
 module.exports = {
-    permission: 'admin',
+    permission: ['leadership'],
     data: new SlashCommandBuilder()
         .setName('reactionroles')
         .setDescription('Generates a unique link to manage reaction roles.'),

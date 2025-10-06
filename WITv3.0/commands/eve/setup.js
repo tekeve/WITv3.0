@@ -5,7 +5,7 @@ const logger = require('@helpers/logger');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
-    permission: 'admin', // Only bot admins can initiate setup.
+    permission: ['leadership'], // Only bot admins can initiate setup.
     data: new SlashCommandBuilder()
         .setName('setup')
         .setDescription('Generates a link to perform or edit the bot setup (bot admin only after first run).'),

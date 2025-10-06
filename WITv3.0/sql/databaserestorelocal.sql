@@ -1,5 +1,12 @@
+-- --------------------------------------------------------
+-- Host:                         localhost
+-- Server version:               11.8.3-MariaDB - mariadb.org binary distribution
+-- Server OS:                    Win64
+-- HeidiSQL Version:             12.11.0.7065
+-- --------------------------------------------------------
+
 -- Dumping database structure for wit-db
-CREATE DATABASE IF NOT EXISTS `wit-db`;
+CREATE DATABASE IF NOT EXISTS `wit-db` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
 USE `wit-db`;
 
 -- Dumping structure for table wit-db.action_log_settings
@@ -45,7 +52,7 @@ CREATE TABLE IF NOT EXISTS `bot_status` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.bot_status: ~0 rows (approximately)
+-- Dumping data for table wit-db.bot_status: ~1 rows (approximately)
 REPLACE INTO `bot_status` (`id`, `activity`, `statusText`, `url`, `expiryTimestamp`) VALUES
 	(1, 'Watching', '... always watching ...', NULL, NULL);
 
@@ -54,22 +61,25 @@ CREATE TABLE IF NOT EXISTS `config` (
   `key_name` varchar(255) NOT NULL,
   `value` longtext DEFAULT NULL,
   PRIMARY KEY (`key_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.config: ~21 rows (approximately)
+-- Dumping data for table wit-db.config: ~24 rows (approximately)
 REPLACE INTO `config` (`key_name`, `value`) VALUES
 	('actionLogChannelId', '["1418465802247475231"]'),
-	('adminRoles', '["1412546107975929917"]'),
+	('adminUsers', '["107396590653698048"]'),
 	('archiveChannelId', '["1411962451439652904"]'),
 	('auditLogChannelId', '["1413370040245555312"]'),
 	('authRoles', '["1412546107975929917","1412546080448712826"]'),
+	('certifiedtrainerRoles', '["1412546024819392733","1412545985388871730"]'),
 	('commanderRoles', '["1412545597021622383"]'),
 	('councilRoles', '["1412546107975929917","1412546080448712826"]'),
-	('githubBranch', '["master","v1.1"]'),
+	('fleetcommanderRoles', '["1412545955106127983","1412545912462512168"]'),
+	('githubBranch', '["master","v1.1","1.2"]'),
 	('githubChannelId', '["1418129590143942718"]'),
 	('githubRepoUrl', '["https://github.com/tekeve/WITv3.0"]'),
 	('incursionChannelId', '["1364223029814759444"]'),
-	('lastCommitSha', '{"master":"de5f64e5244ce2998678e3416120a4c541ea4f88","v1.1":"f95cabbe7a122e9cafa7d6263a6334ac0217dc72"}'),
+	('lastCommitSha', '{"master":"cd25e2fa3d6bf349da64ff3db5cebb3565733352","v1.1":"f95cabbe7a122e9cafa7d6263a6334ac0217dc72","1.2":"51fb60f60aa2c6b83539630a0aba15fc4d30c7e6"}'),
+	('leadershipRoles', '["1412546107975929917"]'),
 	('logiSignoffChannelId', '["1420720850654597331"]'),
 	('newMemberRoleId', '["1055468376866168853"]'),
 	('removeAllRoles', '["1412546056994160822","410301424283418625"]'),
@@ -86,7 +96,7 @@ CREATE TABLE IF NOT EXISTS `google_docs` (
   `alias` varchar(50) NOT NULL,
   `doc_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- Dumping data for table wit-db.google_docs: ~0 rows (approximately)
 
@@ -96,9 +106,9 @@ CREATE TABLE IF NOT EXISTS `google_sheets` (
   `alias` varchar(50) NOT NULL,
   `sheet_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.google_sheets: ~0 rows (approximately)
+-- Dumping data for table wit-db.google_sheets: ~1 rows (approximately)
 REPLACE INTO `google_sheets` (`id`, `alias`, `sheet_id`) VALUES
 	(1, 'anonfeedback', '1Pe_6hyoXVbrFwC0zAohzrF8Y2aubJRC97faqoZMHDbE');
 
@@ -115,11 +125,11 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
   `lastIncursionStats` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`lastIncursionStats`)),
   `route_data` text DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- Dumping data for table wit-db.incursion_state: ~1 rows (approximately)
 REPLACE INTO `incursion_state` (`id`, `lastIncursionState`, `incursionMessageId`, `lastHqSystemId`, `spawnTimestamp`, `mobilizingTimestamp`, `withdrawingTimestamp`, `endedTimestamp`, `lastIncursionStats`, `route_data`) VALUES
-	(1, '20000501-established-1', '1423076049583079444', 30005043, 1759358165, NULL, NULL, NULL, NULL, '{"tradeHubRoutes":"**Jita**:\\n[24j (safest)](https://eve-gatecheck.space/eve/#Jita:Ansher:secure) / [14j (shortest)](https://eve-gatecheck.space/eve/#Jita:Ansher:shortest)\\n**Amarr**:\\n[29j (safest)](https://eve-gatecheck.space/eve/#Amarr:Ansher:secure) / [19j (shortest)](https://eve-gatecheck.space/eve/#Amarr:Ansher:shortest)\\n**Dodixie**:\\n[13j (safest)](https://eve-gatecheck.space/eve/#Dodixie:Ansher:secure)\\n**Rens**:\\n[9j (safest)](https://eve-gatecheck.space/eve/#Rens:Ansher:secure)\\n**Hek**:\\n[5j (safest)](https://eve-gatecheck.space/eve/#Hek:Ansher:secure)","lastHqRoute":"**Molea**: [31j (safest)](https://eve-gatecheck.space/eve/#Molea:Ansher:secure) / [21j (shortest)](https://eve-gatecheck.space/eve/#Molea:Ansher:shortest)"}');
+	(1, '20000501-mobilizing-1', '1423076049583079444', 30005043, 1759358165, 1759560830, NULL, NULL, NULL, '{"tradeHubRoutes":"**Jita**:\\n[24j (safest)](https://eve-gatecheck.space/eve/#Jita:Ansher:secure) / [14j (shortest)](https://eve-gatecheck.space/eve/#Jita:Ansher:shortest)\\n**Amarr**:\\n[29j (safest)](https://eve-gatecheck.space/eve/#Amarr:Ansher:secure) / [19j (shortest)](https://eve-gatecheck.space/eve/#Amarr:Ansher:shortest)\\n**Dodixie**:\\n[13j (safest)](https://eve-gatecheck.space/eve/#Dodixie:Ansher:secure)\\n**Rens**:\\n[9j (safest)](https://eve-gatecheck.space/eve/#Rens:Ansher:secure)\\n**Hek**:\\n[5j (safest)](https://eve-gatecheck.space/eve/#Hek:Ansher:secure)","lastHqRoute":"**Molea**: [31j (safest)](https://eve-gatecheck.space/eve/#Molea:Ansher:secure) / [21j (shortest)](https://eve-gatecheck.space/eve/#Molea:Ansher:shortest)"}');
 
 -- Dumping structure for table wit-db.incursion_systems
 CREATE TABLE IF NOT EXISTS `incursion_systems` (
@@ -135,11 +145,11 @@ CREATE TABLE IF NOT EXISTS `incursion_systems` (
   `region` varchar(255) DEFAULT NULL,
   `region_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`Constellation_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- Dumping data for table wit-db.incursion_systems: ~105 rows (approximately)
 REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard_systems`, `assault_systems`, `headquarters_system`, `dockup`, `dock_up_system_id`, `is_island`, `region_faction`, `region`, `region_id`) VALUES
-	(20000001, 'San Matar', 'Akpivem, Nirbhi, Tanoo, Yuzier', 'Jark, Sasta', 'Lashesih (0.8)', 'Lisudeh IV - Moon 4 - Theology Council Tribunal', '30000005', 'NOTISLAND', '500007', 'Derelik', 10000001),
+	(20000001, 'San Matar', 'Akpivem, Nirbhi, Tanoo, Yuzier', 'Jark, Sasta', 'Lashesih (0.8)', 'Lisudeh IV - Moon 4 - Theology Council Tribunal', '30002973', 'NOTISLAND', '500007', 'Derelik', 10000001),
 	(20000004, 'Kalangin', 'Eshtah, Kasrasi, Ordize, Rashy', 'Fovihi, Psasa', 'Kiereend (0.8)', 'Kiereend VII - Moon 3 - DED Assembly Plant', '30000024', 'NOTISLAND', '500007', 'Derelik', 10000001),
 	(20000008, 'Mossas', 'Ibaria, Maspah, Zemalu', 'Juddi', 'Khankenirdia (0.6)', 'Khankenirdia V - Moon 17 - Ammatar Consulate Academy', '30000056', 'NOTISLAND', '500007', 'Derelik', 10000001),
 	(20000009, 'Mekashtad', 'Iosantin, Janus, Orva, Salashayama, Thiarer, Zet', 'Amphar, Nikh, Usroh', 'Agha (0.7)', 'Agha IX - Moon 6 - Trust Partners Warehouse', '30000061', 'NOTISLAND', '500007', 'Derelik', 10000001),
@@ -147,11 +157,12 @@ REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard
 	(20000012, 'Oraron', 'Ejahi, Gelhan, Jarizza', 'Asghatil, Bar', 'Sucha (0.7)', 'Asghatil IX - Moon 3 - DED Assembly Plant', '30000084', 'NOTISLAND', '500007', 'Derelik', 10000001),
 	(20000017, 'Ruomo', 'Ahtulaima, Kylmabe, Vaankalen', 'Jatate, Mitsolen', 'Mahtista (0.7)', 'Mitsolen I - Moon 1 - Expert Housing Warehouse', '30000120', 'NOTISLAND', '500001', 'The Forge', 10000002),
 	(20000019, 'Ihilakken', 'Ansila, Aokannitoh, Hirtamon, Ikuchi', 'Hykkota, Ohmahailen, Outuni', 'Aokannitoh (1.0)', 'Aokannitoh VII - Moon 2 - School of Applied Knowledge', '30021407', 'NOTISLAND', '500001', 'The Forge', 10000002),
-	(20000021, 'Okomon', '', '', 'Abagawa (0.6)', 'Abagawa VIII - Moon 4 - Peace and Order Unit Logistic Support', '', 'NOTISLAND', '500001', 'The Forge', 10000002),
+	(20000021, 'Okomon', '', '', 'Abagawa (0.6)', 'Abagawa VIII - Moon 4 - Peace and Order Unit Logistic Support', '30000147', 'NOTISLAND', '500001', 'The Forge', 10000002),
+	(20000022, 'Onirvura', '', '', NULL, '', '', 'NOTISLAND', '500001', 'Lonetrek', 10000016),
 	(20000025, 'Otsabaira', 'Akkilen, Keikaken, Onuse', 'Soshin, Vattuolen', 'Silen (0.5)', 'Silen III - Moon 9 - Lai Dai Corporation Research Center', '30000179', 'NOTISLAND', '500001', 'The Forge', 10000002),
 	(20000200, 'Haurala', 'Erenta, Ouranienen, Uemisaisen', 'Sotrentaira', 'Raussinen (0.5)', 'Raussinen XI - Moon 2 - Genolution Biotech Research Center', '30001373', 'NOTISLAND', '500001', 'Lonetrek', 10000016),
 	(20000207, 'Kainokai', 'Autama, Kuoka, Tsukuras', 'Kirras', 'Nani (-1.0)', 'Nani IV - Moon 2 - Aliastra Warehouse', '30001413', 'NOTISLAND', '500001', 'Lonetrek', 10000016),
-	(20000208, 'Pietanen', 'Atai, Otalieto, Rauntaka', 'Liukikka', 'Aikantoh (0.6)', 'Aikantoh I - Moon 1 - Mercantile Club Academy', '', 'ISLAND', '500001', 'Lonetrek', 10000016),
+	(20000208, 'Pietanen', 'Atai, Otalieto, Rauntaka', 'Liukikka', 'Aikantoh (0.6)', 'Aikantoh I - Moon 1 - Mercantile Club Academy', '30001418', 'ISLAND', '500001', 'Lonetrek', 10000016),
 	(20000209, 'Asalola', 'Ibura, Isinokka, Yoma', 'Oipo', 'Haajinen (0.8)', 'Haajinen XI - Moon 9 - Lai Dai Corporation Warehouse', '30001424', 'NOTISLAND', '500001', 'Lonetrek', 10000016),
 	(20000243, 'Sanair', 'Adahum, Goram, Tendhyes', 'Tividu', 'Anjedin (0.5)', 'Tividu III - Kaalakiota Corporation Factory', '30001644', 'NOTISLAND', '500003', 'Tash-Murkon', 10000020),
 	(20000244, 'Somi', 'Imeshasa, Jarzalad, Pimsu', 'Nafomeh', 'Riramia (0.6)', 'Riramia VI - Moon 12 - TransStellar Shipping Storage', '30001650', 'NOTISLAND', '500003', 'Tash-Murkon', 10000020),
@@ -188,10 +199,10 @@ REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard
 	(20000407, 'Outartoh', 'Annaro, Isutaka, Tasabeshi', 'Muvolailen', 'Paara (0.8)', 'Paara I - Spacelane Patrol Logistic Support', '30002775', 'NOTISLAND', '500001', 'The Citadel', 10000033),
 	(20000409, 'Suon', 'Inaro, Irjunen, Waskisen', 'Sirppala', 'Kaaputenen (0.8)', 'Kaaputenen III - Moon 1 - CBD Sell Division Warehouse', '30002789', 'NOTISLAND', '500001', 'The Citadel', 10000033),
 	(20000413, 'Santenpaa', 'Aramachi, Komo, Laah, Oichiya', 'Saila, Isenairos', 'Uotila (0.6)', 'Uotila V - Moon 14 - Chief Executive Panel Bureau', '30002814', 'NOTISLAND', '500001', 'The Citadel', 10000033),
-	(20000434, 'Ryra', 'Choonka, Dihra, Dital', 'Esescama', 'Odin (0.6)', 'Ohide VI - Moon 2 - Kaalakiota Corporation Warehouse', '30002964', 'NOTISLAND', '500003', 'Devoid', 10000036),
+	(20000434, 'Ryra', 'Choonka, Dihra, Dital', 'Esescama', 'Odin (0.6)', 'Ohide VI - Moon 2 - Kaalakiota Corporation Warehouse', '30002970', 'NOTISLAND', '500003', 'Devoid', 10000036),
 	(20000435, 'Kisana', 'Gheth, Lisudeh, Mehatoor', 'Sasoutikh', 'Ohide (0.6)', 'Ohide VI - Moon 2 - Kaalakiota Corporation Warehouse', '30002970', 'NOTISLAND', '500003', 'Devoid', 10000036),
 	(20000438, 'Daredan', 'Hati, Riavayed, Uadelah', 'Hakshma, Laddiaha', 'Nakatre (0.6)', 'Nakatre II - Emperor Family Bureau', '30002988', 'NOTISLAND', '500003', 'Devoid', 10000036),
-	(20000440, 'Enka', 'Arveyil, Nidebora, Uktiad, Ulerah', 'Faktun, Halenan', 'Mili (0.6)', 'Mili VIII - Moon 12 - Amarr Civil Service Bureau Offices', '', 'ISLAND', '500003', 'Devoid', 10000036),
+	(20000440, 'Enka', 'Arveyil, Nidebora, Uktiad, Ulerah', 'Faktun, Halenan', 'Mili (0.6)', 'Mili VIII - Moon 12 - Amarr Civil Service Bureau Offices', '30003001', 'ISLAND', '500003', 'Devoid', 10000036),
 	(20000441, 'Osnins', 'Amattens, Bereye, Junsoraert, Jurlesel', 'Arnatele, Halle', 'Mormoen (0.7)', 'Mormoen II - Caldari Business Tribunal Accounting', '30003011', 'NOTISLAND', '500004', 'Everyshore', 10000037),
 	(20000443, 'Ysiette', 'Jaschercis, Marosier, Vaurent', 'Ardallabier, Lirsautton', 'Blameston (1.0)', 'Blameston IV - Moon 12 - Quafe Company Retail Center', '30003026', 'NOTISLAND', '500004', 'Everyshore', 10000037),
 	(20000444, 'Odilis', 'Frarolle, Gicodel, Mattere', 'Ethernity, Meves', 'Athinard (1.0)', 'Athinard IV - Sisters of EVE Bureau', '30003031', 'NOTISLAND', '500004', 'Everyshore', 10000037),
@@ -213,9 +224,9 @@ REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard
 	(20000513, 'Chardu', 'Etav, Pedel, Saheri', 'Anila, Yeeramoun', 'Ides (0.8)', 'Etav VIII - Moon 14 - Amarr Civil Service Bureau Offices', '30003517', 'NOTISLAND', '500003', 'Domain', 10000043),
 	(20000514, 'Maddam', 'Hama, Hanan, Irnal, Sarum Prime', 'Alkabsi, Bagodan, Mahrokht', 'Murzi (0.6)', 'Aghesi VI - Moon 10 - Ministry of Assessment Bureau Offices', '30002220', 'NOTISLAND', '500003', 'Domain', 10000043),
 	(20000517, 'Maseend', 'Hamse, Jaswelu, Lashkai, Zhilshinou', 'Maiah, Yuhelia', 'Barira (0.8)', 'Yuhelia V - Moon 1 - Imperial Armaments Factory', '30003545', 'NOTISLAND', '500003', 'Domain', 10000043),
-	(20000522, 'Orvanne', 'Niballe, Odinesyn, Postouvin', 'Larryn', 'Weraroix (0.6)', 'Larryn II - FedMart Warehouse', '', 'ISLAND', '500004', 'Solitude', 10000044),
-	(20000523, 'Goins', 'Arasare, Lazer, Yvelet', 'Vecodie', 'Yvaeroure (0.8)', 'Yvaeroure VI - Moon 1 - Fedmart Retail Center', '', 'ISLAND', '500004', 'Solitude', 10000044),
-	(20000557, 'Unour', 'Iffrue, Mollin, Ommaerrer', 'Ivorider', 'Osmallanais (0.8)', 'Osmallanais VII - Moon 9 - Material Acquisition Refinery', '', 'ISLAND', '500004', 'Placid', 10000048),
+	(20000522, 'Orvanne', 'Niballe, Odinesyn, Postouvin', 'Larryn', 'Weraroix (0.6)', 'Larryn II - FedMart Warehouse', '30003579', 'ISLAND', '500004', 'Solitude', 10000044),
+	(20000523, 'Goins', 'Arasare, Lazer, Yvelet', 'Vecodie', 'Yvaeroure (0.8)', 'Yvaeroure VI - Moon 1 - Fedmart Retail Center', '30003588', 'ISLAND', '500004', 'Solitude', 10000044),
+	(20000557, 'Unour', 'Iffrue, Mollin, Ommaerrer', 'Ivorider', 'Osmallanais (0.8)', 'Osmallanais VII - Moon 9 - Material Acquisition Refinery', '30003812', 'ISLAND', '500004', 'Placid', 10000048),
 	(20000564, 'Nohshayess', 'Ipref, Jachanu, Khanid Prime, Kihtaled', 'Agil, Gousoviba, Neyi', 'Bukah (0.8)', 'Agil VI - Moon 2 - CONCORD Logistic Support', '30003862', 'NOTISLAND', '500008', 'Khanid', 10000049),
 	(20000565, 'Finaka', 'Hishai, Osis, Sehsasez, Yezara', 'Ervekam, Kahah, Mashtarmem', 'Saloti (0.7)', 'Kahah I - Khanid Transport Storage', '30003873', 'NOTISLAND', '500008', 'Khanid', 10000049),
 	(20000566, 'Amdimmah', 'Palas, Reteka, Safshela', 'Gidali', 'Molea (0.7)', 'Nakregde I - Amarr Civil Service Bureau Offices', '30005043', 'NOTISLAND', '500008', 'Khanid', 10000049),
@@ -231,7 +242,7 @@ REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard
 	(20000606, 'Naloran', 'Hapala, Salah, Yebouz', 'Syrikos', 'Hikansog (0.8)', 'Hikansog VII - Moon 9 - Royal Amarr Institute School', '30004142', 'NOTISLAND', '500003', 'Kador', 10000052),
 	(20000607, 'Moghiz', 'Kooreng, Shaggoth, Ustnia', 'Elmed, Minin', 'Jennim (0.8)', 'Safizon II - Moon 1 - Amarr Navy Assembly Plant', '30002279', 'NOTISLAND', '500003', 'Kador', 10000052),
 	(20000608, 'Qermi', 'Asrios, Ithar, Shemah', 'Zorrabed', 'Telang (0.8)', 'Asrios III - Kaalakiota Corporation Factory', '30004156', 'NOTISLAND', '500003', 'Kador', 10000052),
-	(20000622, 'Mayonhen', 'Avada, Haimeh, Pahineh', 'Bazadod', 'Chibi (0.5)', 'Chibi VI - Moon 15 - CONCORD Treasury', '', 'ISLAND', '500003', 'Aridia', 10000054),
+	(20000622, 'Mayonhen', 'Avada, Haimeh, Pahineh', 'Bazadod', 'Chibi (0.5)', 'Chibi VI - Moon 15 - CONCORD Treasury', '30004250', 'ISLAND', '500003', 'Aridia', 10000054),
 	(20000735, 'Eustron', 'Cat, Ommare, Vale', 'Atlangeins, Derririntel', 'Hecarrin (0.8)', 'Hecarrin VI - Moon 3 - Federal Navy Academy', '30024971', 'NOTISLAND', '500004', 'Essence', 10000064),
 	(20000738, 'Nimedaz', 'Danyana, Jinkah, Nibainkier, Polfaly', 'Annad, Nahyeen', 'Andrub (0.7)', 'Andrub VI - Ministry of War Bureau Offices', '30005049', 'NOTISLAND', '500003', 'Kor-Azor', 10000065),
 	(20000739, 'Panoumid', 'Imih, Soumi, Zinkon', 'Choga', 'Kulu (0.6)', 'Kulu X - Moon 3 - Caldari Business Tribunal Bureau Offices', '30005050', 'NOTISLAND', '500003', 'Kor-Azor', 10000065),
@@ -242,8 +253,7 @@ REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard
 	(20000774, 'Fabas', 'Agal, Doza, Ebasez', 'Bania, Nasreri', 'Girani-Fa (0.6)', 'Aydoteaux V - Moon 1 - Duvolle Laboratories Factory', '30003055', 'NOTISLAND', '500003', 'Genesis', 10000067),
 	(20000777, 'Kiartanne', 'Ansalle, Ellmay, Gisleres', 'Amygnon, Jufvitte', 'Scheenins (0.5)', 'Scheenins IV - Chemal Tech Factory', '30005310', 'NOTISLAND', '500004', 'Verge Vendor', 10000068),
 	(20000779, 'Ancbeu', 'Annelle, Claulenne, Masalle', 'Sortet', 'Scolluzer (0.8)', 'Scolluzer VI - DED Logistic Support', '30005322', 'NOTISLAND', '500004', 'Verge Vendor', 10000068),
-	(20000784, 'Aokinen', 'Onnamon,Tsuruma, Uuhulanen', 'Astoh, Rohamaa, Samanuhi', 'Uchomida (0.5)', 'Samanuni VI - Caldari Navy Anchorage', '30045322', 'NOTISLAND', '500001', 'Black Rise', 10000069),
-	(30000154, 'Onirvura', '', '', NULL, '', '', 'NOTISLAND', '500001', 'Lonetrek', 10000016);
+	(20000784, 'Aokinen', 'Onnamon,Tsuruma, Uuhulanen', 'Astoh, Rohamaa, Samanuhi', 'Uchomida (0.5)', 'Samanuni VI - Caldari Navy Anchorage', '30045322', 'NOTISLAND', '500001', 'Black Rise', 10000069);
 
 -- Dumping structure for table wit-db.logi_signoffs
 CREATE TABLE IF NOT EXISTS `logi_signoffs` (
@@ -257,7 +267,7 @@ CREATE TABLE IF NOT EXISTS `logi_signoffs` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `pilot_name` (`pilot_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- Dumping data for table wit-db.logi_signoffs: ~27 rows (approximately)
 REPLACE INTO `logi_signoffs` (`id`, `pilot_name`, `pilot_id`, `signoffs`, `history`, `status`, `created_at`, `updated_at`) VALUES
@@ -312,12 +322,15 @@ CREATE TABLE IF NOT EXISTS `reaction_roles` (
   `emoji` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `message_emoji_role` (`message_id`,`emoji`(100),`role_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.reaction_roles: ~2 rows (approximately)
+-- Dumping data for table wit-db.reaction_roles: ~5 rows (approximately)
 REPLACE INTO `reaction_roles` (`id`, `guild_id`, `channel_id`, `message_id`, `role_id`, `emoji`) VALUES
 	(14, '366076789438808064', '1412213555150716948', '1422914494027268127', '1412546107975929917', '<:Isis_titan:1422870698866642964>'),
-	(15, '366076789438808064', '1412213555150716948', '1422914494027268127', '1412546080448712826', '<:Isis_supercarrier:1422870696488599552>');
+	(15, '366076789438808064', '1412213555150716948', '1422914494027268127', '1412546080448712826', '<:Isis_supercarrier:1422870696488599552>'),
+	(18, '366076789438808064', '1412213555150716948', '1423655675577237535', '1412546056994160822', '<:Isis_freighter:1422870701081362432>'),
+	(19, '366076789438808064', '1412213555150716948', '1423655675577237535', '1412545955106127983', '<a:eyeswiggle:1225938195729092699>'),
+	(20, '366076789438808064', '1412213555150716948', '1423655675577237535', '1412545912462512168', '😉');
 
 -- Dumping structure for table wit-db.reminders
 CREATE TABLE IF NOT EXISTS `reminders` (
@@ -330,7 +343,7 @@ CREATE TABLE IF NOT EXISTS `reminders` (
   PRIMARY KEY (`id`),
   KEY `discord_id` (`discord_id`),
   KEY `remind_at` (`remind_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- Dumping data for table wit-db.reminders: ~0 rows (approximately)
 
@@ -351,7 +364,7 @@ CREATE TABLE IF NOT EXISTS `resident_applications` (
   `discord_id` varchar(50) NOT NULL,
   `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- Dumping data for table wit-db.resident_applications: ~22 rows (approximately)
 REPLACE INTO `resident_applications` (`id`, `character_name`, `alts`, `forum_identity`, `discord_identity`, `wtm_time`, `logistics_ships`, `battleship_ships`, `t2_guns`, `command_time_estimate`, `why_commander`, `why_wtm`, `discord_id`, `submitted_at`) VALUES
@@ -381,22 +394,23 @@ REPLACE INTO `resident_applications` (`id`, `character_name`, `alts`, `forum_ide
 -- Dumping structure for table wit-db.role_hierarchy
 CREATE TABLE IF NOT EXISTS `role_hierarchy` (
   `roleName` varchar(50) NOT NULL,
+  `hierarchy_level` int(11) NOT NULL DEFAULT 0,
   `promote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`promote`)),
   `demote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`demote`)),
   `history` longtext DEFAULT NULL,
   PRIMARY KEY (`roleName`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- Dumping data for table wit-db.role_hierarchy: ~8 rows (approximately)
-REPLACE INTO `role_hierarchy` (`roleName`, `promote`, `demote`, `history`) VALUES
-	('certified_trainer', '{"add":["1412546024819392733"],"remove":["1412545985388871730"]}', '{"add":[],"remove":["1412546024819392733"]}', NULL),
-	('fleet_commander', '{\r\n  "add": [\r\n    "1412545955106127983"\r\n  ],\r\n  "remove": [\r\n    "1412545912462512168"\r\n  ]\r\n}', '{\r\n  "add": [\r\n    "1412545912462512168"\r\n  ],\r\n  "remove": [\r\n    "1412545955106127983"\r\n  ]\r\n}', NULL),
-	('leadership', '{\r\n  "add": [\r\n    "1412546107975929917"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412546107975929917"\r\n  ]\r\n}', NULL),
-	('line_commander', '{\r\n  "add": [\r\n    "1412545877163118704"\r\n  ],\r\n  "remove": [\r\n    "1412545820015857724"\r\n  ]\r\n}', '{\r\n  "add": [\r\n    1412545820015857700\r\n  ],\r\n  "remove": [\r\n    1412545877163118600\r\n  ]\r\n}', NULL),
-	('officer', '{\r\n  "add": [\r\n    "1412546080448712826"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412546080448712826"\r\n  ]\r\n}', NULL),
-	('resident', '{\r\n  "add": [\r\n    "1412545597021622383",\r\n    "1412545820015857724"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412545597021622383",\r\n    "1412545820015857724"\r\n  ]\r\n}', NULL),
-	('training_ct', '{\r\n  "add": [\r\n    "1412545985388871730"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412545985388871730"\r\n  ]\r\n}', NULL),
-	('training_fc', '{\r\n  "add": [\r\n    "1412545912462512168"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412545912462512168"\r\n  ]\r\n}', NULL);
+REPLACE INTO `role_hierarchy` (`roleName`, `hierarchy_level`, `promote`, `demote`, `history`) VALUES
+	('certified_trainer', 70, '{"add":["1412546024819392733"],"remove":["1412545985388871730"]}', '{"add":[],"remove":["1412546024819392733"]}', NULL),
+	('fleet_commander', 50, '{\r\n  "add": [\r\n    "1412545955106127983"\r\n  ],\r\n  "remove": [\r\n    "1412545912462512168"\r\n  ]\r\n}', '{\r\n  "add": [\r\n    "1412545912462512168"\r\n  ],\r\n  "remove": [\r\n    "1412545955106127983"\r\n  ]\r\n}', NULL),
+	('leadership', 100, '{\r\n  "add": [\r\n    "1412546107975929917"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412546107975929917"\r\n  ]\r\n}', NULL),
+	('line_commander', 30, '{\r\n  "add": [\r\n    "1412545877163118704"\r\n  ],\r\n  "remove": [\r\n    "1412545820015857724"\r\n  ]\r\n}', '{\r\n  "add": [\r\n    1412545820015857700\r\n  ],\r\n  "remove": [\r\n    1412545877163118600\r\n  ]\r\n}', NULL),
+	('officer', 90, '{\r\n  "add": [\r\n    "1412546080448712826"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412546080448712826"\r\n  ]\r\n}', NULL),
+	('resident', 20, '{\r\n  "add": [\r\n    "1412545597021622383",\r\n    "1412545820015857724"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412545597021622383",\r\n    "1412545820015857724"\r\n  ]\r\n}', NULL),
+	('training_ct', 65, '{\r\n  "add": [\r\n    "1412545985388871730"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412545985388871730"\r\n  ]\r\n}', NULL),
+	('training_fc', 45, '{\r\n  "add": [\r\n    "1412545912462512168"\r\n  ],\r\n  "remove": []\r\n}', '{\r\n  "add": [],\r\n  "remove": [\r\n    "1412545912462512168"\r\n  ]\r\n}', NULL);
 
 -- Dumping structure for table wit-db.saved_embeds
 CREATE TABLE IF NOT EXISTS `saved_embeds` (
@@ -415,12 +429,13 @@ CREATE TABLE IF NOT EXISTS `saved_embeds` (
   PRIMARY KEY (`embed_name`,`guild_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Dumping data for table wit-db.saved_embeds: ~4 rows (approximately)
+-- Dumping data for table wit-db.saved_embeds: ~5 rows (approximately)
 REPLACE INTO `saved_embeds` (`embed_name`, `guild_id`, `embed_data`, `content`, `created_by_id`, `created_by_tag`, `last_edited_by_id`, `last_edited_by_tag`, `created_at`, `last_edited_at`, `last_sent_channel_id`, `last_sent_message_id`) VALUES
 	('focusgroups', '366076789438808064', '{"title":"Reaction Roles Test","color":16744512,"fields":[{"name":"Leadership","value":"<:Isis_titan:1422870698866642964>","inline":true},{"name":"Officer","value":"<:Isis_supercarrier:1422870696488599552>","inline":false}],"timestamp":"2025-10-01T11:58:00.398Z"}', '', '107396590653698048', 'teknick', '107396590653698048', 'teknick', '2025-10-01 11:54:11', '2025-10-01 11:58:03', '1412213555150716948', '1422914494027268127'),
-	('Founders', '366076789438808064', '{"title":"Founders & Current Leadership","description":"Sparta93 & Canyon Vjourytant","color":16478517,"fields":[{"name":"Octerdo Xir","value":"<@483337426341724202> <t:1767189600:D>","inline":true},{"name":"Ezabella","value":"<@107396590653698048> <t:1782828000:D>","inline":true},{"name":"â€‹","value":"â€‹","inline":true},{"name":"Bella Cadelanne","value":"<@368778318415265792>","inline":true},{"name":"Skeltek","value":"<@266657286355681280>","inline":true},{"name":"Tani Makia","value":"<@211238849349812225>","inline":true}],"timestamp":"2025-09-25T04:36:40.011Z"}', '', '107396590653698048', 'teknick', '107396590653698048', 'teknick', '2025-09-24 03:29:33', '2025-09-25 04:36:43', '1412213555150716948', '1420630080568295577'),
+	('Founders', '366076789438808064', '{"title":"Founders & Current Leadership","description":"Sparta93 & Canyon Vjourytant","color":16478517,"fields":[{"name":"Octerdo Xir","value":"<@483337426341724202> <t:1767189600:D>","inline":true},{"name":"Ezabella","value":"<@107396590653698048> <t:1782828000:D>","inline":true},{"name":"​","value":"​","inline":true},{"name":"Bella Cadelanne","value":"<@368778318415265792>","inline":true},{"name":"Skeltek","value":"<@266657286355681280>","inline":true},{"name":"Tani Makia","value":"<@211238849349812225>","inline":true}],"timestamp":"2025-09-25T04:36:40.011Z"}', '', '107396590653698048', 'teknick', '107396590653698048', 'teknick', '2025-09-24 03:29:33', '2025-09-25 04:36:43', '1412213555150716948', '1420630080568295577'),
 	('masterlist', '366076789438808064', '{"title":"Master List","color":3718648,"fields":[{"name":"Commander Tools","value":"[Waitlist](https://wl.warptome.net/)\\n[Fitting Website](https://wl.warptome.net/fits/)\\n[Forums](http://forums.warptome.net/)\\n[Rookie Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=301)\\n[R&R](http://tinyurl.com/WTMRR)\\n[Bylaws](https://docs.google.com/document/d/1DTlsl3UHMsHGA01pyLXw4-FOO1hdsVibOrKIjb2_iDM)","inline":true},{"name":"TS/Discord","value":"[Channel Command](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=2564&tab=comments#comment-26699)\\n[TS Badges Explained](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=27)\\n[Discord Responder](https://docs.google.com/spreadsheets/d/159qZ0nJW8DwIYCaf362DN2LiqPnz1gsmkzs3BIqeS4Y/)\\n[Hammer Time](https://hammertime.cyou) ","inline":true},{"name":"LC+","value":"[New Pilot Speech](https://tinyurl.com/y7u36mvl)\\n[Upgrade Policy Exceptions](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=1921)\\n[Scouting Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=2261)\\n[Booster Guide](https://tinyurl.com/yyr79nqr)\\n[Evac Guide](https://docs.google.com/spreadsheets/u/4/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=1557297835&single=true)\\n[MOTDs](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=141)\\n\\n[LC AS Application](https://tinyurl.com/2p9yjbuv) ","inline":true},{"name":"Resident","value":"[Resident/TFC Tracker](https://tinyurl.com/WTMCommanderTracker)\\n[Resident Overview](https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml)\\n[Resident Orientation](https://docs.google.com/spreadsheets/u/1/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=800172255&single=true)\\n[Resident Sign-Off Form](http://tinyurl.com/WTMRSignOFF)\\n[Resident App](https://tinyurl.com/yy5z4jyl)","inline":true},{"name":"Training FC","value":"[Resident/TFC Tracker](https://tinyurl.com/WTMCommanderTracker)\\n[TFC Overview](https://tinyurl.com/WTMFCOverview)\\n[TFC Sign-Off Form](http://tinyurl.com/WTMTFCSignOff)\\n[TFC Application](https://docs.google.com/forms/d/e/1FAIpQLSeSF3pi9deEmmEq-d5l-hNcZQ-fIwl1Krz2ZKsu4WL9Dzeu3Q/viewform)","inline":true},{"name":"FC","value":"[Tagging Guide](https://docs.google.com/spreadsheets/u/1/d/1zPSoNN5v8h6HqNkhx-boUc2GQYClwXOUik3fNXs7LQo/pubhtml)\\n[Adaptive Tagging Guide](http://tinyurl.com/AdaptiveTaggingGuide)\\n[Contesting Guide](https://tinyurl.com/3ptvp4vu)\\n[TCRC Guide](https://tinyurl.com/TCRCguide)\\n\\n[VG Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=1613)\\n[AS Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=143)","inline":true},{"name":"Bastion","value":"[Bastion Tracker](https://tinyurl.com/BastionTracking)\\n[Bastion Quiz](https://forms.gle/6csxb84L7iasdz3k9)\\n[Bastion Sign-Off Form](https://tinyurl.com/AddBastion)\\n[Bastion Info](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=1952)\\n[Bastion Training Guide](https://tinyurl.com/BastionTraining)","inline":true},{"name":"DL/TL","value":"[TL Tracker](https://tinyurl.com/CurrentTL)\\n[TL +1 Sign-Off](https://tinyurl.com/AddTL)\\n[TL -1 Form](https://tinyurl.com/RemTL)\\n[DL Tracker/Overview](https://tinyurl.com/y58kbwgs)\\n[DL Sign-Off Form](https://forms.gle/9ByeuZN4NhRAHDJg7)\\n[DL Application](https://forms.gle/JnYFqYMRZdLXLmTF9)","inline":true},{"name":"isk/hr & SRP","value":"[Loss Report Form](https://docs.google.com/forms/d/e/1FAIpQLSebpTDPK82WtKpWdsSOctabngrwRGaJwPscoskryYJ3YNRECg/viewform)\\n[Loss Report Guide](http://tinyurl.com/yyaye8bb)\\n[isk/hr Guide](https://tinyurl.com/2p8dtby2)\\n[isk/hr Submission Form](https://tinyurl.com/iskPhSubmit)\\n[isk/hr AVG Overview](https://tinyurl.com/2b7xbkr6)\\n[isk/hr Calculator](https://isk.warptome.net/)","inline":true}],"timestamp":"2025-10-01T12:19:15.959Z"}', '', '107396080869593088', 'teknickk', '107396590653698048', 'teknick', '2025-10-01 12:09:05', '2025-10-01 12:19:17', '1412575503746990232', '1422918244829761720'),
-	('residentmasterlist', '366076789438808064', '{"title":"Resident Master List","color":3718648,"fields":[{"name":"Commander Tools","value":"[Waitlist](https://wl.warptome.net/)\\n[Fitting Website](https://wl.warptome.net/fits/)\\n[Forums](http://forums.warptome.net/)\\n[R&R](http://tinyurl.com/WTMRR)\\n[Bylaws](https://docs.google.com/document/d/1DTlsl3UHMsHGA01pyLXw4-FOO1hdsVibOrKIjb2_iDM)","inline":true},{"name":"TS/Discord","value":"[Channel Command](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=2564&tab=comments#comment-26699)\\n[TS Badges Explained](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=27)","inline":true},{"name":"LC+","value":"[New Pilot Speech](https://tinyurl.com/y7u36mvl)\\n[Upgrade Policy Exceptions](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=1921)\\n[Scouting Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=2261)\\n[Booster Guide](https://tinyurl.com/yyr79nqr)\\n[Evac Guide](https://docs.google.com/spreadsheets/u/4/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=1557297835&single=true)","inline":true},{"name":"Resident","value":"[Resident/TFC Tracker](https://tinyurl.com/WTMCommanderTracker)\\n[Resident Sign-Off Descriptions](https://docs.google.com/spreadsheets/u/1/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=1910953629&single=true)\\n[Resident Orientation](https://docs.google.com/spreadsheets/u/1/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=800172255&single=true)\\n[Resident App](https://tinyurl.com/yy5z4jyl)","inline":true},{"name":"Rezident Quizes","value":"[Fitting Quiz](https://tinyurl.com/FittingQ)\\n[Fleet Roles Quiz](https://tinyurl.com/FleetRolesQ)\\n[Scouting Quiz](https://tinyurl.com/ScoutingQ)\\n[Site Mechanics Quiz](https://tinyurl.com/SiteMechQ)","inline":true},{"name":"Resident Study Tools","value":"Resident Study Guides (coming soon:tm:)\\n[Tagging Guide](https://docs.google.com/spreadsheets/u/1/d/1zPSoNN5v8h6HqNkhx-boUc2GQYClwXOUik3fNXs7LQo/pubhtml)","inline":true}],"timestamp":"2025-10-01T12:58:32.307Z"}', '', '107396590653698048', 'teknick', '107396590653698048', 'teknick', '2025-10-01 12:58:33', '2025-10-01 12:58:34', '1412388512149409792', '1422930697491845131');
+	('residentmasterlist', '366076789438808064', '{"title":"Resident Master List","color":3718648,"fields":[{"name":"Commander Tools","value":"[Waitlist](https://wl.warptome.net/)\\n[Fitting Website](https://wl.warptome.net/fits/)\\n[Forums](http://forums.warptome.net/)\\n[R&R](http://tinyurl.com/WTMRR)\\n[Bylaws](https://docs.google.com/document/d/1DTlsl3UHMsHGA01pyLXw4-FOO1hdsVibOrKIjb2_iDM)","inline":true},{"name":"TS/Discord","value":"[Channel Command](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=2564&tab=comments#comment-26699)\\n[TS Badges Explained](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=27)","inline":true},{"name":"LC+","value":"[New Pilot Speech](https://tinyurl.com/y7u36mvl)\\n[Upgrade Policy Exceptions](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=1921)\\n[Scouting Guide](https://forums.warptome.net/index.php?app=forums&module=forums&controller=topic&id=2261)\\n[Booster Guide](https://tinyurl.com/yyr79nqr)\\n[Evac Guide](https://docs.google.com/spreadsheets/u/4/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=1557297835&single=true)","inline":true},{"name":"Resident","value":"[Resident/TFC Tracker](https://tinyurl.com/WTMCommanderTracker)\\n[Resident Sign-Off Descriptions](https://docs.google.com/spreadsheets/u/1/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=1910953629&single=true)\\n[Resident Orientation](https://docs.google.com/spreadsheets/u/1/d/e/2PACX-1vQ_8plaL_dhZrDMmYyzH5yr4qI3C6FtTjtdABEujB1UTLO9RP-_0dew7matWFpL4nmmf5mgTL36JaAh/pubhtml?gid=800172255&single=true)\\n[Resident App](https://tinyurl.com/yy5z4jyl)","inline":true},{"name":"Rezident Quizes","value":"[Fitting Quiz](https://tinyurl.com/FittingQ)\\n[Fleet Roles Quiz](https://tinyurl.com/FleetRolesQ)\\n[Scouting Quiz](https://tinyurl.com/ScoutingQ)\\n[Site Mechanics Quiz](https://tinyurl.com/SiteMechQ)","inline":true},{"name":"Resident Study Tools","value":"Resident Study Guides (coming soon:tm:)\\n[Tagging Guide](https://docs.google.com/spreadsheets/u/1/d/1zPSoNN5v8h6HqNkhx-boUc2GQYClwXOUik3fNXs7LQo/pubhtml)","inline":true}],"timestamp":"2025-10-01T12:58:32.307Z"}', '', '107396590653698048', 'teknick', '107396590653698048', 'teknick', '2025-10-01 12:58:33', '2025-10-01 12:58:34', '1412388512149409792', '1422930697491845131'),
+	('testing', '366076789438808064', '{"title":"More testing embeds","color":3718648,"fields":[{"name":"Testing","value":"Stuff","inline":false}],"timestamp":"2025-10-03T12:59:18.468Z"}', '', '107396590653698048', 'teknick', '107396590653698048', 'teknick', '2025-10-03 12:59:22', '2025-10-03 12:59:22', '1412213555150716948', '1423655675577237535');
 
 -- Dumping structure for table wit-db.srp_history
 CREATE TABLE IF NOT EXISTS `srp_history` (
@@ -436,7 +451,7 @@ CREATE TABLE IF NOT EXISTS `srp_history` (
   `loss_description` text NOT NULL,
   `loot_status` text NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- Dumping data for table wit-db.srp_history: ~21 rows (approximately)
 REPLACE INTO `srp_history` (`id`, `pilot_name`, `kill_report_link`, `fc_name`, `fc_status`, `backseat_details`, `ship_type`, `srpable`, `srp_paid`, `loss_description`, `loot_status`) VALUES
@@ -474,7 +489,7 @@ CREATE TABLE IF NOT EXISTS `trusted_pilots` (
   `history` longtext DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `pilot_name` (`pilot_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- Dumping data for table wit-db.trusted_pilots: ~11 rows (approximately)
 REPLACE INTO `trusted_pilots` (`id`, `pilot_name`, `pilot_id`, `final_signoff_by`, `added_at`, `signoffs`, `demerits`, `history`) VALUES
@@ -504,15 +519,15 @@ CREATE TABLE IF NOT EXISTS `users` (
   PRIMARY KEY (`character_id`),
   KEY `discord_id` (`discord_id`),
   CONSTRAINT `roles` CHECK (json_valid(`roles`))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.users: ~8 rows (approximately)
+-- Dumping data for table wit-db.users: ~9 rows (approximately)
 REPLACE INTO `users` (`character_id`, `discord_id`, `character_name`, `roles`, `access_token`, `refresh_token`, `token_expiry`, `is_main`, `is_mailing_char`) VALUES
-	(93220962, '368778318415265792', 'Bella Cadelanne', '["410301376162299906","1055468376866168853","1412545597021622383","1412545877163118704","366076789438808064"]', NULL, NULL, NULL, 1, 0),
-	(95000233, '107396590653698048', 'Mirror Saisima', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 0, 0),
+	(93220962, '368778318415265792', 'Bella Cadelanne', '["410301376162299906","1055468376866168853","1412545597021622383","1412545877163118704","1412546080448712826","366076789438808064"]', NULL, NULL, NULL, 1, 0),
+	(95000233, '107396590653698048', 'Mirror Saisima', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwuc2VuZF9tYWlsLnYxIiwiZXNpLW1haWwucmVhZF9tYWlsLnYxIiwiZXNpLXNlYXJjaC5zZWFyY2hfc3RydWN0dXJlcy52MSJdLCJqdGkiOiIxZDZjNTY4My1jNThhLTRlZjMtOGY1OS03NmU2YzViNTdkYjQiLCJraWQiOiJKV1QtU2lnbmF0dXJlLUtleSIsInN1YiI6IkNIQVJBQ1RFUjpFVkU6OTUwMDAyMzMiLCJhenAiOiI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsInRlbmFudCI6InRyYW5xdWlsaXR5IiwidGllciI6ImxpdmUiLCJyZWdpb24iOiJ3b3JsZCIsImF1ZCI6WyI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsIkVWRSBPbmxpbmUiXSwibmFtZSI6Ik1pcnJvciBTYWlzaW1hIiwib3duZXIiOiJMTUJWbmNBTWhJNWxpcnRVN0J2cWdPRzR5MUk9IiwiZXhwIjoxNzU5NDk2OTc5LCJpYXQiOjE3NTk0OTU3NzksImlzcyI6Imh0dHBzOi8vbG9naW4uZXZlb25saW5lLmNvbSJ9.fSP_2fI_QP-frawhgaEgXyCyBwTw0Dl1zsP8lM_xXnwKFzHjsaEtjampsf0gUqI3Xp6uoAiQUyQTiKeFrLlhovnBj8JeXKS1TTYBd-_p5KrmtvmAQjnyn0HlSQ_6gTSPI_8TuDfKWy66liEGqW3v0y_cXkESk6-4D24Qi3X7pAVtDUKNP1i0x-bX3y97MIkHCdmCQ-szIfPZXq9m8_CwfLO7WZSVQHpa5_Y5NKzk4dk1guNoXac7vPwZFUT9Kw9CfpHHOpETKm36haLUV8uSB3mJRwJW6_vVYt6xK-szaknfyN_OlAZ1ZPpY1AHvKMhQBfsWsLrklFuJrLHTjv6WEQ', 'zCny+8LAtUC+WhN3tRtRZA==', 1759496978606, 0, 1),
 	(95000238, '107396590653698048', 'Mirror Erata', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 0, 0),
-	(96408902, '107396080869593088', 'Personal Cyno', '["1055468376866168853","1412546080448712826","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
-	(96566328, '107396590653698048', 'Ezabella', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwucmVhZF9tYWlsLnYxIiwiZXNpLW1haWwuc2VuZF9tYWlsLnYxIl0sImp0aSI6IjE2NzE2NmI0LTBkYmEtNDA4YS04OGQwLWRiYjIxYTQ2MzRkOCIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5Iiwic3ViIjoiQ0hBUkFDVEVSOkVWRTo5NjU2NjMyOCIsImF6cCI6IjhkNTFlNmRjMDk0ZTQ5MWY5M2U4Y2RkMjEyNzQ0YTg1IiwidGVuYW50IjoidHJhbnF1aWxpdHkiLCJ0aWVyIjoibGl2ZSIsInJlZ2lvbiI6IndvcmxkIiwiYXVkIjpbIjhkNTFlNmRjMDk0ZTQ5MWY5M2U4Y2RkMjEyNzQ0YTg1IiwiRVZFIE9ubGluZSJdLCJuYW1lIjoiRXphYmVsbGEiLCJvd25lciI6InhERm8vbDZOeVloeXdOTXRGN05id3FDK1FFZz0iLCJleHAiOjE3NTg3Njk5OTIsImlhdCI6MTc1ODc2ODc5MiwiaXNzIjoiaHR0cHM6Ly9sb2dpbi5ldmVvbmxpbmUuY29tIn0.RHnFd2Um4uM00PBKULdgvyG-4aj5dpcKpalTPzQ0YNs1RBppPqss767MyWOxkheQf5IFekQ5fL49uX17bRWbenMEHIhUkH-km8m_WZKZP5eDPrkqsJ0arJeg5Pxiq_W0NFovg50bMKCxMlQliQ2HHio185xFgoesus6OwkJigsxd8xINwnPSWUio4iCGzPWXBwIf5Hnt_mM6NE6He8uUGolMrJCMfmcGYhZ4HOs62gDHv11F7AQYgnForYheTu3YWaERwTB2QB7IFwOeDCe2dZ095cXg_OaCNYn2OXqPB5hczP2cdynxsk_G3DvprrTd9kZgk8RQW58zZ9GgYzBVhw', 'Jv8Y65LiTU6+GOpz6FWKdw==', 1758769990097, 1, 1),
+	(96408902, '107396080869593088', 'Personal Cyno', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546080448712826","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
+	(96566328, '107396590653698048', 'Ezabella', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
 	(97173610, '266657286355681280', 'Kitsune Miyamoto', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 0, 0),
 	(163565361, '266657286355681280', 'Skeltek', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwuc2VuZF9tYWlsLnYxIiwiZXNpLW1haWwucmVhZF9tYWlsLnYxIl0sImp0aSI6IjM1ODY3NmQyLWQ4NzEtNDdiOS1iYjUzLWRiZWNiZDYzNGNhNiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5Iiwic3ViIjoiQ0hBUkFDVEVSOkVWRToxNjM1NjUzNjEiLCJhenAiOiI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsInRlbmFudCI6InRyYW5xdWlsaXR5IiwidGllciI6ImxpdmUiLCJyZWdpb24iOiJ3b3JsZCIsImF1ZCI6WyI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsIkVWRSBPbmxpbmUiXSwibmFtZSI6IlNrZWx0ZWsiLCJvd25lciI6IlNPN3F3dHpGOUY0eFE5c29kTEk1dVFjd0E3ST0iLCJleHAiOjE3NTgxNzA2ODEsImlhdCI6MTc1ODE2OTQ4MSwiaXNzIjoiaHR0cHM6Ly9sb2dpbi5ldmVvbmxpbmUuY29tIn0.W3DUD8CLjPaQNVXH-k1ddQ7lLRTjMVNWBX0Gtc33yGGUjKjkcjo5J203rzWhpXZsx49ySNoWI4NCL4ddeSmSrx2Bv-35uCpDhBSq65Z76O5YUrBGewDbM9Oxe3AXcPPNrN7sKxdvt7mu7eFyIgERwSF-RI4wRbeRKqxSIUmK3e93RwplPXiRl3dQf3xw2T3-MBb0j1byDXc07O6Y2Vppjh1ALVfIf10DJcjmg9NQrjoCAfaEGP77ABVbXK6IVR_NwFG0XDg-PQniQFszVu1pcA8cLsQpp4gVpQWg0e-X52PrWWnBKWsjS1l89raTJ10ZkHlZWIyZ_cDrThGukNYGWg', '4sVwNTj7ykOtLjBvPcTTtg==', 1758170679890, 1, 1),
 	(1945530066, '524711946268835840', 'Tee Gun', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546080448712826","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
