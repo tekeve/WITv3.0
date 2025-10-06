@@ -2,7 +2,7 @@ const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, MessageF
 const tableManager = require('@helpers/managers/tableManager');
 
 module.exports = {
-    permission: ['leadership'],
+    permissions: ['leadership', 'admin'],
     data: new SlashCommandBuilder()
         .setName('webedit')
         .setDescription('Generates a link to edit a database table via a web interface.'),

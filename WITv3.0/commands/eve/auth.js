@@ -4,7 +4,7 @@ const authManager = require('@helpers/authManager.js');
 const logger = require('@helpers/logger');
 
 module.exports = {
-    permissions: ['auth'],
+    permissions: ['assault_line_commander', 'training_fc', 'fleet_commander', 'training_ct', 'certified_trainer', 'council'],
     data: new SlashCommandBuilder()
         .setName('auth')
         .setDescription('Authenticate your EVE Online character with the bot.')
@@ -36,7 +36,7 @@ module.exports = {
                     flags: [MessageFlags.Ephemeral]
                 });
             }
-            
+
             // --- FIX START ---
             // Ensure the required scope for authenticated search is always included.
             const requiredScope = 'esi-search.search_structures.v1';
@@ -48,7 +48,7 @@ module.exports = {
             const state = crypto.randomBytes(16).toString('hex');
             interaction.client.esiStateMap.set(state, interaction.user.id);
 
-            const encodedScopes = ESI_SCOPES.split(' ').map(scope => encodeURIComponent(scope)).join('%20');
+            const encodedScopes = finalScopes.split(' ').map(scope => encodeURIComponent(scope)).join('%20');
             const authUrl = `https://login.eveonline.com/v2/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(ESI_CALLBACK_URL)}&client_id=${ESI_CLIENT_ID}&scope=${encodedScopes}&state=${state}`;
 
             const row = new ActionRowBuilder()
@@ -69,14 +69,21 @@ module.exports = {
             const authData = await authManager.getUserAuthData(interaction.user.id);
             if (authData && authData.character_name) {
                 const expiryTimestamp = Math.floor(authData.token_expiry / 1000);
+
+                const refreshTokenStatus = authData.refresh_token
+                    ? 'Active (Automatically refreshed on use)'
+                    : 'Inactive (Please re-authenticate)';
+
                 const embed = new EmbedBuilder()
                     .setColor(0x3BA55D)
                     .setTitle('Authentication Status: Connected')
                     .addFields(
                         { name: 'Authenticated Character', value: authData.character_name, inline: true },
-                        { name: 'Token Expires', value: `<t:${expiryTimestamp}:R>`, inline: true }
+                        { name: 'Access Token Expires', value: `<t:${expiryTimestamp}:R>`, inline: true },
+                        { name: 'Refresh Token Status', value: refreshTokenStatus, inline: false },
+                        { name: 'Manage Access', value: '[Revoke on EVE Online\'s Website](https://community.eveonline.com/support/third-party-applications/)' }
                     )
-                    .setFooter({ text: 'Your token will be refreshed automatically.' });
+                    .setFooter({ text: 'Note: If unused for an extended period, you may need to re-authenticate.' });
                 await interaction.reply({ embeds: [embed], flags: [MessageFlags.Ephemeral] });
             } else {
                 await interaction.reply({ content: 'You do not have a character authenticated with this bot.', flags: [MessageFlags.Ephemeral] });

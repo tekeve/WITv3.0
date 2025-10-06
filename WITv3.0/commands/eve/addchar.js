@@ -3,7 +3,7 @@ const charManager = require('@helpers/characterManager');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
-    permissions: ['admin', 'council', 'commander'],
+    permissions: ['commander'],
     data: new SlashCommandBuilder()
         .setName('addchar')
         .setDescription('Add a character to a profile.')

@@ -4,10 +4,10 @@ const statusManager = require('@helpers/statusManager'); // Import the new manag
 const logger = require('@helpers/logger');
 
 module.exports = {
-    permission: ['leadership'],
+    permissions: ['leadership', 'admin'],
     data: new SlashCommandBuilder()
         .setName('setstatus')
-        .setDescription('Manage the bot\'s custom status (Admin Only).')
+        .setDescription('Manage the bot\'s custom status.')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('set')

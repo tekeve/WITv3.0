@@ -2,7 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
 const charManager = require('@helpers/characterManager');
 
 module.exports = {
-    permissions: ['commander', 'resident', 'line_commander', 'assault_line_commander', 'training_fc', 'fleet_commander', 'training_ct', 'certified_trainer', 'council', 'officer', 'leadership', 'founder', 'admin'],
+    permissions: ['commander'],
     data: new SlashCommandBuilder()
         .setName('inrole')
         .setDescription('Lists the main characters of users with a specific Discord role.')

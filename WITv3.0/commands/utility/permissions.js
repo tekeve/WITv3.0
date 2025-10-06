@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 module.exports = {
-    permission: ['leadership'],
+    permissions: ['leadership', 'admin'],
     data: new SlashCommandBuilder()
         .setName('permissions')
         .setDescription('Displays the permission levels for all bot commands for auditing.'),
@@ -48,10 +48,13 @@ module.exports = {
 
         // Group commands by their permission level
         commands.forEach(command => {
-            const permissionLevel = command.permission || 'admin'; // Default to admin if not specified
-            if (permissionsMap[permissionLevel]) {
-                permissionsMap[permissionLevel].push(formatCommand(command));
-            }
+            // FIX: Use 'permissions' (plural)
+            const permissionLevels = command.permissions || ['admin']; // Default to admin if not specified
+            permissionLevels.forEach(level => {
+                if (permissionsMap[level]) {
+                    permissionsMap[level].push(formatCommand(command));
+                }
+            });
         });
 
         const embed = new EmbedBuilder()
@@ -81,4 +84,3 @@ module.exports = {
         await interaction.editReply({ embeds: [embed] });
     },
 };
-

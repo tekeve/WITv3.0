@@ -4,7 +4,7 @@ const logger = require('@helpers/logger');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
-    permissions: ['commander', 'admin', 'resident', 'line_commander', 'assault_line_commander', 'training_fc', 'fleet_commander', 'training_ct', 'certified_trainer', 'council', 'officer', 'leadership', 'founder'],
+    permissions: ['commander'],
     data: new SlashCommandBuilder()
         .setName('logi')
         .setDescription('Generates a unique link to the logistics sign-off management page.'),

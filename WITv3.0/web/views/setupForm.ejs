@@ -65,11 +65,6 @@
                 <input type="text" id="residentRoles" name="residentRoles" value="<%= currentConfig.residentRoles || '' %>">
                  <small>Comma-separated list of Role IDs.</small>
             </div>
-             <div class="form-group">
-                <label for="authRoles">Auth Roles</label>
-                <input type="text" id="authRoles" name="authRoles" required value="<%= currentConfig.authRoles || '' %>">
-                <small>Comma-separated list of Role IDs that can use /auth.</small>
-            </div>
             <div class="form-group">
                 <label for="removeAllRoles">"Remove All" Roles</label>
                 <input type="text" id="removeAllRoles" name="removeAllRoles" value="<%= currentConfig.removeAllRoles || '' %>">
@@ -146,5 +141,3 @@
     </form>
 </div>
 </body></html>
-
-

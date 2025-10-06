@@ -6,7 +6,7 @@ const roleManager = require('@helpers/roleManager');
 const tableManager = require('@helpers/managers/tableManager');
 
 module.exports = {
-    permission: ['leadership'],
+    permissions: ['leadership', 'admin'],
     data: new SlashCommandBuilder()
         .setName('doc')
         .setDescription('Interact with Google Docs (Leadership Only)')

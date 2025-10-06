@@ -407,8 +407,6 @@ async function manageRoles(interaction, action) {
 const hasRole = (member, roleListName) => {
     const config = configManager.get();
     if (!config || !config[roleListName]) {
-        // This is not an error, just means the role isn't configured.
-        // logger.warn(`Permission check failed: "${roleListName}" not found in config.`);
         return false;
     }
     const requiredRoleIds = config[roleListName];
@@ -418,12 +416,13 @@ const hasRole = (member, roleListName) => {
 
 const isAdmin = (member) => {
     if (!member) return false;
-    // Server owner is always an admin
     if (member.id === member.guild.ownerId) return true;
     const config = configManager.get();
     const adminUsers = config && config.adminUsers ? config.adminUsers : [];
     return adminUsers.includes(member.id);
 };
+
+// --- START: Hierarchical Permission Checkers ---
 
 const isFounder = (member) => hasRole(member, 'founderRoles');
 const isLeadership = (member) => hasRole(member, 'leadershipRoles');
@@ -438,6 +437,21 @@ const isLineCommander = (member) => hasRole(member, 'lineCommanderRoles');
 const isResident = (member) => hasRole(member, 'residentRoles');
 const isCommander = (member) => hasRole(member, 'commanderRoles');
 const canAuth = (member) => hasRole(member, 'authRoles');
+
+const isFounderOrHigher = (member) => isAdmin(member) || isFounder(member);
+const isLeadershipOrHigher = (member) => isFounderOrHigher(member) || isLeadership(member);
+const isOfficerOrHigher = (member) => isLeadershipOrHigher(member) || isOfficer(member);
+const isCouncilOrHigher = (member) => isOfficerOrHigher(member) || isCouncil(member);
+const isCertifiedTrainerOrHigher = (member) => isCouncilOrHigher(member) || isCertifiedTrainer(member);
+const isTrainingCtOrHigher = (member) => isCertifiedTrainerOrHigher(member) || isTrainingCt(member);
+const isFleetCommanderOrHigher = (member) => isTrainingCtOrHigher(member) || isFleetCommander(member);
+const isTrainingFcOrHigher = (member) => isFleetCommanderOrHigher(member) || isTrainingFc(member);
+const isAssaultLineCommanderOrHigher = (member) => isTrainingFcOrHigher(member) || isAssaultLineCommander(member);
+const isLineCommanderOrHigher = (member) => isAssaultLineCommanderOrHigher(member) || isLineCommander(member);
+const isResidentOrHigher = (member) => isLineCommanderOrHigher(member) || isResident(member);
+const isCommanderOrHigher = (member) => isResidentOrHigher(member) || isCommander(member);
+
+// --- END: Hierarchical Permission Checkers ---
 
 module.exports = {
     hasPermission,
@@ -458,5 +472,17 @@ module.exports = {
     isResident,
     isCommander,
     canAuth,
+    // Exporting the new hierarchical checkers
+    isFounderOrHigher,
+    isLeadershipOrHigher,
+    isOfficerOrHigher,
+    isCouncilOrHigher,
+    isCertifiedTrainerOrHigher,
+    isTrainingCtOrHigher,
+    isFleetCommanderOrHigher,
+    isTrainingFcOrHigher,
+    isAssaultLineCommanderOrHigher,
+    isLineCommanderOrHigher,
+    isResidentOrHigher,
+    isCommanderOrHigher,
 };
-

@@ -135,10 +135,58 @@ async function getAccessToken(discordId) {
     }
 }
 
+/**
+ * Fetches all users who have a refresh token stored.
+ * @returns {Promise<Array<{discord_id: string}>>}
+ */
+async function getAllAuthenticatedUsers() {
+    try {
+        const sql = 'SELECT DISTINCT discord_id FROM users WHERE refresh_token IS NOT NULL';
+        return await db.query(sql);
+    } catch (error) {
+        logger.error('Failed to get all authenticated users:', error);
+        return [];
+    }
+}
+
+/**
+ * Iterates through all authenticated users and forces a token refresh to keep them active.
+ */
+async function refreshAllTokens() {
+    logger.info('[AuthManager] Starting scheduled refresh of all ESI tokens...');
+    const users = await getAllAuthenticatedUsers();
+    if (users.length === 0) {
+        logger.info('[AuthManager] No authenticated users found to refresh.');
+        return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const user of users) {
+        try {
+            const token = await getAccessToken(user.discord_id);
+            if (token) {
+                successCount++;
+            } else {
+                failCount++;
+                logger.warn(`[AuthManager] Failed to refresh token for user ${user.discord_id} during scheduled task. They may have revoked access.`);
+            }
+            // Add a small delay to avoid overwhelming the ESI
+            await new Promise(resolve => setTimeout(resolve, 250));
+        } catch (error) {
+            failCount++;
+            logger.error(`[AuthManager] Error during scheduled token refresh for user ${user.discord_id}:`, error);
+        }
+    }
+    logger.success(`[AuthManager] Scheduled token refresh complete. Successful: ${successCount}, Failed: ${failCount}.`);
+}
+
 module.exports = {
     saveUserAuth,
     getUserAuthData,
     removeAuth,
     getAccessToken,
+    refreshAllTokens, // Export the new function
 };
 
