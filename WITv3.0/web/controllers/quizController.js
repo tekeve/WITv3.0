@@ -1,4 +1,4 @@
-const logger = require('@helpers/logger');
+﻿const logger = require('@helpers/logger');
 const db = require('@helpers/database');
 const trainingManager = require('@helpers/trainingManager');
 
@@ -69,7 +69,8 @@ exports.getQuizData = (client) => [
                 return res.status(404).json({ success: false, message: 'Quiz not found.' });
             }
 
-            const questions = await db.query('SELECT question_id, question_text FROM quiz_questions WHERE quiz_id = ?', [quizId]);
+            // --- FIX: Select question_type along with other question data ---
+            const questions = await db.query('SELECT question_id, question_text, question_type FROM quiz_questions WHERE quiz_id = ?', [quizId]);
             const questionIds = questions.map(q => q.question_id);
 
             if (questionIds.length === 0) {
@@ -105,33 +106,75 @@ exports.handleQuizSubmission = (client) => [
     async (req, res) => {
         const { user } = req.tokenData;
         const { quizId } = req.params;
-        const userAnswers = req.body.answers; // Expects an object like { questionId: answerId, ... }
+        const userAnswers = req.body.answers; // Expects an object like { questionId: answerId or [answerIds], ... }
 
         try {
+            // Get the Socket.IO instance from the app
+            const io = req.app.get('io');
+
             const [quiz] = await db.query('SELECT * FROM quizzes WHERE quiz_id = ?', [quizId]);
             if (!quiz) {
                 return res.status(404).json({ success: false, message: 'Quiz not found.' });
             }
 
-            const questions = await db.query('SELECT question_id FROM quiz_questions WHERE quiz_id = ?', [quizId]);
+            // --- FIX: Select question_type for grading logic ---
+            const questions = await db.query('SELECT question_id, question_type FROM quiz_questions WHERE quiz_id = ?', [quizId]);
             const questionIds = questions.map(q => q.question_id);
 
             if (questionIds.length === 0) {
-                return res.json({ success: true, message: 'This quiz has no questions. Marked as complete.', score: 100, passed: true });
+                // If passed, update the commander training tracker
+                if (quiz.update_field) {
+                    const [pilot] = await db.query('SELECT pilot_id FROM commander_training WHERE discord_id = ?', [user.id]);
+                    if (pilot) {
+                        await trainingManager.updatePilotProgress(pilot.pilot_id, quiz.update_field, true, 'System (Quiz)');
+                    }
+                }
+                return res.json({ success: true, message: 'This quiz has no questions. Marked as complete.', score: 100, passed: true, totalQuestions: 0, correctCount: 0, passMark: quiz.pass_mark_percentage, quizName: quiz.name });
             }
 
-            const correctAnswers = await db.query(`SELECT question_id, answer_id FROM quiz_answers WHERE question_id IN (${questionIds.join(',')}) AND is_correct = 1`);
+            // --- START: Reworked Grading Logic ---
+            const correctAnswersFromDb = await db.query(`SELECT question_id, answer_id FROM quiz_answers WHERE question_id IN (${questionIds.join(',')}) AND is_correct = 1`);
 
-            let correctCount = 0;
-            correctAnswers.forEach(correctAnswer => {
-                const userAnswerId = userAnswers[correctAnswer.question_id];
-                if (userAnswerId && parseInt(userAnswerId) === correctAnswer.answer_id) {
-                    correctCount++;
+            // Group correct answers by question ID for efficient lookup
+            const correctAnswersMap = new Map();
+            correctAnswersFromDb.forEach(ans => {
+                if (!correctAnswersMap.has(ans.question_id)) {
+                    correctAnswersMap.set(ans.question_id, []);
                 }
+                // Store answer_id as a string for consistent comparison
+                correctAnswersMap.get(ans.question_id).push(ans.answer_id.toString());
             });
 
+            let correctCount = 0;
+
+            // Iterate through each question of the quiz to grade it
+            questions.forEach(question => {
+                const questionId = question.question_id;
+                const questionType = question.question_type;
+                const userSubmission = userAnswers[questionId]; // This is either a string or an array of strings
+                const correctDbAnswers = correctAnswersMap.get(questionId) || [];
+
+                if (questionType === 'multiple') {
+                    // Ensure user submission is an array and sort both arrays for comparison
+                    const submittedAnswers = Array.isArray(userSubmission) ? userSubmission.sort() : [];
+                    const correctAnswersSorted = correctDbAnswers.sort();
+
+                    // The answer is correct only if the submitted array is identical to the correct answer array
+                    if (submittedAnswers.length === correctAnswersSorted.length && JSON.stringify(submittedAnswers) === JSON.stringify(correctAnswersSorted)) {
+                        correctCount++;
+                    }
+                } else { // 'single' choice question
+                    // For a single choice question, correctDbAnswers will be an array with one element, e.g., ['123']
+                    // The userSubmission will be a single string, e.g., '123'
+                    if (correctDbAnswers.length === 1 && userSubmission === correctDbAnswers[0]) {
+                        correctCount++;
+                    }
+                }
+            });
+            // --- END: Reworked Grading Logic ---
+
             const totalQuestions = questions.length;
-            const score = Math.round((correctCount / totalQuestions) * 100);
+            const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 100;
             const passed = score >= quiz.pass_mark_percentage;
 
             // Save the attempt to the database
@@ -144,17 +187,23 @@ exports.handleQuizSubmission = (client) => [
             if (passed) {
                 const updateField = quiz.update_field;
                 if (updateField) {
-                    await trainingManager.updatePilotProgress(null, updateField, true, 'System (Quiz)');
                     // Manually find the pilot_id to pass to trainingManager for a more direct update
                     const [pilot] = await db.query('SELECT pilot_id FROM commander_training WHERE discord_id = ?', [user.id]);
                     if (pilot) {
                         await trainingManager.updatePilotProgress(pilot.pilot_id, updateField, true, 'System (Quiz)');
+                        // If the update was successful and io is available, emit the update event
+                        if (io) {
+                            io.emit('training-update');
+                        }
+                    } else {
+                        logger.warn(`Could not find commander_training record for Discord ID ${user.id} to update quiz status.`);
                     }
                 }
             }
 
-            // Invalidate the token after a successful attempt
-            client.activeQuizTokens.delete(req.params.token);
+            // Do not invalidate the token, allow user to take more quizzes.
+            // The token will expire naturally based on the timeout set in the command file.
+            // client.activeQuizTokens.delete(req.params.token);
 
             res.json({
                 success: true,
@@ -172,3 +221,5 @@ exports.handleQuizSubmission = (client) => [
         }
     }
 ];
+
+

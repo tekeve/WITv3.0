@@ -25,10 +25,10 @@ exports.showManager = (client) => async (req, res) => {
             const [quizInfo] = await db.query('SELECT * FROM quizzes WHERE quiz_id = ?', [quizId]);
             if (quizInfo) {
                 quizData = { ...quizData, ...quizInfo };
-                const questions = await db.query('SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY question_id ASC', [quizId]);
+                const questions = await db.query('SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY order_index ASC, question_id ASC', [quizId]);
                 const questionIds = questions.map(q => q.question_id);
                 if (questionIds.length > 0) {
-                    const answers = await db.query(`SELECT * FROM quiz_answers WHERE question_id IN (${questionIds.join(',')}) ORDER BY answer_id ASC`);
+                    const answers = await db.query(`SELECT * FROM quiz_answers WHERE question_id IN (${questionIds.join(',')}) ORDER BY order_index ASC, answer_id ASC`);
                     questions.forEach(q => {
                         q.answers = answers.filter(a => a.question_id === q.question_id);
                     });
@@ -86,38 +86,49 @@ exports.handleManagerSubmission = (client) => async (req, res) => {
             await connection.query('UPDATE quizzes SET name = ?, pass_mark_percentage = ?, update_field = ? WHERE quiz_id = ?', [quiz.name, quiz.pass_mark_percentage, quiz.update_field, quizId]);
         }
 
-        // 2. Handle Deletions
-        if (deleted_answers) {
-            const idsToDelete = Array.isArray(deleted_answers) ? deleted_answers : [deleted_answers];
-            if (idsToDelete.length > 0) {
-                await connection.query(`DELETE FROM quiz_answers WHERE answer_id IN (${idsToDelete.map(() => '?').join(',')})`, idsToDelete);
-            }
+        // 2. Handle Deletions (Questions first due to ON DELETE CASCADE)
+        const getIds = (value) => {
+            if (!value) return [];
+            return Array.isArray(value) ? value : [value];
+        };
+
+        const questionIdsToDelete = getIds(deleted_questions);
+        if (questionIdsToDelete.length > 0) {
+            await connection.query(`DELETE FROM quiz_questions WHERE question_id IN (?)`, [questionIdsToDelete]);
         }
-        if (deleted_questions) {
-            const idsToDelete = Array.isArray(deleted_questions) ? deleted_questions : [deleted_questions];
-            if (idsToDelete.length > 0) {
-                await connection.query(`DELETE FROM quiz_questions WHERE question_id IN (${idsToDelete.map(() => '?').join(',')})`, idsToDelete);
-            }
+
+        const answerIdsToDelete = getIds(deleted_answers);
+        if (answerIdsToDelete.length > 0) {
+            // This might try to delete answers already removed by the cascade, which is safe.
+            await connection.query(`DELETE FROM quiz_answers WHERE answer_id IN (?)`, [answerIdsToDelete]);
         }
 
         // 3. Upsert Questions and Answers
+        const deletedQuestionIdsSet = new Set(questionIdsToDelete.map(id => String(id))); // For efficient lookup
         for (const qKey in questions) {
+            // Server-side validation to prevent processing a deleted question
+            if (deletedQuestionIdsSet.has(qKey)) {
+                continue;
+            }
+
             const questionData = questions[qKey];
             const questionType = questionData.type || 'single';
+            const questionOrder = questionData.order_index || 0;
             let questionId;
 
             if (qKey.startsWith('new_')) { // New Question
-                const [qResult] = await connection.query('INSERT INTO quiz_questions (quiz_id, question_text, question_type) VALUES (?, ?, ?)', [quizId, questionData.text, questionType]);
+                const [qResult] = await connection.query('INSERT INTO quiz_questions (quiz_id, question_text, question_type, order_index) VALUES (?, ?, ?, ?)', [quizId, questionData.text, questionType, questionOrder]);
                 questionId = qResult.insertId;
             } else { // Existing Question
                 questionId = qKey;
-                await connection.query('UPDATE quiz_questions SET question_text = ?, question_type = ? WHERE question_id = ?', [questionData.text, questionType, questionId]);
+                await connection.query('UPDATE quiz_questions SET question_text = ?, question_type = ?, order_index = ? WHERE question_id = ?', [questionData.text, questionType, questionOrder, questionId]);
             }
 
             // Upsert Answers for this question
             if (questionData.answers) {
                 for (const aKey in questionData.answers) {
                     const answerData = questionData.answers[aKey];
+                    const answerOrder = answerData.order_index || 0;
                     let isCorrect = false;
                     if (questionType === 'multiple') {
                         isCorrect = !!answerData.is_correct; // Comes as '1' from checkbox, or undefined
@@ -126,9 +137,9 @@ exports.handleManagerSubmission = (client) => async (req, res) => {
                     }
 
                     if (aKey.startsWith('new_')) { // New Answer
-                        await connection.query('INSERT INTO quiz_answers (question_id, answer_text, is_correct) VALUES (?, ?, ?)', [questionId, answerData.text, isCorrect]);
+                        await connection.query('INSERT INTO quiz_answers (question_id, answer_text, is_correct, order_index) VALUES (?, ?, ?, ?)', [questionId, answerData.text, isCorrect, answerOrder]);
                     } else { // Existing Answer
-                        await connection.query('UPDATE quiz_answers SET answer_text = ?, is_correct = ? WHERE answer_id = ?', [answerData.text, isCorrect, aKey]);
+                        await connection.query('UPDATE quiz_answers SET answer_text = ?, is_correct = ?, order_index = ? WHERE answer_id = ?', [answerData.text, isCorrect, answerOrder, aKey]);
                     }
                 }
             }
@@ -149,3 +160,4 @@ exports.handleManagerSubmission = (client) => async (req, res) => {
         connection.release();
     }
 };
+

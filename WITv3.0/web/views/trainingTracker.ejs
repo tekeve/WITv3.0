@@ -85,6 +85,11 @@
         input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: var(--accent-green); }
         input[type="checkbox"]:not(:disabled) { cursor: pointer; }
         input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.6; }
+        
+        /* Corrected rule to style checked but disabled checkboxes */
+        input[type="checkbox"]:disabled:checked {
+            opacity: 1;
+        }
 
         .signoff-item a { color: var(--accent-blue); cursor: pointer; text-decoration: none; margin-left: 0.5rem; font-size: 0.8rem; font-weight: 500; }
         .signoff-item a:hover { text-decoration: underline; }
@@ -479,10 +484,19 @@
         };
 
         const socket = io();
+        socket.on('connect', () => {
+            console.log('Successfully connected to WebSocket server.');
+        });
+
         socket.on('training-update', () => {
             console.log('Received training-update event. Fetching new data...');
             showToast('Data updated. Refreshing list...', 'info');
             fetchAndRenderPilots();
+        });
+        
+        socket.on('disconnect', () => {
+            console.warn('Disconnected from WebSocket server. Real-time updates will be paused.');
+            showToast('Connection lost. Real-time updates paused.', 'error');
         });
 
         // Initial render on page load
