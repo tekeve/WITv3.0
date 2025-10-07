@@ -11,10 +11,13 @@ module.exports = (client) => {
     // Route to display the tracker
     router.get('/training/:token', trainingController.showTracker(client));
 
-    // API routes for interaction
-    router.post('/training/add-resident/:token', trainingController.addResident(client));
-    router.post('/training/update/:token', trainingController.updateProgress(client));
-    router.post('/training/add-comment/:token', trainingController.addComment(client));
+    // API routes for interaction (namespaced for clarity)
+    router.post('/training/api/add-resident/:token', trainingController.addResident(client));
+    router.post('/training/api/update/:token', trainingController.updateProgress(client));
+    router.post('/training/api/add-comment/:token', trainingController.addComment(client));
+    router.get('/training/api/pilots/:token', trainingController.getPilotsData(client));
+
 
     return router;
 };
+

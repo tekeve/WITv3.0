@@ -4,15 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Commander Training Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569;
-            --text-primary: #e2e8f0; --text-secondary: #94a3b8;
+            --bg-card: #2d3748; --text-primary: #e2e8f0; --text-secondary: #94a3b8;
             --accent-blue: #38bdf8; --accent-green: #4ade80; --accent-red: #f87171;
             --accent-yellow: #facc15; --border-color: #4a5568;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
             background-color: var(--bg-primary);
             color: var(--text-primary);
             margin: 0;
@@ -20,93 +23,97 @@
         }
         .container { max-width: 98%; margin: auto; }
         h1 { text-align: center; color: #f8fafc; margin-bottom: 2rem; }
-        .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; border: 1px solid var(--border-color); }
-        
-        /* New Pilot Grid Layout */
+        .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; border: 1px solid var(--border-color); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); }
         .pilots-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
             gap: 1.5rem;
             margin-top: 1.5rem;
         }
         .pilot-card {
-            background-color: var(--bg-tertiary);
+            background-color: var(--bg-card);
             border-radius: 0.5rem;
-            padding: 1rem;
+            padding: 1.25rem;
             display: flex;
             flex-direction: column;
-            gap: 1.25rem;
+            gap: 1.5rem;
+            border: 1px solid var(--border-color);
         }
         .pilot-card h3 {
             margin: 0;
             font-size: 1.25rem;
             color: var(--accent-blue);
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
         }
         .pilot-card h4 {
             margin: 0 0 0.75rem 0;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 0.5rem;
-            font-size: 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
             color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
         .info-grid, .progress-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 0.75rem;
+            gap: 1rem;
         }
         .form-group { margin-bottom: 0; }
-        label { display: block; margin-bottom: 0.25rem; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; }
+        label { display: block; margin-bottom: 0.35rem; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); }
         input[type="text"], input[type="date"] {
             width: 100%;
             padding: 0.5rem;
-            border-radius: 0.25rem;
+            border-radius: 0.375rem;
             background-color: var(--bg-primary);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
             font-size: 0.875rem;
             box-sizing: border-box;
         }
+        input:disabled, textarea:disabled { background-color: #3d4c5f; cursor: not-allowed; }
         .progress-item {
             display: flex;
             align-items: center;
             justify-content: space-between;
             background-color: var(--bg-secondary);
-            padding: 0.5rem 0.75rem;
-            border-radius: 0.25rem;
+            padding: 0.6rem 0.8rem;
+            border-radius: 0.375rem;
         }
-        .progress-item label { margin: 0; color: var(--text-primary); text-transform: none; font-size: 0.875rem; }
+        .progress-item label { margin: 0; color: var(--text-primary); font-size: 0.875rem; }
         
-        input[type="checkbox"] { width: 1.1rem; height: 1.1rem; cursor: pointer; accent-color: var(--accent-green); }
-        input:disabled { cursor: not-allowed; opacity: 0.6; }
+        input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: var(--accent-green); }
+        input[type="checkbox"]:not(:disabled) { cursor: pointer; }
+        input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.6; }
 
-        .signoff-item a { color: var(--accent-blue); cursor: pointer; text-decoration: none; margin-left: 0.5rem; font-size: 0.8rem; }
+        .signoff-item a { color: var(--accent-blue); cursor: pointer; text-decoration: none; margin-left: 0.5rem; font-size: 0.8rem; font-weight: 500; }
         .signoff-item a:hover { text-decoration: underline; }
 
-        /* Comments Section */
         .comments-section { margin-top: 1rem; }
         .latest-comment {
             background-color: var(--bg-secondary);
             padding: 0.75rem;
-            border-radius: 0.25rem;
+            border-radius: 0.375rem;
             font-size: 0.8rem;
             color: var(--text-secondary);
             margin-bottom: 0.5rem;
             border-left: 3px solid var(--accent-yellow);
+            white-space: pre-wrap;
+            word-break: break-word;
         }
         .latest-comment strong { color: var(--text-primary); }
         .comments-actions { text-align: right; }
         .comments-actions a { color: var(--accent-blue); cursor: pointer; text-decoration: none; font-size: 0.875rem; }
 
-        /* Add Resident Form */
         .add-resident-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end; }
-
-        /* Modal Styles */
+        
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal { background: var(--bg-secondary); padding: 2rem; border-radius: 0.5rem; max-width: 600px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
         .modal h2 { margin: 0 0 1rem 0; text-align: left; border: none; font-size: 1.25rem; color: #f8fafc;}
         .modal-content { overflow-y: auto; margin-right: -1rem; padding-right: 1rem;}
         .modal-actions { margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem; }
         button { padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; font-weight: 600; }
+        button:disabled { cursor: not-allowed; opacity: 0.7; }
         .btn-primary { background-color: var(--accent-blue); color: white; }
         .btn-secondary { background-color: var(--bg-tertiary); color: var(--text-primary); }
         .comment { border-bottom: 1px solid var(--border-color); padding: 0.75rem 0; }
@@ -114,12 +121,13 @@
         .comment-header { font-size: 0.8rem; color: var(--text-secondary); }
         .comment-header strong { color: var(--text-primary); }
         .comment-body { margin-top: 0.25rem; white-space: pre-wrap; font-size: 0.875rem;}
-        textarea { width: 100%; padding: 0.75rem; border-radius: 0.375rem; background-color: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; }
+        textarea { width: 100%; padding: 0.75rem; border-radius: 0.375rem; background-color: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; resize: vertical; }
         
-        .toast { position: fixed; top: 1.5rem; right: 1.5rem; padding: 1rem 1.5rem; border-radius: 0.5rem; z-index: 1001; opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s; }
+        .toast { position: fixed; top: 1.5rem; right: 1.5rem; padding: 1rem 1.5rem; border-radius: 0.5rem; z-index: 1001; opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.success { background-color: var(--accent-green); color: black; }
         .toast.error { background-color: var(--accent-red); color: white; }
+        .toast.info { background-color: var(--accent-blue); color: white; }
     </style>
 </head>
 <body>
@@ -147,86 +155,7 @@
     <% } %>
 
     <div class="pilots-grid" id="pilots-container">
-        <% pilots.forEach(pilot => { %>
-            <div class="pilot-card" data-pilot-id="<%= pilot.pilot_id %>">
-                <h3><%= pilot.pilot_name %></h3>
-
-                <!-- General Info -->
-                <div class="info-section">
-                    <div class="info-grid">
-                        <div class="form-group">
-                            <label for="start_date_<%= pilot.pilot_id %>">Start Date</label>
-                            <input type="date" id="start_date_<%= pilot.pilot_id %>" value="<%= pilot.start_date ? new Date(pilot.start_date).toISOString().split('T')[0] : '' %>" data-field="start_date" <%= !permissions.canEdit ? 'disabled' : '' %>>
-                        </div>
-                         <div class="form-group">
-                            <label for="last_active_<%= pilot.pilot_id %>">Last Active</label>
-                            <input type="date" id="last_active_<%= pilot.pilot_id %>" value="<%= pilot.last_active ? new Date(pilot.last_active).toISOString().split('T')[0] : '' %>" data-field="last_active" <%= !permissions.canEdit ? 'disabled' : '' %>>
-                        </div>
-                    </div>
-                     <div class="form-group" style="margin-top: 0.75rem;">
-                        <label for="orientation_<%= pilot.pilot_id %>">Resident Orientation</label>
-                        <input type="text" id="orientation_<%= pilot.pilot_id %>" value="<%= pilot.resident_orientation_by || '' %>" data-field="resident_orientation_by" placeholder="FC Name" <%= !permissions.canEdit ? 'disabled' : '' %>>
-                    </div>
-                </div>
-
-                <!-- Quizzes -->
-                <div class="progress-section">
-                    <h4>Quizzes</h4>
-                    <div class="progress-grid">
-                        <div class="progress-item"><label for="quiz_scouting_<%= pilot.pilot_id %>">Scouting</label><input type="checkbox" id="quiz_scouting_<%= pilot.pilot_id %>" <%= pilot.quiz_scouting ? 'checked' : '' %> data-field="quiz_scouting" <%= !permissions.canEdit ? 'disabled' : '' %>></div>
-                        <div class="progress-item"><label for="quiz_fitting_<%= pilot.pilot_id %>">Fitting</label><input type="checkbox" id="quiz_fitting_<%= pilot.pilot_id %>" <%= pilot.quiz_fitting ? 'checked' : '' %> data-field="quiz_fitting" <%= !permissions.canEdit ? 'disabled' : '' %>></div>
-                        <div class="progress-item"><label for="quiz_fleet_roles_<%= pilot.pilot_id %>">Fleet Roles</label><input type="checkbox" id="quiz_fleet_roles_<%= pilot.pilot_id %>" <%= pilot.quiz_fleet_roles ? 'checked' : '' %> data-field="quiz_fleet_roles" <%= !permissions.canEdit ? 'disabled' : '' %>></div>
-                        <div class="progress-item"><label for="quiz_site_mechanics_<%= pilot.pilot_id %>">Site Mechanics</label><input type="checkbox" id="quiz_site_mechanics_<%= pilot.pilot_id %>" <%= pilot.quiz_site_mechanics ? 'checked' : '' %> data-field="quiz_site_mechanics" <%= !permissions.canEdit ? 'disabled' : '' %>></div>
-                    </div>
-                </div>
-
-                <!-- Sign-Offs -->
-                <div class="progress-section">
-                    <h4>In Fleet Sign-Offs</h4>
-                    <div class="progress-grid">
-                        <div class="progress-item signoff-item" data-field="signoff_scouting_by">
-                            <label for="signoff_scouting_<%= pilot.pilot_id %>">Scouting</label>
-                            <span>
-                                <a href="#" class="view-signoffs">(<%= pilot.signoff_scouting_by.length %>)</a>
-                                <input type="checkbox" id="signoff_scouting_<%= pilot.pilot_id %>" <%= pilot.signoff_scouting_by.includes(commanderName) ? 'checked' : '' %> <%= !permissions.canEdit ? 'disabled' : '' %> data-field="signoff_scouting_by">
-                            </span>
-                        </div>
-                        <div class="progress-item"><label for="signoff_logi_<%= pilot.pilot_id %>">Trusted Logi</label><input type="checkbox" id="signoff_logi_<%= pilot.pilot_id %>" <%= pilot.signoff_trusted_logi ? 'checked' : '' %> data-field="signoff_trusted_logi" disabled></div>
-                        <div class="progress-item"><label for="signoff_bastion_<%= pilot.pilot_id %>">Bastion Badge</label><input type="checkbox" id="signoff_bastion_<%= pilot.pilot_id %>" <%= pilot.signoff_bastion ? 'checked' : '' %> data-field="signoff_bastion" <%= !permissions.canEdit ? 'disabled' : '' %>></div>
-                        <div class="progress-item signoff-item" data-field="signoff_new_pilot_orientation_by">
-                            <label for="signoff_npo_<%= pilot.pilot_id %>">New Pilot Orientation</label>
-                            <span>
-                                <a href="#" class="view-signoffs">(<%= pilot.signoff_new_pilot_orientation_by.length %>)</a>
-                                <input type="checkbox" id="signoff_npo_<%= pilot.pilot_id %>" <%= pilot.signoff_new_pilot_orientation_by.includes(commanderName) ? 'checked' : '' %> <%= !permissions.canEdit ? 'disabled' : '' %> data-field="signoff_new_pilot_orientation_by">
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Exam -->
-                <div class="progress-section">
-                    <h4>Exam</h4>
-                    <div class="progress-grid">
-                        <div class="progress-item"><label for="exam_mc_<%= pilot.pilot_id %>">Multiple Choice</label><input type="checkbox" id="exam_mc_<%= pilot.pilot_id %>" <%= pilot.exam_multiple_choice ? 'checked' : '' %> data-field="exam_multiple_choice" <%= !permissions.canEdit ? 'disabled' : '' %>></div>
-                        <div class="progress-item"><label for="exam_ct_<%= pilot.pilot_id %>">CT Exam</label><input type="checkbox" id="exam_ct_<%= pilot.pilot_id %>" <%= pilot.exam_ct ? 'checked' : '' %> data-field="exam_ct" <%= !permissions.canEdit ? 'disabled' : '' %>></div>
-                    </div>
-                </div>
-
-                <!-- Comments -->
-                <div class="comments-section">
-                    <h4>Comments</h4>
-                    <% const lastComment = pilot.comments.length > 0 ? pilot.comments[pilot.comments.length - 1] : null; %>
-                    <div class="latest-comment" style="<%= !lastComment ? 'display: none;' : '' %>">
-                        <% if(lastComment) { %>
-                            <strong><%= lastComment.commander %>:</strong> <%= lastComment.comment %>
-                        <% } %>
-                    </div>
-                    <div class="comments-actions">
-                         <a href="#" class="view-comments">View All (<%= pilot.comments.length %>) / Add Comment</a>
-                    </div>
-                </div>
-            </div>
-        <% }); %>
+         <!-- Pilot cards will be dynamically inserted here by JavaScript -->
     </div>
 </div>
 
@@ -238,7 +167,7 @@
         <% if (permissions.canEdit) { %>
         <div class="form-group" style="margin-top: 1.5rem;">
             <label for="newComment">Add New Comment</label>
-            <textarea id="newComment" rows="3"></textarea>
+            <textarea id="newComment" rows="3" placeholder="Enter your comment..."></textarea>
         </div>
         <% } %>
         <div class="modal-actions">
@@ -263,12 +192,15 @@
 
 <div id="toast" class="toast"></div>
 
+<script src="/socket.io/socket.io.js"></script>
 <script>
+    // --- GLOBAL STATE ---
     const token = "<%= token %>";
     const commanderName = "<%= commanderName %>";
     const permissions = <%- JSON.stringify(permissions) %>;
     let pilotsData = <%- JSON.stringify(pilots) %>;
 
+    // --- UTILITY FUNCTIONS ---
     function showToast(message, type = 'info') {
         const toast = document.getElementById('toast');
         toast.textContent = message;
@@ -280,11 +212,19 @@
 
     async function apiCall(endpoint, body) {
         try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
+            const options = {
+                method: body ? 'POST' : 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            };
+
+            if (body) {
+                options.body = JSON.stringify(body);
+            } else {
+                // Add cache-busting for GET requests to ensure fresh data
+                options.cache = 'no-store';
+            }
+
+            const response = await fetch(endpoint, options);
             const data = await response.json();
             if (!response.ok) {
                 throw new Error(data.message || `HTTP error! Status: ${response.status}`);
@@ -294,6 +234,93 @@
             console.error('API Call Failed:', error);
             showToast(error.message, 'error');
             return null;
+        }
+    }
+    
+    // --- DYNAMIC RENDERING FUNCTIONS ---
+    function createPilotCardHTML(pilot) {
+        const lastComment = pilot.comments.length > 0 ? pilot.comments[pilot.comments.length - 1] : null;
+        const canEdit = permissions.canEdit;
+
+        return `
+            <div class="pilot-card" data-pilot-id="${pilot.pilot_id}">
+                <h3>${pilot.pilot_name}</h3>
+                <div class="info-section">
+                    <h4>General</h4>
+                    <div class="info-grid">
+                        <div class="form-group">
+                            <label for="start_date_${pilot.pilot_id}">Start Date</label>
+                            <input type="date" id="start_date_${pilot.pilot_id}" value="${pilot.start_date ? new Date(pilot.start_date).toISOString().split('T')[0] : ''}" data-field="start_date" ${!canEdit ? 'disabled' : ''}>
+                        </div>
+                         <div class="form-group">
+                            <label for="last_active_${pilot.pilot_id}">Last Active</label>
+                            <input type="date" id="last_active_${pilot.pilot_id}" value="${pilot.last_active ? new Date(pilot.last_active).toISOString().split('T')[0] : ''}" data-field="last_active" ${!canEdit ? 'disabled' : ''}>
+                        </div>
+                    </div>
+                     <div class="form-group" style="margin-top: 1rem;">
+                        <label for="orientation_${pilot.pilot_id}">Resident Orientation</label>
+                        <input type="text" id="orientation_${pilot.pilot_id}" value="${pilot.resident_orientation_by || ''}" data-field="resident_orientation_by" placeholder="FC Name" ${!canEdit ? 'disabled' : ''}>
+                    </div>
+                </div>
+                <div class="progress-section">
+                    <h4>Quizzes</h4>
+                    <div class="progress-grid">
+                        <div class="progress-item"><label>Scouting</label><input type="checkbox" ${pilot.quiz_scouting ? 'checked' : ''} disabled></div>
+                        <div class="progress-item"><label>Fitting</label><input type="checkbox" ${pilot.quiz_fitting ? 'checked' : ''} disabled></div>
+                        <div class="progress-item"><label>Fleet Roles</label><input type="checkbox" ${pilot.quiz_fleet_roles ? 'checked' : ''} disabled></div>
+                        <div class="progress-item"><label>Site Mechanics</label><input type="checkbox" ${pilot.quiz_site_mechanics ? 'checked' : ''} disabled></div>
+                    </div>
+                </div>
+                <div class="progress-section">
+                    <h4>In Fleet Sign-Offs</h4>
+                    <div class="progress-grid">
+                        <div class="progress-item signoff-item" data-field="signoff_scouting_by">
+                            <label>Scouting</label>
+                            <span>
+                                <a href="#" class="view-signoffs">(${pilot.signoff_scouting_by.length})</a>
+                                <input type="checkbox" id="signoff_scouting_${pilot.pilot_id}" ${pilot.signoff_scouting_by.includes(commanderName) ? 'checked' : ''} ${!canEdit ? 'disabled' : ''} data-field="signoff_scouting_by">
+                            </span>
+                        </div>
+                        <div class="progress-item"><label>Trusted Logi</label><input type="checkbox" id="signoff_logi_${pilot.pilot_id}" ${pilot.signoff_trusted_logi ? 'checked' : ''} data-field="signoff_trusted_logi" disabled></div>
+                        <div class="progress-item"><label>Bastion Badge</label><input type="checkbox" id="signoff_bastion_${pilot.pilot_id}" ${pilot.signoff_bastion ? 'checked' : ''} ${!canEdit ? 'disabled' : ''} data-field="signoff_bastion"></div>
+                        <div class="progress-item signoff-item" data-field="signoff_new_pilot_orientation_by">
+                            <label>New Pilot Orientation</label>
+                            <span>
+                                <a href="#" class="view-signoffs">(${pilot.signoff_new_pilot_orientation_by.length})</a>
+                                <input type="checkbox" id="signoff_npo_${pilot.pilot_id}" ${pilot.signoff_new_pilot_orientation_by.includes(commanderName) ? 'checked' : ''} ${!canEdit ? 'disabled' : ''} data-field="signoff_new_pilot_orientation_by">
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="progress-section">
+                    <h4>Exam</h4>
+                    <div class="progress-grid">
+                        <div class="progress-item"><label>Multiple Choice</label><input type="checkbox" id="exam_mc_${pilot.pilot_id}" ${pilot.exam_multiple_choice ? 'checked' : ''} data-field="exam_multiple_choice" ${!canEdit ? 'disabled' : ''}></div>
+                        <div class="progress-item"><label>CT Exam</label><input type="checkbox" id="exam_ct_${pilot.pilot_id}" ${pilot.exam_ct ? 'checked' : ''} data-field="exam_ct" ${!canEdit ? 'disabled' : ''}></div>
+                    </div>
+                </div>
+                <div class="comments-section">
+                     <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}">
+                        ${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}
+                    </div>
+                    <div class="comments-actions">
+                         <a href="#" class="view-comments">View All (${pilot.comments.length}) / Add Comment</a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderAllPilots() {
+        const pilotsContainer = document.getElementById('pilots-container');
+        pilotsContainer.innerHTML = pilotsData.map(createPilotCardHTML).join('');
+    }
+
+    async function fetchAndRenderPilots() {
+        const result = await apiCall(`/training/api/pilots/${token}`);
+        if (result && result.success) {
+            pilotsData = result.pilots;
+            renderAllPilots();
         }
     }
 
@@ -312,49 +339,19 @@
             const pilotId = card.dataset.pilotId;
             let value = (input.type === 'checkbox') ? input.checked : input.value;
 
-            const result = await apiCall(`/training/update/${token}`, { pilotId, field, value });
+            const result = await apiCall(`/training/api/update/${token}`, { pilotId, field, value });
             
             if (result && result.success) {
                 showToast(result.message, 'success');
-                const pilot = pilotsData.find(p => p.pilot_id == pilotId);
-                
-                // Update local data for multi-signoff fields for immediate UI feedback
-                if (pilot && Array.isArray(pilot[field])) {
-                     if (value) { // checked
-                        if (!pilot[field].includes(commanderName)) pilot[field].push(commanderName);
-                    } else { // unchecked
-                        pilot[field] = pilot[field].filter(name => name !== commanderName);
-                    }
-                    const signoffItem = input.closest('.signoff-item');
-                    const link = signoffItem.querySelector('a');
-                    link.textContent = `(${pilot[field].length})`;
-                }
-
-                // If a checkbox was changed, update the 'Last Active' date on the page.
-                if (input.type === 'checkbox') {
-                    const lastActiveInput = card.querySelector('input[data-field="last_active"]');
-                    if (lastActiveInput) {
-                        const today = new Date();
-                        // Format to YYYY-MM-DD for the date input
-                        const yyyy = today.getFullYear();
-                        const mm = String(today.getMonth() + 1).padStart(2, '0');
-                        const dd = String(today.getDate()).padStart(2, '0');
-                        lastActiveInput.value = `${yyyy}-${mm}-${dd}`;
-                    }
-                }
-
+                // Don't manually update the DOM here, let the socket event handle it for consistency
             } else {
                 showToast(result ? result.message : 'Update failed', 'error');
-                // Revert UI change on failure
                 if (input.type === 'checkbox') {
                     input.checked = !input.checked;
-                } else {
-                    // This is trickier for text/date, would need to store old value
                 }
             }
         }
 
-        // --- Add Resident Logic ---
         if (permissions.canAddResidents) {
             const addResidentBtn = document.getElementById('add-resident-btn');
             addResidentBtn.addEventListener('click', async () => {
@@ -369,10 +366,12 @@
                 addResidentBtn.disabled = true;
                 addResidentBtn.textContent = 'Adding...';
 
-                const result = await apiCall(`/training/add-resident/${token}`, { pilotName, discordId });
+                const result = await apiCall(`/training/api/add-resident/${token}`, { pilotName, discordId });
                 if (result && result.success) {
                     showToast(result.message, 'success');
-                    window.location.reload(); 
+                    // Data will be reloaded via socket event
+                    document.getElementById('new-pilot-name').value = '';
+                    document.getElementById('new-pilot-discord-id').value = '';
                 } else {
                     showToast(result ? result.message : 'Failed to add resident.', 'error');
                 }
@@ -382,7 +381,6 @@
             });
         }
         
-        // --- Modal Logic using Event Delegation ---
         const commentsModal = document.getElementById('commentsModal');
         const signoffsModal = document.getElementById('signoffsModal');
         
@@ -411,7 +409,7 @@
             contentEl.innerHTML = '';
             
             if (pilot.comments.length === 0) {
-                contentEl.innerHTML = '<p>No comments yet.</p>';
+                contentEl.innerHTML = '<p style="color: var(--text-secondary);">No comments yet.</p>';
             } else {
                 pilot.comments.slice().reverse().forEach(c => {
                     const commentDiv = document.createElement('div');
@@ -432,22 +430,19 @@
                      const commentText = newCommentEl.value.trim();
                      if (!commentText) return;
 
-                     const result = await apiCall(`/training/add-comment/${token}`, { pilotId, comment: commentText });
+                     addCommentBtn.disabled = true;
+                     addCommentBtn.textContent = 'Adding...';
+
+                     const result = await apiCall(`/training/api/add-comment/${token}`, { pilotId, comment: commentText });
 
                      if(result && result.success) {
                         showToast(result.message, 'success');
-                        const newComment = { commander: commanderName, comment: commentText, date: new Date().toISOString() };
-                        pilot.comments.push(newComment);
                         newCommentEl.value = '';
-                        // Update UI
-                        const card = document.querySelector(`.pilot-card[data-pilot-id="${pilotId}"]`);
-                        card.querySelector('.view-comments').textContent = `View All (${pilot.comments.length}) / Add Comment`;
-                        const latestCommentEl = card.querySelector('.latest-comment');
-                        latestCommentEl.innerHTML = `<strong>${newComment.commander}:</strong> ${newComment.comment}`;
-                        latestCommentEl.style.display = 'block';
-
-                        openCommentsModal(pilotId); // Refresh modal content
+                        closeModal(commentsModal);
+                        // Data will be refreshed via socket event
                      }
+                     addCommentBtn.disabled = false;
+                     addCommentBtn.textContent = 'Add Comment';
                 };
             }
             commentsModal.style.display = 'flex';
@@ -466,21 +461,35 @@
             if (signoffs.length > 0) {
                 contentEl.innerHTML = `<ul>${signoffs.map(name => `<li>${name}</li>`).join('')}</ul>`;
             } else {
-                contentEl.innerHTML = '<p>No sign-offs yet.</p>';
+                contentEl.innerHTML = '<p style="color: var(--text-secondary);">No sign-offs yet.</p>';
             }
             
             signoffsModal.style.display = 'flex';
         }
 
-        // Close modal logic
-        document.getElementById('closeCommentsModal').onclick = () => commentsModal.style.display = 'none';
-        document.getElementById('closeSignoffsModal').onclick = () => signoffsModal.style.display = 'none';
+        function closeModal(modalElement) {
+            modalElement.style.display = 'none';
+        }
+
+        document.getElementById('closeCommentsModal').onclick = () => closeModal(commentsModal);
+        document.getElementById('closeSignoffsModal').onclick = () => closeModal(signoffsModal);
         window.onclick = (e) => {
-            if (e.target == commentsModal) commentsModal.style.display = 'none';
-            if (e.target == signoffsModal) signoffsModal.style.display = 'none';
+            if (e.target == commentsModal) closeModal(commentsModal);
+            if (e.target == signoffsModal) closeModal(signoffsModal);
         };
+
+        const socket = io();
+        socket.on('training-update', () => {
+            console.log('Received training-update event. Fetching new data...');
+            showToast('Data updated. Refreshing list...', 'info');
+            fetchAndRenderPilots();
+        });
+
+        // Initial render on page load
+        renderAllPilots();
     });
 </script>
 
 </body>
 </html>
+

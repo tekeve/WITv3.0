@@ -2,9 +2,11 @@ const logger = require('@helpers/logger');
 const trainingManager = require('@helpers/trainingManager');
 const roleManager = require('@helpers/roleManager');
 const charManager = require('@helpers/characterManager');
+const { syncLogiStatus } = require('@helpers/trainingSyncManager');
 
 /**
  * Middleware to validate the token and user permissions for all training routes.
+ * It also provides access to the Socket.IO instance via req.app.get('io').
  */
 const validateTokenAndPermissions = (client, requiredPermission = 'commander') => (req, res, next) => {
     const { token } = req.params;
@@ -15,15 +17,15 @@ const validateTokenAndPermissions = (client, requiredPermission = 'commander') =
             client.activeTrainingTokens.delete(token);
         }
         // If it's an API call, send JSON, otherwise render an error page.
-        if (req.path.startsWith('/training/')) {
+        if (req.path.includes('/api/')) {
             return res.status(403).json({ success: false, message: 'Session expired. Please generate a new link in Discord.' });
         }
         return res.status(403).render('error', { title: 'Link Invalid', message: 'This link is invalid or has expired.' });
     }
 
     // Use the generic hasPermission check
-    if (!roleManager.hasPermission(tokenData.member, [requiredPermission])) {
-        if (req.path.startsWith('/training/')) {
+    if (!roleManager.hasPermission(tokenData.member, [requiredPermission, 'admin'])) { // Admins can always access
+        if (req.path.includes('/api/')) {
             return res.status(403).json({ success: false, message: 'You do not have permission for this action.' });
         }
         return res.status(403).render('error', { title: 'Permission Denied', message: `You do not have the required role to access this page.` });
@@ -40,12 +42,18 @@ const validateTokenAndPermissions = (client, requiredPermission = 'commander') =
  * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.showTracker = (client) => [
-    validateTokenAndPermissions(client),
+    validateTokenAndPermissions(client, 'commander'),
     async (req, res) => {
         try {
             const { member } = req.tokenData;
             const commanderChar = await charManager.getChars(member.id);
             const commanderName = commanderChar?.main?.character_name || member.user.tag;
+
+            // Run a quick sync on page load to ensure data is fresh
+            const io = req.app.get('io');
+            if (io) {
+                await syncLogiStatus(io);
+            }
 
             const pilots = await trainingManager.getAllPilots();
 
@@ -55,8 +63,8 @@ exports.showTracker = (client) => [
                 commanderName,
                 // Pass a permissions object to the frontend
                 permissions: {
-                    canEdit: roleManager.isCommanderOrHigher(member), // Use the base commander permission for editing
-                    canAddResidents: roleManager.isCouncilOrHigher(member)
+                    canEdit: roleManager.hasPermission(member, ['certified_trainer', 'council', 'admin']),
+                    canAddResidents: roleManager.hasPermission(member, ['council', 'admin'])
                 }
             });
         } catch (error) {
@@ -74,6 +82,7 @@ exports.addResident = (client) => [
     validateTokenAndPermissions(client, 'council'), // Requires council+ to add new residents
     async (req, res) => {
         const { pilotName, discordId } = req.body;
+        const io = req.app.get('io');
 
         if (!pilotName || !discordId) {
             return res.status(400).json({ success: false, message: 'Pilot name and Discord ID are required.' });
@@ -81,6 +90,9 @@ exports.addResident = (client) => [
 
         try {
             const result = await trainingManager.addResident(pilotName, discordId);
+            if (result.success && io) {
+                io.emit('training-update');
+            }
             res.json(result);
         } catch (error) {
             logger.error('Error in addResident controller:', error);
@@ -94,20 +106,23 @@ exports.addResident = (client) => [
  * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.updateProgress = (client) => [
-    validateTokenAndPermissions(client, 'commander'), // Lowered permission to 'commander'
+    validateTokenAndPermissions(client, 'certified_trainer'),
     async (req, res) => {
         const { pilotId, field, value } = req.body;
+        const io = req.app.get('io');
 
         if (pilotId === undefined || field === undefined || value === undefined) {
             return res.status(400).json({ success: false, message: 'Missing pilotId, field, or value.' });
         }
 
         try {
-            // Refetch commander name to be sure
             const commanderChar = await charManager.getChars(req.tokenData.user.id);
             const name = commanderChar?.main?.character_name || req.tokenData.user.tag;
 
             const result = await trainingManager.updatePilotProgress(pilotId, field, value, name);
+            if (result.success && io) {
+                io.emit('training-update');
+            }
             res.json(result);
         } catch (error) {
             logger.error('Error in updateProgress controller:', error);
@@ -121,9 +136,10 @@ exports.updateProgress = (client) => [
  * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.addComment = (client) => [
-    validateTokenAndPermissions(client, 'commander'), // Lowered permission to 'commander'
+    validateTokenAndPermissions(client, 'certified_trainer'),
     async (req, res) => {
         const { pilotId, comment } = req.body;
+        const io = req.app.get('io');
 
         if (!pilotId || !comment) {
             return res.status(400).json({ success: false, message: 'Missing pilotId or comment text.' });
@@ -134,6 +150,9 @@ exports.addComment = (client) => [
             const commanderName = commanderChar?.main?.character_name || req.tokenData.user.tag;
 
             const result = await trainingManager.addComment(pilotId, comment, commanderName);
+            if (result.success && io) {
+                io.emit('training-update');
+            }
             res.json(result);
         } catch (error) {
             logger.error('Error in addComment controller:', error);
@@ -142,4 +161,20 @@ exports.addComment = (client) => [
     }
 ];
 
+/**
+ * Handles fetching all pilot data as JSON for real-time updates.
+ * @param {import('discord.js').Client} client - The Discord client instance.
+ */
+exports.getPilotsData = (client) => [
+    validateTokenAndPermissions(client), // Reuse the same validation
+    async (req, res) => {
+        try {
+            const pilots = await trainingManager.getAllPilots();
+            res.json({ success: true, pilots });
+        } catch (error) {
+            logger.error('Error fetching pilot data for API:', error);
+            res.status(500).json({ success: false, message: 'Could not load training data.' });
+        }
+    }
+];
 
