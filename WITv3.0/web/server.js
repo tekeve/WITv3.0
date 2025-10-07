@@ -14,7 +14,8 @@ const actionlogRoutes = require('./routes/actionlogRoutes');
 const residentAppRoutes = require('./routes/residentAppRoutes');
 const embedRoutes = require('./routes/embedRoutes');
 const logiRoutes = require('./routes/logiRoutes');
-const reactionRoleRoutes = require('./routes/reactionRoleRoutes'); // Import the new router
+const reactionRoleRoutes = require('./routes/reactionRoleRoutes');
+const trainingRoutes = require('./routes/trainingRoutes'); // Import the new training routes
 
 /**
  * Initializes and starts the Express web server.
@@ -27,7 +28,6 @@ function startServer(client) {
     const host = process.env.HOST_NAME;
 
     app.use(express.urlencoded({ extended: true }));
-    // Added express.json() to handle JSON payloads from the web editor.
     app.use(express.json());
 
     app.set('view engine', 'ejs');
@@ -41,7 +41,7 @@ function startServer(client) {
         });
     });
 
-    // Load and use all the routers, passing the 'io' instance to logiRoutes
+    // Load and use all the routers
     app.use('/', authRoutes(client));
     app.use('/', srpRoutes(client, client.activeSrpTokens));
     app.use('/', setupRoutes(client, client.activeSetupTokens));
@@ -49,8 +49,9 @@ function startServer(client) {
     app.use('/', actionlogRoutes(client));
     app.use('/', residentAppRoutes(client, client.activeResidentAppTokens));
     app.use('/', embedRoutes(client));
-    app.use('/', logiRoutes(client, io)); // Pass the 'io' instance here
-    app.use('/', reactionRoleRoutes(client)); // Add the new router
+    app.use('/', logiRoutes(client, io));
+    app.use('/', reactionRoleRoutes(client));
+    app.use('/', trainingRoutes(client)); // Use the new training routes
 
     app.get('/', (req, res) => {
         res.send('Web server is running.');

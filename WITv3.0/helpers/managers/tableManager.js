@@ -5,6 +5,7 @@ const logger = require('@helpers/logger');
 const editableTables = [
     'action_log_settings',
     'bot_status',
+    'commander_training', // Added new table
     'config',
     'google_docs',
     'google_sheets',
@@ -22,6 +23,7 @@ const editableTables = [
 const tableKeyMap = {
     action_log_settings: 'id',
     bot_status: 'id',
+    commander_training: 'pilot_id', // Added key for new table
     config: 'key_name',
     google_docs: 'alias',
     google_sheets: 'alias',
@@ -71,8 +73,8 @@ module.exports = {
         try {
             const sql = `SELECT \`${keyColumn}\` FROM \`${tableName}\` WHERE \`${keyColumn}\` LIKE ? LIMIT 25`;
             const rows = await db.query(sql, [`%${filter}%`]);
-            const validRows = rows.filter(row => row[keyColumn] && typeof row[keyColumn] === 'string');
-            return validRows.map(row => ({ name: row[keyColumn], value: row[keyColumn] }));
+            const validRows = rows.filter(row => row[keyColumn] && (typeof row[keyColumn] === 'string' || typeof row[keyColumn] === 'number'));
+            return validRows.map(row => ({ name: String(row[keyColumn]), value: String(row[keyColumn]) }));
         } catch (error) {
             logger.error(`Failed to get keys from table ${tableName}:`, error);
             return [];
@@ -152,4 +154,3 @@ module.exports = {
         }
     },
 };
-
