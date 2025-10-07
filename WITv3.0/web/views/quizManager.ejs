@@ -29,7 +29,7 @@
         .question-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .answers-container { padding-left: 1.5rem; border-left: 2px solid var(--bg-secondary); }
         .answer-group { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; }
-        .answer-group input[type="radio"] { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
+        .answer-group input[type="radio"], .answer-group input[type="checkbox"] { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
         .answer-group input[type="text"] { flex-grow: 1; }
         .hidden-inputs { display: none; }
     </style>
@@ -91,15 +91,24 @@
             hiddenInputsContainer.appendChild(input);
         }
 
-        function createAnswerElement(questionKey, answer = {}) {
+        function createAnswerElement(questionKey, questionType = 'single', answer = {}) {
             const answerKey = answer.answer_id || `new_${answerCounter++}`;
             const isChecked = answer.is_correct ? 'checked' : '';
+            const inputType = questionType === 'multiple' ? 'checkbox' : 'radio';
+            
+            // For multiple choice, the name indicates if it's correct. For single, it groups the radios.
+            const inputName = questionType === 'multiple' 
+                ? `questions[${questionKey}][answers][${answerKey}][is_correct]`
+                : `questions[${questionKey}][correct_answer]`;
+
+            // For checkboxes, we submit '1' if checked. For radios, the value is the answer's unique key.
+            const inputValue = questionType === 'multiple' ? '1' : answerKey;
 
             const answerDiv = document.createElement('div');
             answerDiv.className = 'answer-group';
             answerDiv.dataset.answerKey = answerKey;
             answerDiv.innerHTML = `
-                <input type="radio" name="questions[${questionKey}][correct_answer]" value="${answerKey}" ${isChecked} required title="Mark as correct answer">
+                <input type="${inputType}" name="${inputName}" value="${inputValue}" ${isChecked} ${inputType === 'radio' ? 'required' : ''} title="Mark as correct answer">
                 <input type="text" name="questions[${questionKey}][answers][${answerKey}][text]" placeholder="Answer text..." value="${answer.answer_text || ''}" required>
                 <button type="button" class="btn btn-danger btn-sm remove-answer-btn">&times;</button>
             `;
@@ -116,6 +125,7 @@
 
         function createQuestionElement(question = {}) {
             const questionKey = question.question_id || `new_${questionCounter++}`;
+            const questionType = question.question_type || 'single';
             const card = document.createElement('div');
             card.className = 'panel question-card';
             card.dataset.questionKey = questionKey;
@@ -129,6 +139,13 @@
                     <label>Question Text</label>
                     <textarea name="questions[${questionKey}][text]" required>${question.question_text || ''}</textarea>
                 </div>
+                <div class="form-group">
+                    <label>Question Type</label>
+                    <select name="questions[${questionKey}][type]" class="question-type-select">
+                        <option value="single" ${questionType !== 'multiple' ? 'selected' : ''}>Single Answer</option>
+                        <option value="multiple" ${questionType === 'multiple' ? 'selected' : ''}>Multiple Answers</option>
+                    </select>
+                </div>
                 <div class="answers-container">
                     <h3>Answers</h3>
                     <div class="answers-list"></div>
@@ -140,16 +157,33 @@
             
             if (question.answers && question.answers.length > 0) {
                 question.answers.forEach(answer => {
-                    answersList.appendChild(createAnswerElement(questionKey, answer));
+                    answersList.appendChild(createAnswerElement(questionKey, questionType, answer));
                 });
             } else {
                 // Add two blank answers by default for new questions
-                answersList.appendChild(createAnswerElement(questionKey));
-                answersList.appendChild(createAnswerElement(questionKey));
+                answersList.appendChild(createAnswerElement(questionKey, questionType));
+                answersList.appendChild(createAnswerElement(questionKey, questionType));
             }
 
             card.querySelector('.add-answer-btn').addEventListener('click', () => {
-                answersList.appendChild(createAnswerElement(questionKey));
+                const currentType = card.querySelector('.question-type-select').value;
+                answersList.appendChild(createAnswerElement(questionKey, currentType));
+            });
+            
+            card.querySelector('.question-type-select').addEventListener('change', (e) => {
+                const newType = e.target.value;
+                const currentAnswers = [];
+                answersList.querySelectorAll('.answer-group').forEach(ag => {
+                    currentAnswers.push({
+                        answer_id: ag.dataset.answerKey.startsWith('new_') ? undefined : ag.dataset.answerKey,
+                        answer_text: ag.querySelector('input[type="text"]').value,
+                        is_correct: ag.querySelector('input[type="radio"], input[type="checkbox"]').checked
+                    });
+                });
+                answersList.innerHTML = '';
+                currentAnswers.forEach(answer => {
+                    answersList.appendChild(createAnswerElement(questionKey, newType, answer));
+                });
             });
 
             card.querySelector('.remove-question-btn').addEventListener('click', () => {

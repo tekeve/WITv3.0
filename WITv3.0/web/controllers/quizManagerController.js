@@ -103,21 +103,27 @@ exports.handleManagerSubmission = (client) => async (req, res) => {
         // 3. Upsert Questions and Answers
         for (const qKey in questions) {
             const questionData = questions[qKey];
+            const questionType = questionData.type || 'single';
             let questionId;
 
             if (qKey.startsWith('new_')) { // New Question
-                const [qResult] = await connection.query('INSERT INTO quiz_questions (quiz_id, question_text) VALUES (?, ?)', [quizId, questionData.text]);
+                const [qResult] = await connection.query('INSERT INTO quiz_questions (quiz_id, question_text, question_type) VALUES (?, ?, ?)', [quizId, questionData.text, questionType]);
                 questionId = qResult.insertId;
             } else { // Existing Question
                 questionId = qKey;
-                await connection.query('UPDATE quiz_questions SET question_text = ? WHERE question_id = ?', [questionData.text, questionId]);
+                await connection.query('UPDATE quiz_questions SET question_text = ?, question_type = ? WHERE question_id = ?', [questionData.text, questionType, questionId]);
             }
 
             // Upsert Answers for this question
             if (questionData.answers) {
                 for (const aKey in questionData.answers) {
                     const answerData = questionData.answers[aKey];
-                    const isCorrect = (questionData.correct_answer === aKey);
+                    let isCorrect = false;
+                    if (questionType === 'multiple') {
+                        isCorrect = !!answerData.is_correct; // Comes as '1' from checkbox, or undefined
+                    } else { // 'single'
+                        isCorrect = (questionData.correct_answer === aKey);
+                    }
 
                     if (aKey.startsWith('new_')) { // New Answer
                         await connection.query('INSERT INTO quiz_answers (question_id, answer_text, is_correct) VALUES (?, ?, ?)', [questionId, answerData.text, isCorrect]);
@@ -143,5 +149,3 @@ exports.handleManagerSubmission = (client) => async (req, res) => {
         connection.release();
     }
 };
-
-
