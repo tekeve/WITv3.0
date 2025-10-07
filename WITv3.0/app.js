@@ -97,7 +97,8 @@ async function initializeApp() {
     client.activeResidentAppTokens = new Map();
     client.activeEmbedTokens = new Map();
     client.activeReactionRoleTokens = new Map();
-    client.activeTrainingTokens = new Map(); // Added for the new training tracker
+    client.activeTrainingTokens = new Map();
+    client.activeQuizTokens = new Map(); // Added for the new quiz system
     client.esiStateMap = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null;

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commander Quiz Portal</title>
+    <style>
+        :root {
+            --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569;
+            --text-primary: #e2e8f0; --text-secondary: #94a3b8; --accent-blue: #38bdf8;
+            --accent-green: #4ade80; --accent-red: #f87171; --border-color: #4a5568;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 2rem; }
+        .container { max-width: 800px; margin: auto; }
+        .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 2rem; border: 1px solid var(--border-color); }
+        h1, h2 { color: #f8fafc; text-align: center; margin-top: 0; }
+        h1 { margin-bottom: 0.5rem; }
+        .subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 2rem; }
+        #quiz-selection-view, #quiz-view, #results-view { display: none; }
+        .quiz-list { list-style: none; padding: 0; margin: 0; }
+        .quiz-list-item { background-color: var(--bg-tertiary); padding: 1rem 1.5rem; border-radius: 0.5rem; margin-bottom: 1rem; cursor: pointer; transition: background-color 0.2s, transform 0.2s; }
+        .quiz-list-item:hover { background-color: #55667d; transform: translateY(-2px); }
+        .question-block { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); }
+        .question-text { font-size: 1.1rem; font-weight: 500; margin-bottom: 1rem; }
+        .answers-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+        .answer-item label { display: block; background-color: var(--bg-tertiary); padding: 0.75rem 1rem; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s; }
+        .answer-item input[type="radio"] { display: none; }
+        .answer-item input[type="radio"]:checked + label { background-color: var(--accent-blue); color: #fff; }
+        button { padding: 0.75rem 1.5rem; border: none; border-radius: 0.375rem; color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        .btn-primary { background-color: var(--accent-blue); } .btn-primary:hover { background-color: #0ea5e9; }
+        .btn-secondary { background-color: var(--bg-tertiary); } .btn-secondary:hover { background-color: #55667d; }
+        .actions { margin-top: 2rem; display: flex; justify-content: space-between; }
+        .loader { text-align: center; font-size: 1.5rem; padding: 2rem; }
+        .results-summary { text-align: center; }
+        .results-summary.pass { color: var(--accent-green); }
+        .results-summary.fail { color: var(--accent-red); }
+        .results-summary h2 { font-size: 2rem; margin-bottom: 0.5rem; }
+        .results-summary p { font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="quiz-selection-view" class="panel">
+        <h1>Commander Quiz Portal</h1>
+        <p class="subtitle">Welcome, <%= userTag %>. Select a quiz to begin.</p>
+        <ul id="quiz-list" class="quiz-list">
+            <% if (quizzes.length > 0) { %>
+                <% quizzes.forEach(quiz => { %>
+                    <li class="quiz-list-item" data-quiz-id="<%= quiz.quiz_id %>" data-quiz-name="<%= quiz.name %>">
+                        <%= quiz.name %>
+                    </li>
+                <% }); %>
+            <% } else { %>
+                <li style="text-align: center; color: var(--text-secondary);">You have completed all available quizzes!</li>
+            <% } %>
+        </ul>
+    </div>
+
+    <div id="quiz-view" class="panel">
+        <h1 id="quiz-title"></h1>
+        <div id="quiz-content"></div>
+        <div class="actions">
+            <button id="back-to-selection" class="btn-secondary">Back to Quizzes</button>
+            <button id="submit-quiz" class="btn-primary">Submit Answers</button>
+        </div>
+    </div>
+    
+    <div id="results-view" class="panel">
+        <!-- Results will be injected here -->
+    </div>
+
+    <div id="loading-view" class="panel" style="display: none;">
+        <div class="loader">Loading...</div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = "<%= token %>";
+        const selectionView = document.getElementById('quiz-selection-view');
+        const quizView = document.getElementById('quiz-view');
+        const resultsView = document.getElementById('results-view');
+        const loadingView = document.getElementById('loading-view');
+        const quizList = document.getElementById('quiz-list');
+        const quizTitle = document.getElementById('quiz-title');
+        const quizContent = document.getElementById('quiz-content');
+
+        let currentQuizId = null;
+
+        function showView(view) {
+            selectionView.style.display = 'none';
+            quizView.style.display = 'none';
+            resultsView.style.display = 'none';
+            loadingView.style.display = 'none';
+            view.style.display = 'block';
+        }
+
+        async function fetchQuiz(quizId, quizName) {
+            currentQuizId = quizId;
+            showView(loadingView);
+            try {
+                const response = await fetch(`/quiz/api/data/${token}/${quizId}`);
+                if (!response.ok) throw new Error('Failed to load quiz data.');
+                const { success, quiz, questions } = await response.json();
+                if (!success) throw new Error(data.message);
+
+                quizTitle.textContent = quiz.name;
+                quizContent.innerHTML = '';
+
+                if (questions.length === 0) {
+                     quizContent.innerHTML = '<p>This quiz currently has no questions.</p>';
+                } else {
+                    questions.forEach((q, index) => {
+                        const questionBlock = document.createElement('div');
+                        questionBlock.className = 'question-block';
+                        questionBlock.innerHTML = `
+                            <div class="question-text">${index + 1}. ${q.question_text}</div>
+                            <ul class="answers-list" data-question-id="${q.question_id}">
+                                ${q.answers.map(a => `
+                                    <li class="answer-item">
+                                        <input type="radio" name="question_${q.question_id}" id="answer_${a.answer_id}" value="${a.answer_id}">
+                                        <label for="answer_${a.answer_id}">${a.answer_text}</label>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        `;
+                        quizContent.appendChild(questionBlock);
+                    });
+                }
+                showView(quizView);
+            } catch (error) {
+                console.error('Error fetching quiz:', error);
+                showView(selectionView);
+                alert('Could not load the quiz. Please try again.');
+            }
+        }
+
+        async function submitQuiz() {
+            const answers = {};
+            const answerLists = quizContent.querySelectorAll('.answers-list');
+            
+            let allAnswered = true;
+            answerLists.forEach(list => {
+                const qId = list.dataset.questionId;
+                const checkedRadio = list.querySelector(`input[name="question_${qId}"]:checked`);
+                if (checkedRadio) {
+                    answers[qId] = checkedRadio.value;
+                } else {
+                    allAnswered = false;
+                }
+            });
+
+            if (!allAnswered) {
+                alert('Please answer all questions before submitting.');
+                return;
+            }
+            
+            showView(loadingView);
+            try {
+                const response = await fetch(`/quiz/api/submit/${token}/${currentQuizId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answers })
+                });
+                if (!response.ok) throw new Error('Failed to submit quiz.');
+                const result = await response.json();
+                displayResults(result);
+
+            } catch (error) {
+                console.error('Error submitting quiz:', error);
+                showView(quizView);
+                alert('Could not submit the quiz. Please try again.');
+            }
+        }
+
+        function displayResults(result) {
+            const passFailClass = result.passed ? 'pass' : 'fail';
+            const passFailText = result.passed ? 'Passed!' : 'Failed';
+
+            resultsView.innerHTML = `
+                <div class="results-summary ${passFailClass}">
+                    <h2 id="result-status">${passFailText}</h2>
+                    <p>You scored ${result.score}% (${result.correctCount} / ${result.totalQuestions})</p>
+                    <p>Passing Score: ${result.passMark}%</p>
+                </div>
+                <div class="actions" style="justify-content: center; margin-top: 2rem;">
+                     ${!result.passed ? '<button id="retry-quiz" class="btn-primary">Try Again</button>' : ''}
+                    <button id="return-home" class="btn-secondary">Return to Quiz List</button>
+                </div>
+            `;
+            
+            const retryBtn = document.getElementById('retry-quiz');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', () => {
+                    // Refetch the quiz to start fresh
+                    fetchQuiz(currentQuizId);
+                });
+            }
+
+            document.getElementById('return-home').addEventListener('click', () => {
+                // Hard reload to get the fresh list of available quizzes
+                window.location.reload();
+            });
+
+            showView(resultsView);
+        }
+
+        // --- Event Listeners ---
+        quizList.addEventListener('click', (e) => {
+            const item = e.target.closest('.quiz-list-item');
+            if (item) {
+                fetchQuiz(item.dataset.quizId, item.dataset.quizName);
+            }
+        });
+
+        document.getElementById('back-to-selection').addEventListener('click', () => {
+            showView(selectionView);
+        });
+
+        document.getElementById('submit-quiz').addEventListener('click', submitQuiz);
+
+        // --- Initial View ---
+        showView(selectionView);
+    });
+</script>
+
+</body>
+</html>

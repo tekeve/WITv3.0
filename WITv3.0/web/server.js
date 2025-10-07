@@ -16,6 +16,8 @@ const embedRoutes = require('./routes/embedRoutes');
 const logiRoutes = require('./routes/logiRoutes');
 const reactionRoleRoutes = require('./routes/reactionRoleRoutes');
 const trainingRoutes = require('./routes/trainingRoutes');
+const quizRoutes = require('./routes/quizRoutes');
+const quizManagerRoutes = require('./routes/quizManagerRoutes');
 
 /**
  * Initializes and starts the Express web server.
@@ -57,6 +59,8 @@ function startServer(client) {
     app.use('/', logiRoutes(client, io)); // logiRoutes still needs io passed directly for its own emits
     app.use('/', reactionRoleRoutes(client));
     app.use('/', trainingRoutes(client)); // trainingRoutes will get io from the app instance
+    app.use('/', quizRoutes(client));
+    app.use('/', quizManagerRoutes(client));
 
     app.get('/', (req, res) => {
         res.send('Web server is running.');
