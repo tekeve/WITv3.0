@@ -21,7 +21,7 @@ exports.showForm = (client) => async (req, res) => {
     try {
         const commanderChar = await charManager.getChars(tokenData.user.id);
         const commanderName = commanderChar?.main?.character_name || tokenData.user.tag;
-        const isAdmin = roleManager.isAdmin(tokenData.member);
+        const isLeadership = roleManager.isLeadership(tokenData.member) || roleManager.isAdmin(tokenData.member);
 
         // Fetch initial data for both lists
         const initialData = await logiManager.getSignoffData();
@@ -48,7 +48,7 @@ exports.showForm = (client) => async (req, res) => {
             commanderName,
             inProgressData,
             trustedData,
-            isAdmin,
+            isLeadership,
         });
     } catch (error) {
         logger.error('Error preparing logi sign-off page:', error);
@@ -71,11 +71,11 @@ exports.handleSignoff = (client, io) => async (req, res) => {
     }
 
     const { pilotName, commanderName, comment, adminOverride } = req.body;
-    const isAdmin = roleManager.isAdmin(tokenData.member);
+    const isLeadership = roleManager.isLeadership(tokenData.member) || roleManager.isAdmin(tokenData.member);
 
     try {
         let result;
-        if (adminOverride && isAdmin) {
+        if (adminOverride && isLeadership) {
             // If the override checkbox is checked and the user is an admin, add directly to trusted.
             result = await logiManager.addPilotDirectlyToTrusted(pilotName, commanderName, comment, client);
         } else {

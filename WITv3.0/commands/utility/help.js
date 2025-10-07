@@ -2,10 +2,7 @@
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
-    // Each command should export a 'permission' property.
-    // This allows the help command and interaction handler to check permissions dynamically.
-    // Possible values: 'admin', 'council', 'commander', 'auth', 'public'
-    permission: 'public',
+    permissions: ['public'],
     data: new SlashCommandBuilder()
         .setName('help')
         .setDescription('Lists all available commands you have permission to use.'),
@@ -14,25 +11,40 @@ module.exports = {
         const member = interaction.member;
         const commands = interaction.client.commands;
 
-        // An object mapping permission levels to checking functions from roleManager
+        // An object mapping permission level names to their checking functions.
+        // This ensures that even if old command files use a single permission string,
+        // we can still resolve it to the correct hierarchical check.
         const permissionChecks = {
             admin: roleManager.isAdmin,
-            council: roleManager.isCouncilOrAdmin, // Council can do their own things + admin things
-            commander: roleManager.isCommanderOrAdmin, // Commanders can do their own things + admin things
+            founder: roleManager.isFounderOrHigher,
+            leadership: roleManager.isLeadershipOrHigher,
+            officer: roleManager.isOfficerOrHigher,
+            council: roleManager.isCouncilOrHigher,
+            certified_trainer: roleManager.isCertifiedTrainerOrHigher,
+            training_ct: roleManager.isTrainingCtOrHigher,
+            fleet_commander: roleManager.isFleetCommanderOrHigher,
+            training_fc: roleManager.isTrainingFcOrHigher,
+            assault_line_commander: roleManager.isAssaultLineCommanderOrHigher,
+            line_commander: roleManager.isLineCommanderOrHigher,
+            resident: roleManager.isResidentOrHigher,
+            commander: roleManager.isCommanderOrHigher,
             auth: roleManager.canAuth,
             public: () => true, // Everyone can use public commands
         };
 
         const availableCommands = commands.filter(command => {
-            // Default to 'admin' permission if not specified on the command file
-            const requiredPermission = command.permission || 'admin';
-            const hasPermission = permissionChecks[requiredPermission];
-            return hasPermission ? hasPermission(member) : false;
+            const requiredPermissions = command.permissions || ['admin'];
+            // This now checks if the member passes ANY of the required permission checks.
+            return requiredPermissions.some(p => {
+                const check = permissionChecks[p];
+                return check ? check(member) : false;
+            });
         });
 
-        const commandList = availableCommands.map(command => {
-            return `**/${command.data.name}**: ${command.data.description}`;
-        }).join('\n');
+        const commandList = availableCommands
+            .map(command => `**/${command.data.name}**: ${command.data.description}`)
+            .sort() // Sort the commands alphabetically
+            .join('\n');
 
         const embed = new EmbedBuilder()
             .setColor(0x4E5D94)
@@ -46,3 +58,4 @@ module.exports = {
         });
     },
 };
+

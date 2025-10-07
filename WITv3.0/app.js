@@ -113,10 +113,11 @@ async function initializeApp() {
         for (const file of commandFiles) {
             const filePath = path.join(commandsPath, file);
             const command = require(filePath);
-            if ('data' in command && ('execute' in command || 'autocomplete' in command) && 'permission' in command) {
+            // FIX: Changed check from 'permission' to 'permissions' to standardize.
+            if ('data' in command && ('execute' in command || 'autocomplete' in command) && 'permissions' in command) {
                 client.commands.set(command.data.name, command);
             } else {
-                logger.warn(`The command at ${filePath} is missing a required property.`);
+                logger.warn(`The command at ${filePath} is missing a required "data", "execute", "autocomplete", or "permissions" property.`);
             }
         }
     }
@@ -154,4 +155,3 @@ async function initializeApp() {
 }
 
 initializeApp();
-

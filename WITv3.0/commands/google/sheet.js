@@ -5,10 +5,10 @@ const logger = require('@helpers/logger');
 const tableManager = require('@helpers/managers/tableManager');
 
 module.exports = {
-    permission: 'admin',
+    permissions: ['leadership', 'admin'],
     data: new SlashCommandBuilder()
         .setName('sheet')
-        .setDescription('Interact with Google Sheets (Admin Only)')
+        .setDescription('Interact with Google Sheets (Leadership Only)')
         .addSubcommand(subcommand =>
             subcommand
                 .setName('read')
@@ -164,4 +164,3 @@ module.exports = {
         }
     },
 };
-

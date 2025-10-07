@@ -3,7 +3,7 @@ const charManager = require('@helpers/characterManager');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
-    permission: 'commander',
+    permissions: ['commander'],
     data: new SlashCommandBuilder()
         .setName('delchar')
         .setDescription('Delete a character from a profile.')
@@ -31,7 +31,7 @@ module.exports = {
 
         if (targetUserOption) {
             // If a target is specified, you must have council/admin roles.
-            if (!roleManager.isCouncilOrAdmin(interaction.member)) {
+            if (!roleManager.hasPermission(interaction.member, ['admin', 'council'])) {
                 return interaction.reply({
                     content: 'You do not have the required role to manage characters for other users.',
                     flags: [MessageFlags.Ephemeral]
@@ -39,13 +39,7 @@ module.exports = {
             }
             effectiveUser = targetUserOption;
         } else {
-            // If no target, it's a self-action; requires commander/admin roles.
-            if (!roleManager.isCommanderOrAdmin(interaction.member)) {
-                return interaction.reply({
-                    content: 'You do not have the required role to use this command.',
-                    flags: [MessageFlags.Ephemeral]
-                });
-            }
+            // If no target, it's a self-action.
             effectiveUser = interaction.user;
         }
 

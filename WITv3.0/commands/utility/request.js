@@ -1,7 +1,7 @@
 ﻿const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 
 module.exports = {
-    permission: 'commander',
+    permissions: ['commander'],
     data: new SlashCommandBuilder()
         .setName('request')
         .setDescription('Opens a form to submit a request ticket.'),

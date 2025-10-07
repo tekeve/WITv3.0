@@ -38,7 +38,7 @@ function parseDuration(timeString) {
 }
 
 module.exports = {
-    permission: 'public',
+    permissions: ['public'],
     data: new SlashCommandBuilder()
         .setName('remindme')
         .setDescription('Set, view, or delete your reminders.')
