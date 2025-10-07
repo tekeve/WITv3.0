@@ -4,15 +4,15 @@ const logger = require('@helpers/logger');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
-    permission: 'commander',
+    permissions: ['commander'],
     data: new SlashCommandBuilder()
         .setName('logi')
         .setDescription('Generates a unique link to the logistics sign-off management page.'),
     async execute(interaction) {
         // Ensure the user has the commander role
-        if (!roleManager.isCommanderOrAdmin(interaction.member)) {
+        if (!roleManager.hasPermission(interaction.member, module.exports.permissions)) {
             return interaction.reply({
-                content: 'You must be a Commander to use this command.',
+                content: 'You do not have permission to use this command.',
                 flags: [MessageFlags.Ephemeral]
             });
         }

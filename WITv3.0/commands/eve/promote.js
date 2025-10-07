@@ -1,9 +1,9 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const roleManager = require('@helpers/roleManager');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 
 module.exports = {
-    permission: 'council',
+    permissions: ['certified_trainer', 'council'],
     data: new SlashCommandBuilder()
         .setName('promote')
         .setDescription('Promotes a user to a specified rank.')
@@ -28,8 +28,19 @@ module.exports = {
     },
 
     async execute(interaction) {
-        // All logic is now handled directly by the role manager.
+        const targetRankName = interaction.options.getString('rank');
+
+        // Add a specific check: only bot admins can promote to 'leadership'
+        if (targetRankName.toLowerCase() === 'leadership') {
+            if (!roleManager.isAdmin(interaction.member)) {
+                return interaction.reply({
+                    content: 'You must be a Bot Admin to promote a user to Leadership.',
+                    flags: [MessageFlags.Ephemeral]
+                });
+            }
+        }
+
+        // All other logic is now handled directly by the role manager.
         await roleManager.manageRoles(interaction, 'promote');
     },
 };
-

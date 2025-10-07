@@ -1,9 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const charManager = require('@helpers/characterManager');
-const roleManager = require('@helpers/roleManager');
 
 module.exports = {
-    permission: 'commander',
+    permissions: ['commander'],
     data: new SlashCommandBuilder()
         .setName('getchar')
         .setDescription('Displays registered characters.')

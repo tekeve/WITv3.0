@@ -4,10 +4,10 @@ const roleManager = require('@helpers/roleManager');
 const logger = require('@helpers/logger');
 
 module.exports = {
-    permission: 'admin',
+    permissions: ['leadership'],
     data: new SlashCommandBuilder()
         .setName('refreshroles')
-        .setDescription('Forces a sync of roles from the database to Discord for registered users. (Admin Only)')
+        .setDescription('Forces a sync of roles from the database to Discord for registered users. (Leadership Only)')
         .addUserOption(option =>
             option.setName('user')
                 .setDescription('Optional: A specific user to refresh.')
@@ -88,4 +88,3 @@ module.exports = {
         }
     },
 };
-

@@ -3,7 +3,7 @@ const incursionManager = require('@helpers/incursionManager');
 const logger = require('@helpers/logger');
 
 module.exports = {
-    permission: 'admin',
+    permissions: ['leadership', 'admin'],
     data: new SlashCommandBuilder()
         .setName('datasync')
         .setDescription('Verifies and updates internal static data from ESI. CAUSES A LOT OF ESI CALLS!')

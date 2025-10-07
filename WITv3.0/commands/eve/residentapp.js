@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('@helpers/logger');
 
 module.exports = {
-    permission: 'public',
+    permissions: ['public'],
     data: new SlashCommandBuilder()
         .setName('residentapp')
         .setDescription('Generates a unique link to file a WTM Resident Application.'),

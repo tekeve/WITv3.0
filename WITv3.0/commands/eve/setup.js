@@ -5,18 +5,18 @@ const logger = require('@helpers/logger');
 const roleManager = require('@helpers/roleManager');
 
 module.exports = {
-    permission: 'admin', // Only admins can initiate setup.
+    permissions: ['leadership', 'admin'], // Only bot admins can initiate setup.
     data: new SlashCommandBuilder()
         .setName('setup')
-        .setDescription('Generates a link to perform or edit the bot setup (owner-only after first run).'),
+        .setDescription('Generates a link to perform or edit the bot setup (bot admin only after first run).'),
     async execute(interaction) {
         const config = configManager.get();
         const isSetupComplete = config && config.setupLocked && config.setupLocked.includes("true");
 
-        // After the first setup, only the server owner or an admin can run this command again.
-        if (isSetupComplete && (interaction.user.id !== interaction.guild.ownerId && !roleManager.isAdmin(interaction.member))) {
+        // After the first setup, only a bot admin (owner or from user list) can run this command again.
+        if (isSetupComplete && !roleManager.isAdmin(interaction.member)) {
             return interaction.reply({
-                content: 'The initial setup has been completed. Only the server owner or an Admin can run this command again to edit the configuration.',
+                content: 'The initial setup has been completed. Only a bot admin can run this command again to edit the configuration.',
                 flags: [MessageFlags.Ephemeral]
             });
         }

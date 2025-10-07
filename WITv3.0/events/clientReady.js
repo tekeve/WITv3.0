@@ -3,6 +3,7 @@ const logger = require('@helpers/logger');
 const statusManager = require('@helpers/statusManager');
 const githubWatcher = require('@helpers/githubWatcher');
 const reminderManager = require('@helpers/reminderManager'); // Import the new manager
+const scheduler = require('@helpers/scheduler');
 
 module.exports = {
 	name: Events.ClientReady,
@@ -19,8 +20,12 @@ module.exports = {
 		// Initial call to update incursions, which will then schedule the next call itself.
 		client.updateIncursions();
 
+		// Initialize scheduled tasks, including the new token refresh task
+		scheduler.initialize(client);
+
 		// Initialize and start GitHub watcher with a standard interval
 		await githubWatcher.initializeLastSha();
-		setInterval(() => githubWatcher.checkGithubForUpdates(client), 2 * 60 * 1000); // Check every 5 minutes
+		setInterval(() => githubWatcher.checkGithubForUpdates(client), 2 * 60 * 1000); // Check every 2 minutes
 	},
 };
+

@@ -62,26 +62,9 @@ async function handleChatInputCommand(interaction, client) {
 
     // Dynamic Permissions Check with enhanced error handling
     try {
-        const permissionChecks = {
-            admin: roleManager.isAdmin,
-            council: roleManager.isCouncilOrAdmin,
-            commander: roleManager.isCommanderOrAdmin,
-            auth: roleManager.canAuth,
-            public: () => true,
-        };
+        const requiredPermissions = Array.isArray(command.permissions) ? command.permissions : [command.permissions || 'admin'];
 
-        const requiredPermission = command.permission || 'admin';
-        const hasPermission = permissionChecks[requiredPermission];
-
-        if (!hasPermission) {
-            logger.error(`Unknown permission level: ${requiredPermission} for command: ${interaction.commandName}`);
-            return await interaction.reply({
-                content: '❌ Command configuration error. Please contact an administrator.',
-                flags: [MessageFlags.Ephemeral]
-            });
-        }
-
-        if (!hasPermission(interaction.member)) {
+        if (!roleManager.hasPermission(interaction.member, requiredPermissions)) {
             return await interaction.reply({
                 content: '❌ You do not have the required permission to use this command.',
                 flags: [MessageFlags.Ephemeral]
@@ -232,3 +215,5 @@ async function handleModalSubmit(interaction) {
         );
     }
 }
+
+
