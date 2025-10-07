@@ -350,7 +350,6 @@ async function updateIncursions(client, options = {}) {
         const currentConstellationId = highSecIncursion ? highSecIncursion.constellation_id : null;
         let lastSimpleState = 'none';
         let lastConstellationId = null;
-        let isNewSpawn = false;
 
         if (state.lastIncursionState && state.lastIncursionState !== 'none') {
             const parts = state.lastIncursionState.split('-');
@@ -358,20 +357,24 @@ async function updateIncursions(client, options = {}) {
             lastSimpleState = parts[1];
         }
 
+        const isNewSpawn = currentConstellationId && currentConstellationId !== lastConstellationId;
+        const isStateChange = currentConstellationId && currentConstellationId === lastConstellationId && currentSimpleState !== lastSimpleState;
+        const isEnd = !currentConstellationId && lastConstellationId;
+
+
         if (!isUsingMock) {
             const now = Math.floor(Date.now() / 1000);
-            if (currentConstellationId && currentConstellationId !== lastConstellationId) {
-                isNewSpawn = true;
+            if (isNewSpawn) {
                 state.spawnTimestamp = now;
                 state.mobilizingTimestamp = null;
                 state.withdrawingTimestamp = null;
                 state.endedTimestamp = null;
                 state.lastIncursionStats = null;
                 state.routeData = null; // Clear old route data
-            } else if (currentConstellationId && currentConstellationId === lastConstellationId && currentSimpleState !== lastSimpleState) {
+            } else if (isStateChange) {
                 if (currentSimpleState === 'mobilizing') state.mobilizingTimestamp = now;
                 if (currentSimpleState === 'withdrawing') state.withdrawingTimestamp = now;
-            } else if (currentSimpleState === 'none' && lastSimpleState !== 'none') {
+            } else if (isEnd) {
                 state.endedTimestamp = now;
                 const incursionSystems = incursionManager.get();
                 const lastSpawnData = incursionSystems.find(c => c.Constellation_id === lastConstellationId);
@@ -401,8 +404,11 @@ async function updateIncursions(client, options = {}) {
         const channelId = config.incursionChannelId[0];
         const channel = await client.channels.fetch(channelId);
 
+        // This is a new spawn, which is the most important. Ping @everyone.
         if (isNewSpawn) {
-            if (state.incursionMessageId) {
+            // Only delete the old message if the last state was an active incursion.
+            // If the last state was 'none', we want to keep the "ended" message.
+            if (state.incursionMessageId && lastSimpleState !== 'none') {
                 try {
                     const oldMessage = await channel.messages.fetch(state.incursionMessageId);
                     await oldMessage.delete();
@@ -412,17 +418,36 @@ async function updateIncursions(client, options = {}) {
             }
             const newMessage = await channel.send({ content: '@everyone, a new high-sec incursion has spawned!', embeds: [embed] });
             state.incursionMessageId = newMessage.id;
-        } else {
+        }
+        // This is a change in the state of an existing incursion, or the incursion ending.
+        // Delete and repost to ensure notifications, but don't ping everyone.
+        else if (isStateChange || isEnd) {
+            if (state.incursionMessageId) {
+                try {
+                    const oldMessage = await channel.messages.fetch(state.incursionMessageId);
+                    await oldMessage.delete();
+                } catch (error) {
+                    logger.warn(`Could not delete old incursion message for state change: ${error.message}`);
+                }
+            }
+            const messageContent = isEnd ? 'The high-sec incursion has ended.' : 'Incursion state has updated:';
+            const newMessage = await channel.send({ content: messageContent, embeds: [embed] });
+            state.incursionMessageId = newMessage.id;
+        }
+        // This is any other update, like influence changes. Just edit the message.
+        else {
             const messagePayload = { content: ' ', embeds: [embed] };
             if (state.incursionMessageId) {
                 try {
                     const message = await channel.messages.fetch(state.incursionMessageId);
                     await message.edit(messagePayload);
                 } catch {
+                    // If editing fails (e.g., message was deleted manually), send a new one.
                     const newMessage = await channel.send(messagePayload);
                     state.incursionMessageId = newMessage.id;
                 }
             } else {
+                // If there's no message ID saved, send a new one.
                 const newMessage = await channel.send(messagePayload);
                 state.incursionMessageId = newMessage.id;
             }

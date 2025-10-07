@@ -53,28 +53,31 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
     const withdrawingTimestamp = isUsingMock && mockOverride.withdrawingTimestamp ? mockOverride.withdrawingTimestamp : state.withdrawingTimestamp;
 
     if (spawnTimestamp) {
-        timelineParts.push(`Spawned: <t:${spawnTimestamp}:R>`);
-        timelineParts.push(`Kundi Spawn: <t:${spawnTimestamp + (3 * 24 * 3600)}:R>`);
+        timelineParts.push(`Spawned: <t:${spawnTimestamp}:f> (<t:${spawnTimestamp}:R>)`);
+        const kundiSpawn = spawnTimestamp + (3 * 24 * 3600);
+        timelineParts.push(`Kundi Spawn: <t:${kundiSpawn}:f> (<t:${kundiSpawn}:R>)`);
     }
     if (mobilizingTimestamp) {
-        timelineParts.push(`Mobilizing: <t:${mobilizingTimestamp}:R>`);
-        timelineParts.push(`Despawns by: <t:${mobilizingTimestamp + (3 * 24 * 3600)}:R>`);
+        timelineParts.push(`Mobilizing: <t:${mobilizingTimestamp}:f> (<t:${mobilizingTimestamp}:R>)`);
+        const despawnTime = mobilizingTimestamp + (3 * 24 * 3600);
+        timelineParts.push(`Despawns by: <t:${despawnTime}:f> (<t:${despawnTime}:R>)`);
     }
     if (withdrawingTimestamp) {
-        timelineParts.push(`Withdrawing: <t:${withdrawingTimestamp}:R>`);
+        timelineParts.push(`Withdrawing: <t:${withdrawingTimestamp}:f> (<t:${withdrawingTimestamp}:R>)`);
     }
     const timelineString = timelineParts.length > 0 ? timelineParts.join('\n') : 'Calculating...';
 
+    const currentStateString = highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1);
+
     const embed = new EmbedBuilder()
         .setColor(stateColors[highSecIncursion.state] || stateColors.none)
-        .setTitle(`High-Sec Incursion: **${spawnData.Constellation}**`)
+        .setTitle(`High-Sec Incursion: **${spawnData.Constellation}** (${currentStateString})`)
         .setDescription(`Spawning in the [**${spawnData.region}**](https://evemaps.dotlan.net/region/${encodeURIComponent(spawnData.region)}) region.`)
         .setThumbnail(spawnData.region_faction ? `https://images.evetech.net/corporations/${spawnData.region_faction}/logo?size=128` : null);
 
     const fields = [
-        { name: 'Suggested Dockup', value: `${spawnData.dockup}`, inline: true },
-        { name: 'Current State', value: `${highSecIncursion.state.charAt(0).toUpperCase() + highSecIncursion.state.slice(1)}`, inline: true },
-        { name: 'Incursion Timeline', value: timelineString, inline: true },
+        { name: 'Suggested Dockup', value: `${spawnData.dockup}`, inline: false },
+        { name: 'Incursion Timeline', value: timelineString, inline: false },
         { name: 'Headquarters', value: `[${hqSystemFullName}](https://evemaps.dotlan.net/system/${encodeURIComponent(hqSystemName)})`, inline: true },
         { name: 'Assaults', value: formatSystemLinks(spawnData.assault_systems), inline: true },
         { name: 'Vanguards', value: formatSystemLinks(spawnData.vanguard_systems), inline: true },
@@ -82,7 +85,6 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
     ];
 
     if (routeFromLastHqString) {
-        fields.push({ name: '\u200B', value: '\u200B', inline: true }); // Spacer
         fields.push({ name: 'Route from Last HQ', value: routeFromLastHqString, inline: true });
     }
 
@@ -111,7 +113,7 @@ function buildNoIncursionEmbed(state) {
     if (state.endedTimestamp) {
         const windowOpen = state.endedTimestamp + (12 * 3600);
         const windowClose = windowOpen + (24 * 3600);
-        embed.addFields({ name: 'Next Spawn Window', value: `Opens: <t:${windowOpen}:R>\nCloses: <t:${windowClose}:R>` });
+        embed.addFields({ name: 'Next Spawn Window', value: `Opens: <t:${windowOpen}:F> (<t:${windowOpen}:R>)\nCloses: <t:${windowClose}:F> (<t:${windowClose}:R>)` });
     }
 
     if (state.lastIncursionStats) {
@@ -142,4 +144,7 @@ function buildNoIncursionEmbed(state) {
 }
 
 module.exports = { buildActiveIncursionEmbed, buildNoIncursionEmbed, formatDuration };
+
+
+
 
