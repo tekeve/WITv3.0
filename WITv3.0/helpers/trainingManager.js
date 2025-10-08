@@ -22,9 +22,21 @@ async function getAllPilots() {
         const pilots = await db.query('SELECT * FROM commander_training ORDER BY pilot_name ASC');
         // Process fields that are stored as JSON strings into actual arrays
         pilots.forEach(pilot => {
-            pilot.signoff_scouting = pilot.signoff_scouting ? JSON.parse(pilot.signoff_scouting) : [];
-            pilot.signoff_new_pilot_orientation = pilot.signoff_new_pilot_orientation ? JSON.parse(pilot.signoff_new_pilot_orientation) : [];
-            pilot.comments = pilot.comments ? JSON.parse(pilot.comments) : [];
+            // Make JSON parsing more robust to prevent crashes on malformed data.
+            try {
+                pilot.signoff_scouting = pilot.signoff_scouting ? JSON.parse(pilot.signoff_scouting) : [];
+                if (!Array.isArray(pilot.signoff_scouting)) pilot.signoff_scouting = [];
+            } catch { pilot.signoff_scouting = []; }
+
+            try {
+                pilot.signoff_new_pilot_orientation = pilot.signoff_new_pilot_orientation ? JSON.parse(pilot.signoff_new_pilot_orientation) : [];
+                if (!Array.isArray(pilot.signoff_new_pilot_orientation)) pilot.signoff_new_pilot_orientation = [];
+            } catch { pilot.signoff_new_pilot_orientation = []; }
+
+            try {
+                pilot.comments = pilot.comments ? JSON.parse(pilot.comments) : [];
+                if (!Array.isArray(pilot.comments)) pilot.comments = [];
+            } catch { pilot.comments = []; }
         });
         return pilots;
     } catch (error) {
@@ -92,12 +104,12 @@ async function updatePilotProgress(pilotId, field, value) {
     try {
         let setClauses = `\`${field}\` = ?, last_active = NOW()`;
         const params = [value, pilotId];
-        
+
         const sql = `UPDATE commander_training SET ${setClauses} WHERE pilot_id = ?`;
         await db.query(sql, params);
 
         const friendlyFieldName = field.replace(/_/g, ' ');
-        return { success: true, message: `Updated ${friendlyFieldName} for ${pilot.pilot_name}.`};
+        return { success: true, message: `Updated ${friendlyFieldName} for ${pilot.pilot_name}.` };
     } catch (error) {
         logger.error(`Failed to update pilot progress for pilotId ${pilotId}:`, error);
         return { success: false, message: 'Database update failed.' };
@@ -110,9 +122,10 @@ async function updatePilotProgress(pilotId, field, value) {
  * @param {string} field - The signoff field to update (e.g., 'signoff_scouting').
  * @param {string} commanderName - The name of the commander giving the signoff.
  * @param {string} comment - The comment for the signoff.
+ * @param {string} discordId - The Discord ID of the commander.
  * @returns {Promise<{success: boolean, message: string}>}
  */
-async function addSignoff(pilotId, field, commanderName, comment) {
+async function addSignoff(pilotId, field, commanderName, comment, discordId) {
     if (!allowedComplexSignoffFields.has(field)) {
         return { success: false, message: 'Invalid sign-off field specified.' };
     }
@@ -134,11 +147,14 @@ async function addSignoff(pilotId, field, commanderName, comment) {
         if (currentSignoffs.length >= 3) {
             return { success: false, message: 'This skill already has the maximum of 3 sign-offs.' };
         }
-        if (currentSignoffs.some(s => s.commander === commanderName)) {
+        // Check if the commander has already signed off using the new discordId property.
+        // The `s &&` check prevents errors if an old signoff record is not an object.
+        if (currentSignoffs.some(s => s && s.discordId === discordId)) {
             return { success: false, message: 'You have already signed off this pilot for this skill.' };
         }
 
         currentSignoffs.push({
+            discordId: discordId,
             commander: commanderName,
             comment: comment,
             date: new Date().toISOString()
@@ -160,10 +176,10 @@ async function addSignoff(pilotId, field, commanderName, comment) {
  * Removes a commander's specific signoff from a pilot's record.
  * @param {number} pilotId - The database ID of the pilot.
  * @param {string} field - The signoff field to update.
- * @param {string} commanderName - The name of the commander whose signoff to remove.
+ * @param {string} discordId - The Discord ID of the commander whose signoff to remove.
  * @returns {Promise<{success: boolean, message: string}>}
  */
-async function removeSignoff(pilotId, field, commanderName) {
+async function removeSignoff(pilotId, field, discordId) {
     if (!allowedComplexSignoffFields.has(field)) {
         return { success: false, message: 'Invalid sign-off field specified.' };
     }
@@ -183,7 +199,9 @@ async function removeSignoff(pilotId, field, commanderName) {
         }
 
         const initialLength = currentSignoffs.length;
-        const updatedSignoffs = currentSignoffs.filter(s => s.commander !== commanderName);
+        // Filter out the commander's signoff using the unique discordId.
+        // The `s &&` check prevents errors if an old signoff record is not an object.
+        const updatedSignoffs = currentSignoffs.filter(s => s && s.discordId !== discordId);
 
         if (updatedSignoffs.length === initialLength) {
             return { success: false, message: `Your sign-off was not found for ${pilot.pilot_name} on this skill.` };
@@ -207,9 +225,10 @@ async function removeSignoff(pilotId, field, commanderName) {
  * @param {number} pilotId - The database ID of the pilot.
  * @param {string} comment - The comment text.
  * @param {string} commanderName - The name of the commander leaving the comment.
+ * @param {string} discordId - The Discord ID of the commander.
  * @returns {Promise<{success: boolean, message: string}>}
  */
-async function addComment(pilotId, comment, commanderName) {
+async function addComment(pilotId, comment, commanderName, discordId) {
     if (!pilotId || !comment || !commanderName) {
         return { success: false, message: 'Missing required information for comment.' };
     }
@@ -230,6 +249,7 @@ async function addComment(pilotId, comment, commanderName) {
         }
 
         currentComments.push({
+            discordId: discordId,
             commander: commanderName,
             comment: comment,
             date: new Date().toISOString()

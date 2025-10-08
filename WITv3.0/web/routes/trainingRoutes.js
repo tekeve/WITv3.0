@@ -8,17 +8,16 @@ const trainingController = require('../controllers/trainingController');
  * @returns The configured Express router.
  */
 module.exports = (client) => {
-    // Route to display the tracker
-    router.get('/training/:token', trainingController.showTracker(client));
+    // Route to display the tracker page (matches GET /training/:token)
+    router.get('/:token', trainingController.showTracker(client));
 
-    // API routes for interaction (namespaced for clarity)
-    router.post('/training/api/add-resident/:token', trainingController.addResident(client));
-    router.post('/training/api/update/:token', trainingController.updateProgress(client));
-    router.post('/training/api/add-comment/:token', trainingController.addComment(client));
-    router.get('/training/api/pilots/:token', trainingController.getPilotsData(client));
-    router.post('/training/api/add-signoff/:token', trainingController.addSignoff(client));
-    router.post('/training/api/remove-signoff/:token', trainingController.removeSignoff(client));
+    // API routes are now relative to /training (e.g., /training/api/update/:token)
+    router.post('/api/add-resident/:token', trainingController.addResident(client));
+    router.post('/api/update/:token', trainingController.updateProgress(client));
+    router.post('/api/add-comment/:token', trainingController.addComment(client));
+    router.get('/api/pilots/:token', trainingController.getPilotsData(client));
+    router.post('/api/add-signoff/:token', trainingController.addSignoff(client));
+    router.post('/api/remove-signoff/:token', trainingController.removeSignoff(client));
 
     return router;
 };
-

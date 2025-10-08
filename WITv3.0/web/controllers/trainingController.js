@@ -44,6 +44,7 @@ exports.showTracker = (client) => [
             const { member } = req.tokenData;
             const commanderChar = await charManager.getChars(member.id);
             const commanderName = commanderChar?.main?.character_name || member.user.tag;
+            const commanderDiscordId = member.id; // Pass the Discord ID to the frontend
 
             const io = req.app.get('io');
             if (io) {
@@ -56,6 +57,7 @@ exports.showTracker = (client) => [
                 token: req.params.token,
                 pilots,
                 commanderName,
+                commanderDiscordId, // Pass ID to EJS template
                 permissions: {
                     canEdit: roleManager.hasPermission(member, ['line_commander', 'admin']),
                     canAddResidents: roleManager.hasPermission(member, ['council', 'admin'])
@@ -145,10 +147,11 @@ exports.addComment = (client) => [
         }
 
         try {
-            const commanderChar = await charManager.getChars(req.tokenData.user.id);
+            const discordId = req.tokenData.user.id;
+            const commanderChar = await charManager.getChars(discordId);
             const commanderName = commanderChar?.main?.character_name || req.tokenData.user.tag;
 
-            const result = await trainingManager.addComment(pilotId, comment, commanderName);
+            const result = await trainingManager.addComment(pilotId, comment, commanderName, discordId);
             if (result.success && io) {
                 io.emit('training-update');
             }
@@ -192,10 +195,11 @@ exports.addSignoff = (client) => [
         }
 
         try {
-            const commanderChar = await charManager.getChars(req.tokenData.user.id);
+            const discordId = req.tokenData.user.id;
+            const commanderChar = await charManager.getChars(discordId);
             const commanderName = commanderChar?.main?.character_name || req.tokenData.user.tag;
 
-            const result = await trainingManager.addSignoff(pilotId, field, commanderName, comment);
+            const result = await trainingManager.addSignoff(pilotId, field, commanderName, comment, discordId);
             if (result.success && io) {
                 io.emit('training-update');
             }
@@ -222,10 +226,9 @@ exports.removeSignoff = (client) => [
         }
 
         try {
-            const commanderChar = await charManager.getChars(req.tokenData.user.id);
-            const commanderName = commanderChar?.main?.character_name || req.tokenData.user.tag;
+            const discordId = req.tokenData.user.id;
 
-            const result = await trainingManager.removeSignoff(pilotId, field, commanderName);
+            const result = await trainingManager.removeSignoff(pilotId, field, discordId);
             if (result.success && io) {
                 io.emit('training-update');
             }

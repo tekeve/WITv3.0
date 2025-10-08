@@ -219,6 +219,7 @@
     // --- GLOBAL STATE ---
     const token = "<%= token %>";
     const commanderName = "<%= commanderName %>";
+    const commanderDiscordId = "<%= commanderDiscordId %>";
     const permissions = <%- JSON.stringify(permissions) %>;
     let pilotsData = <%- JSON.stringify(pilots) %>;
 
@@ -266,7 +267,7 @@
         let dotsHTML = '';
         for (let i = 0; i < 3; i++) {
             if (signoffs[i]) {
-                const dotClass = signoffs[i].commander === commanderName ? 'mine' : 'filled';
+                const dotClass = signoffs[i].discordId === commanderDiscordId ? 'mine' : 'filled';
                 dotsHTML += `<div class="signoff-dot ${dotClass}" title="${signoffs[i].commander}"></div>`;
             } else {
                 dotsHTML += `<div class="signoff-dot"></div>`;
@@ -584,7 +585,7 @@
         removeAction.style.display = 'none';
 
         if (permissions.canEdit) {
-            const hasSignedOff = signoffs.some(s => s.commander === commanderName);
+            const hasSignedOff = signoffs.some(s => s.discordId === commanderDiscordId);
             if (hasSignedOff) {
                 removeAction.style.display = 'block';
             } else if (signoffs.length < 3) {
@@ -599,4 +600,3 @@
 
 </body>
 </html>
-

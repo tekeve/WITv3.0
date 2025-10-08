@@ -58,7 +58,7 @@ function startServer(client) {
     app.use('/', embedRoutes(client));
     app.use('/', logiRoutes(client, io)); // logiRoutes still needs io passed directly for its own emits
     app.use('/', reactionRoleRoutes(client));
-    app.use('/', trainingRoutes(client)); // trainingRoutes will get io from the app instance
+    app.use('/training', trainingRoutes(client)); // Mount the training router at the /training path
     app.use('/', quizRoutes(client));
     app.use('/', quizManagerRoutes(client));
 
