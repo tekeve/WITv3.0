@@ -86,13 +86,14 @@ async function addResident(pilotName, discordId) {
 
 /**
  * Updates a simple field for a pilot in the training tracker (dates, booleans, text).
+ * Also updates the `last_active` date.
  * @param {number} pilotId - The database ID of the pilot.
  * @param {string} field - The name of the field to update.
  * @param {any} value - The new value for the field.
  * @returns {Promise<{success: boolean, message: string}>}
  */
 async function updatePilotProgress(pilotId, field, value) {
-    if (!allowedSimpleFields.has(field)) {
+    if (!allowedSimpleFields.has(field) && !field.startsWith('quiz_')) { // Allow all quiz fields
         return { success: false, message: 'Invalid field specified for simple update.' };
     }
 
@@ -102,11 +103,8 @@ async function updatePilotProgress(pilotId, field, value) {
     }
 
     try {
-        let setClauses = `\`${field}\` = ?, last_active = NOW()`;
-        const params = [value, pilotId];
-
-        const sql = `UPDATE commander_training SET ${setClauses} WHERE pilot_id = ?`;
-        await db.query(sql, params);
+        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = UTC_DATE() WHERE pilot_id = ?`;
+        await db.query(sql, [value, pilotId]);
 
         const friendlyFieldName = field.replace(/_/g, ' ');
         return { success: true, message: `Updated ${friendlyFieldName} for ${pilot.pilot_name}.` };
@@ -115,6 +113,28 @@ async function updatePilotProgress(pilotId, field, value) {
         return { success: false, message: 'Database update failed.' };
     }
 }
+
+/**
+ * Updates just the last_active timestamp for a pilot.
+ * @param {number} pilotId - The database ID of the pilot.
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+async function updateLastActive(pilotId) {
+    const [pilot] = await db.query('SELECT pilot_name FROM commander_training WHERE pilot_id = ?', [pilotId]);
+    if (!pilot) {
+        return { success: false, message: 'Pilot not found.' };
+    }
+
+    try {
+        const sql = `UPDATE commander_training SET last_active = UTC_DATE() WHERE pilot_id = ?`;
+        await db.query(sql, [pilotId]);
+        return { success: true, message: `Updated last active time for ${pilot.pilot_name}.` };
+    } catch (error) {
+        logger.error(`Failed to update last active for pilotId ${pilotId}:`, error);
+        return { success: false, message: 'Database update failed.' };
+    }
+}
+
 
 /**
  * Adds a detailed signoff to a pilot's training record.
@@ -160,7 +180,7 @@ async function addSignoff(pilotId, field, commanderName, comment, discordId) {
             date: new Date().toISOString()
         });
         const updatedValue = JSON.stringify(currentSignoffs);
-        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = NOW() WHERE pilot_id = ?`;
+        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = UTC_DATE() WHERE pilot_id = ?`;
         await db.query(sql, [updatedValue, pilotId]);
 
         const friendlyFieldName = field.replace('signoff_', '').replace(/_/g, ' ');
@@ -208,7 +228,7 @@ async function removeSignoff(pilotId, field, discordId) {
         }
 
         const updatedValue = JSON.stringify(updatedSignoffs);
-        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = NOW() WHERE pilot_id = ?`;
+        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = UTC_DATE() WHERE pilot_id = ?`;
         await db.query(sql, [updatedValue, pilotId]);
 
         const friendlyFieldName = field.replace('signoff_', '').replace(/_/g, ' ');
@@ -255,7 +275,7 @@ async function addComment(pilotId, comment, commanderName, discordId) {
             date: new Date().toISOString()
         });
 
-        const sql = 'UPDATE commander_training SET comments = ?, last_active = NOW() WHERE pilot_id = ?';
+        const sql = 'UPDATE commander_training SET comments = ?, last_active = UTC_DATE() WHERE pilot_id = ?';
         await db.query(sql, [JSON.stringify(currentComments), pilotId]);
 
         return { success: true, message: 'Comment added successfully.' };
@@ -295,7 +315,6 @@ module.exports = {
     addComment,
     updateTrustedLogiStatus,
     addSignoff,
-    removeSignoff
+    removeSignoff,
+    updateLastActive
 };
-
-

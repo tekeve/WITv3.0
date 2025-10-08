@@ -77,7 +77,9 @@ exports.getQuizData = (client) => [
                 return res.json({ success: true, quiz, questions: [] });
             }
 
-            const answers = await db.query(`SELECT answer_id, question_id, answer_text FROM quiz_answers WHERE question_id IN (${questionIds.join(',')})`);
+            // FIX: Dynamically create placeholders for the IN clause to avoid argument mismatch.
+            const placeholders = questionIds.map(() => '?').join(',');
+            const answers = await db.query(`SELECT * FROM quiz_answers WHERE question_id IN (${placeholders})`, questionIds);
 
             // Attach answers to their respective questions and shuffle them
             questions.forEach(q => {
@@ -117,18 +119,16 @@ exports.handleQuizSubmission = (client) => [
                 return res.status(404).json({ success: false, message: 'Quiz not found.' });
             }
 
-            // --- FIX: Select question_type for grading logic ---
             const questions = await db.query('SELECT question_id, question_type FROM quiz_questions WHERE quiz_id = ?', [quizId]);
             const questionIds = questions.map(q => q.question_id);
 
             if (questionIds.length === 0) {
-                // If passed, update the commander training tracker
+                // Even with no questions, if we pass, update the tracker.
                 if (quiz.update_field) {
                     const [pilot] = await db.query('SELECT pilot_id FROM commander_training WHERE discord_id = ?', [user.id]);
                     if (pilot) {
-                        await trainingManager.updatePilotProgress(pilot.pilot_id, quiz.update_field, true);
-                        // If the update was successful and io is available, emit the update event
-                        if (io) {
+                        const result = await trainingManager.updatePilotProgress(pilot.pilot_id, quiz.update_field, true);
+                        if (result.success && io) {
                             io.emit('training-update');
                         }
                     }
@@ -137,7 +137,9 @@ exports.handleQuizSubmission = (client) => [
             }
 
             // --- START: Reworked Grading Logic ---
-            const correctAnswersFromDb = await db.query(`SELECT question_id, answer_id FROM quiz_answers WHERE question_id IN (${questionIds.join(',')}) AND is_correct = 1`);
+            // FIX: Dynamically create placeholders for the IN clause to avoid argument mismatch.
+            const placeholders = questionIds.map(() => '?').join(',');
+            const correctAnswersFromDb = await db.query(`SELECT question_id, answer_id FROM quiz_answers WHERE question_id IN (${placeholders}) AND is_correct = 1`, questionIds);
 
             // Group correct answers by question ID for efficient lookup
             const correctAnswersMap = new Map();
@@ -145,77 +147,57 @@ exports.handleQuizSubmission = (client) => [
                 if (!correctAnswersMap.has(ans.question_id)) {
                     correctAnswersMap.set(ans.question_id, []);
                 }
-                // Store answer_id as a string for consistent comparison
                 correctAnswersMap.get(ans.question_id).push(ans.answer_id.toString());
             });
 
             let correctCount = 0;
-
-            // Iterate through each question of the quiz to grade it
             questions.forEach(question => {
                 const questionId = question.question_id;
                 const questionType = question.question_type;
-                const userSubmission = userAnswers[questionId]; // This is either a string or an array of strings
+                const userSubmission = userAnswers[questionId];
                 const correctDbAnswers = correctAnswersMap.get(questionId) || [];
 
                 if (questionType === 'multiple') {
-                    // Ensure user submission is an array and sort both arrays for comparison
                     const submittedAnswers = Array.isArray(userSubmission) ? userSubmission.sort() : [];
                     const correctAnswersSorted = correctDbAnswers.sort();
-
-                    // The answer is correct only if the submitted array is identical to the correct answer array
                     if (submittedAnswers.length === correctAnswersSorted.length && JSON.stringify(submittedAnswers) === JSON.stringify(correctAnswersSorted)) {
                         correctCount++;
                     }
-                } else { // 'single' choice question
-                    // For a single choice question, correctDbAnswers will be an array with one element, e.g., ['123']
-                    // The userSubmission will be a single string, e.g., '123'
+                } else { // 'single'
                     if (correctDbAnswers.length === 1 && userSubmission === correctDbAnswers[0]) {
                         correctCount++;
                     }
                 }
             });
-            // --- END: Reworked Grading Logic ---
 
             const totalQuestions = questions.length;
             const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 100;
             const passed = score >= quiz.pass_mark_percentage;
 
-            // Save the attempt to the database
             await db.query(
                 'INSERT INTO quiz_attempts (discord_id, quiz_id, score, passed, timestamp) VALUES (?, ?, ?, ?, NOW())',
                 [user.id, quizId, score, passed]
             );
 
-            // Find the pilot record to update their status
+            // Consolidated logic to update training tracker
             const [pilot] = await db.query('SELECT pilot_id FROM commander_training WHERE discord_id = ?', [user.id]);
-
             if (pilot) {
-                let updated = false;
+                let result;
+                // If the quiz was passed and has an associated field to update, do a full update.
                 if (passed && quiz.update_field) {
-                    // This function also updates last_active
-                    const result = await trainingManager.updatePilotProgress(pilot.pilot_id, quiz.update_field, true);
-                    if (result.success) {
-                        updated = true;
-                    }
+                    result = await trainingManager.updatePilotProgress(pilot.pilot_id, quiz.update_field, true);
                 } else {
-                    // If not passed, or no update field, just update last_active
-                    const result = await trainingManager.updateLastActive(pilot.pilot_id);
-                    if (result.success) {
-                        updated = true;
-                    }
+                    // Otherwise (if failed, or passed but no update field), just update the last active time.
+                    result = await trainingManager.updateLastActive(pilot.pilot_id);
                 }
 
-                if (updated && io) {
+                // If any update was successful, notify clients.
+                if (result && result.success && io) {
                     io.emit('training-update');
                 }
             } else {
                 logger.warn(`Could not find commander_training record for Discord ID ${user.id} to update quiz status.`);
             }
-
-            // Do not invalidate the token, allow user to take more quizzes.
-            // The token will expire naturally based on the timeout set in the command file.
-            // client.activeQuizTokens.delete(req.params.token);
 
             res.json({
                 success: true,
