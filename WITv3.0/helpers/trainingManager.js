@@ -4,7 +4,7 @@ const charManager = require('@helpers/characterManager');
 
 // A set of fields that are allowed to be updated via the simple update route
 const allowedSimpleFields = new Set([
-    'start_date', 'last_active', 'resident_orientation_by',
+    'last_active', 'resident_orientation_by',
     'signoff_bastion', 'exam_multiple_choice', 'exam_ct'
 ]);
 
@@ -67,7 +67,7 @@ async function addResident(pilotName, discordId) {
         }
 
         // Add to the training table with today's date as start and last active
-        const sql = 'INSERT INTO commander_training (pilot_name, discord_id, start_date, last_active) VALUES (?, ?, CURDATE(), CURDATE())';
+        const sql = 'INSERT INTO commander_training (pilot_name, discord_id, start_date, last_active) VALUES (?, ?, UTC_DATE(), UTC_DATE())';
         const result = await db.query(sql, [pilotName, discordId]);
 
         if (result.affectedRows > 0) {
@@ -297,4 +297,5 @@ module.exports = {
     addSignoff,
     removeSignoff
 };
+
 

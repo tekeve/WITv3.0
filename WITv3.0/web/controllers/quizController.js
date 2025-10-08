@@ -126,7 +126,11 @@ exports.handleQuizSubmission = (client) => [
                 if (quiz.update_field) {
                     const [pilot] = await db.query('SELECT pilot_id FROM commander_training WHERE discord_id = ?', [user.id]);
                     if (pilot) {
-                        await trainingManager.updatePilotProgress(pilot.pilot_id, quiz.update_field, true, 'System (Quiz)');
+                        await trainingManager.updatePilotProgress(pilot.pilot_id, quiz.update_field, true);
+                        // If the update was successful and io is available, emit the update event
+                        if (io) {
+                            io.emit('training-update');
+                        }
                     }
                 }
                 return res.json({ success: true, message: 'This quiz has no questions. Marked as complete.', score: 100, passed: true, totalQuestions: 0, correctCount: 0, passMark: quiz.pass_mark_percentage, quizName: quiz.name });
@@ -183,22 +187,30 @@ exports.handleQuizSubmission = (client) => [
                 [user.id, quizId, score, passed]
             );
 
-            // If passed, update the commander training tracker
-            if (passed) {
-                const updateField = quiz.update_field;
-                if (updateField) {
-                    // Manually find the pilot_id to pass to trainingManager for a more direct update
-                    const [pilot] = await db.query('SELECT pilot_id FROM commander_training WHERE discord_id = ?', [user.id]);
-                    if (pilot) {
-                        await trainingManager.updatePilotProgress(pilot.pilot_id, updateField, true, 'System (Quiz)');
-                        // If the update was successful and io is available, emit the update event
-                        if (io) {
-                            io.emit('training-update');
-                        }
-                    } else {
-                        logger.warn(`Could not find commander_training record for Discord ID ${user.id} to update quiz status.`);
+            // Find the pilot record to update their status
+            const [pilot] = await db.query('SELECT pilot_id FROM commander_training WHERE discord_id = ?', [user.id]);
+
+            if (pilot) {
+                let updated = false;
+                if (passed && quiz.update_field) {
+                    // This function also updates last_active
+                    const result = await trainingManager.updatePilotProgress(pilot.pilot_id, quiz.update_field, true);
+                    if (result.success) {
+                        updated = true;
+                    }
+                } else {
+                    // If not passed, or no update field, just update last_active
+                    const result = await trainingManager.updateLastActive(pilot.pilot_id);
+                    if (result.success) {
+                        updated = true;
                     }
                 }
+
+                if (updated && io) {
+                    io.emit('training-update');
+                }
+            } else {
+                logger.warn(`Could not find commander_training record for Discord ID ${user.id} to update quiz status.`);
             }
 
             // Do not invalidate the token, allow user to take more quizzes.
@@ -221,5 +233,4 @@ exports.handleQuizSubmission = (client) => [
         }
     }
 ];
-
 
