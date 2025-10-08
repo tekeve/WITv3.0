@@ -2,9 +2,9 @@
 const db = require('@helpers/database');
 
 /**
- * Renders the quiz manager page.
+ * Renders the quiz management dashboard.
  */
-exports.showManager = (client) => async (req, res) => {
+exports.showDashboard = (client) => async (req, res) => {
     const { token } = req.params;
     const tokenData = client.activeQuizManagerTokens?.get(token);
 
@@ -13,48 +13,68 @@ exports.showManager = (client) => async (req, res) => {
     }
 
     try {
-        const { mode, quizId, quizName } = tokenData;
+        const quizzes = await db.query('SELECT quiz_id, name, pass_mark_percentage, category FROM quizzes ORDER BY category, name ASC');
+        res.render('quizDashboard', {
+            token,
+            quizzes
+        });
+    } catch (error) {
+        logger.error('Error fetching quizzes for dashboard:', error);
+        res.status(500).render('error', { title: 'Server Error', message: 'Could not load quiz data from the database.' });
+    }
+};
+
+/**
+ * Renders the quiz editor for creating or editing a quiz.
+ */
+exports.showEditor = (client) => async (req, res) => {
+    const { token, quizId } = req.params;
+    const tokenData = client.activeQuizManagerTokens?.get(token);
+
+    if (!tokenData) {
+        return res.status(403).render('error', { title: 'Link Invalid', message: 'This quiz management link is invalid or has expired.' });
+    }
+
+    try {
+        const mode = quizId ? 'edit' : 'create';
         let quizData = {
-            name: quizName,
+            name: '',
             pass_mark_percentage: 80,
-            update_field: '',
+            category: 'resident',
             questions: []
         };
 
-        if (mode === 'edit' && quizId) {
+        if (mode === 'edit') {
             const [quizInfo] = await db.query('SELECT * FROM quizzes WHERE quiz_id = ?', [quizId]);
             if (quizInfo) {
                 quizData = { ...quizData, ...quizInfo };
                 const questions = await db.query('SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY order_index ASC, question_id ASC', [quizId]);
-                const questionIds = questions.map(q => q.question_id);
-                if (questionIds.length > 0) {
-                    const answers = await db.query(`SELECT * FROM quiz_answers WHERE question_id IN (${questionIds.join(',')}) ORDER BY order_index ASC, answer_id ASC`);
+                if (questions.length > 0) {
+                    const questionIds = questions.map(q => q.question_id);
+                    const placeholders = questionIds.map(() => '?').join(',');
+                    const answers = await db.query(`SELECT * FROM quiz_answers WHERE question_id IN (${placeholders}) ORDER BY order_index ASC, answer_id ASC`, questionIds);
                     questions.forEach(q => {
                         q.answers = answers.filter(a => a.question_id === q.question_id);
                     });
                 }
                 quizData.questions = questions;
+            } else {
+                return res.status(404).render('error', { title: 'Not Found', message: 'The quiz you are trying to edit does not exist.' });
             }
         }
 
-        // Fetch commander_training columns to populate the "Update Field" dropdown
-        const trainingColumns = await db.query("SHOW COLUMNS FROM commander_training");
-        const updateFields = trainingColumns
-            .map(c => c.Field)
-            .filter(f => f.startsWith('quiz_'));
-
-        res.render('quizManager', {
+        res.render('quizEditor', {
             token,
             quizData,
-            mode,
-            updateFields
+            mode
         });
 
     } catch (error) {
-        logger.error('Error preparing quiz manager page:', error);
+        logger.error('Error preparing quiz editor page:', error);
         res.status(500).render('error', { title: 'Server Error', message: 'Could not load quiz data from the database.' });
     }
 };
+
 
 /**
  * Handles submission from the quiz manager.
@@ -66,27 +86,23 @@ exports.handleManagerSubmission = (client) => async (req, res) => {
     if (!tokenData) {
         return res.status(403).render('error', { title: 'Link Expired', message: 'This form has expired. Your changes were not saved.' });
     }
-    client.activeQuizManagerTokens.delete(token);
 
-    const { interaction, mode } = tokenData;
-    const { quiz, questions = {}, deleted_questions, deleted_answers } = req.body;
+    const { interaction } = tokenData;
+    const { quizId, quiz, questions = {}, deleted_questions, deleted_answers } = req.body;
 
-    const connection = await db.pool.getConnection(); // Use a transaction
+    const connection = await db.pool.getConnection();
 
     try {
         await connection.beginTransaction();
 
-        // 1. Upsert Quiz Info
-        let quizId;
-        if (mode === 'create') {
-            const [result] = await connection.query('INSERT INTO quizzes (name, pass_mark_percentage, update_field) VALUES (?, ?, ?)', [quiz.name, quiz.pass_mark_percentage, quiz.update_field]);
-            quizId = result.insertId;
-        } else { // 'edit'
-            quizId = tokenData.quizId;
-            await connection.query('UPDATE quizzes SET name = ?, pass_mark_percentage = ?, update_field = ? WHERE quiz_id = ?', [quiz.name, quiz.pass_mark_percentage, quiz.update_field, quizId]);
+        let currentQuizId = quizId;
+        if (!currentQuizId) { // Create
+            const [result] = await connection.query('INSERT INTO quizzes (name, pass_mark_percentage, category) VALUES (?, ?, ?)', [quiz.name, quiz.pass_mark_percentage, quiz.category]);
+            currentQuizId = result.insertId;
+        } else { // Edit
+            await connection.query('UPDATE quizzes SET name = ?, pass_mark_percentage = ?, category = ? WHERE quiz_id = ?', [quiz.name, quiz.pass_mark_percentage, quiz.category, currentQuizId]);
         }
 
-        // 2. Handle Deletions (Questions first due to ON DELETE CASCADE)
         const getIds = (value) => {
             if (!value) return [];
             return Array.isArray(value) ? value : [value];
@@ -94,52 +110,51 @@ exports.handleManagerSubmission = (client) => async (req, res) => {
 
         const questionIdsToDelete = getIds(deleted_questions);
         if (questionIdsToDelete.length > 0) {
-            await connection.query(`DELETE FROM quiz_questions WHERE question_id IN (?)`, [questionIdsToDelete]);
+            const placeholders = questionIdsToDelete.map(() => '?').join(',');
+            await connection.query(`DELETE FROM quiz_questions WHERE question_id IN (${placeholders})`, questionIdsToDelete);
         }
 
         const answerIdsToDelete = getIds(deleted_answers);
         if (answerIdsToDelete.length > 0) {
-            // This might try to delete answers already removed by the cascade, which is safe.
-            await connection.query(`DELETE FROM quiz_answers WHERE answer_id IN (?)`, [answerIdsToDelete]);
+            const placeholders = answerIdsToDelete.map(() => '?').join(',');
+            await connection.query(`DELETE FROM quiz_answers WHERE answer_id IN (${placeholders})`, answerIdsToDelete);
         }
 
-        // 3. Upsert Questions and Answers
-        const deletedQuestionIdsSet = new Set(questionIdsToDelete.map(id => String(id))); // For efficient lookup
-        for (const qKey in questions) {
-            // Server-side validation to prevent processing a deleted question
-            if (deletedQuestionIdsSet.has(qKey)) {
-                continue;
-            }
+        const deletedQuestionIdsSet = new Set(questionIdsToDelete.map(id => String(id)));
 
-            const questionData = questions[qKey];
-            const questionType = questionData.type || 'single';
-            const questionOrder = questionData.order_index || 0;
-            let questionId;
+        if (questions) {
+            for (const qKey in questions) {
+                if (deletedQuestionIdsSet.has(qKey)) continue;
 
-            if (qKey.startsWith('new_')) { // New Question
-                const [qResult] = await connection.query('INSERT INTO quiz_questions (quiz_id, question_text, question_type, order_index) VALUES (?, ?, ?, ?)', [quizId, questionData.text, questionType, questionOrder]);
-                questionId = qResult.insertId;
-            } else { // Existing Question
-                questionId = qKey;
-                await connection.query('UPDATE quiz_questions SET question_text = ?, question_type = ?, order_index = ? WHERE question_id = ?', [questionData.text, questionType, questionOrder, questionId]);
-            }
+                const questionData = questions[qKey];
+                const questionType = questionData.type || 'single';
+                const questionOrder = questionData.order_index || 0;
+                let questionId;
 
-            // Upsert Answers for this question
-            if (questionData.answers) {
-                for (const aKey in questionData.answers) {
-                    const answerData = questionData.answers[aKey];
-                    const answerOrder = answerData.order_index || 0;
-                    let isCorrect = false;
-                    if (questionType === 'multiple') {
-                        isCorrect = !!answerData.is_correct; // Comes as '1' from checkbox, or undefined
-                    } else { // 'single'
-                        isCorrect = (questionData.correct_answer === aKey);
-                    }
+                if (qKey.startsWith('new_')) {
+                    const [qResult] = await connection.query('INSERT INTO quiz_questions (quiz_id, question_text, question_type, order_index) VALUES (?, ?, ?, ?)', [currentQuizId, questionData.text, questionType, questionOrder]);
+                    questionId = qResult.insertId;
+                } else {
+                    questionId = qKey;
+                    await connection.query('UPDATE quiz_questions SET question_text = ?, question_type = ?, order_index = ? WHERE question_id = ?', [questionData.text, questionType, questionOrder, questionId]);
+                }
 
-                    if (aKey.startsWith('new_')) { // New Answer
-                        await connection.query('INSERT INTO quiz_answers (question_id, answer_text, is_correct, order_index) VALUES (?, ?, ?, ?)', [questionId, answerData.text, isCorrect, answerOrder]);
-                    } else { // Existing Answer
-                        await connection.query('UPDATE quiz_answers SET answer_text = ?, is_correct = ?, order_index = ? WHERE answer_id = ?', [answerData.text, isCorrect, answerOrder, aKey]);
+                if (questionData.answers) {
+                    for (const aKey in questionData.answers) {
+                        const answerData = questionData.answers[aKey];
+                        const answerOrder = answerData.order_index || 0;
+                        let isCorrect = false;
+                        if (questionType === 'multiple') {
+                            isCorrect = !!answerData.is_correct;
+                        } else {
+                            isCorrect = (questionData.correct_answer === aKey);
+                        }
+
+                        if (aKey.startsWith('new_')) {
+                            await connection.query('INSERT INTO quiz_answers (question_id, answer_text, is_correct, order_index) VALUES (?, ?, ?, ?)', [questionId, answerData.text, isCorrect, answerOrder]);
+                        } else {
+                            await connection.query('UPDATE quiz_answers SET answer_text = ?, is_correct = ?, order_index = ? WHERE answer_id = ?', [answerData.text, isCorrect, answerOrder, aKey]);
+                        }
                     }
                 }
             }
@@ -148,7 +163,8 @@ exports.handleManagerSubmission = (client) => async (req, res) => {
         await connection.commit();
         const successMsg = `Quiz '${quiz.name}' has been successfully saved.`;
         await interaction.followUp({ content: `✅ ${successMsg}`, ephemeral: true });
-        res.render('success', { title: 'Success!', message: successMsg });
+
+        res.redirect(`/quizmanager/${token}`);
 
     } catch (error) {
         await connection.rollback();
@@ -158,6 +174,40 @@ exports.handleManagerSubmission = (client) => async (req, res) => {
         res.status(500).render('error', { title: 'Database Error', message: errorMsg });
     } finally {
         connection.release();
+    }
+};
+
+/**
+ * Handles the deletion of a quiz.
+ */
+exports.handleDelete = (client) => async (req, res) => {
+    const { token, quizId } = req.params;
+    const tokenData = client.activeQuizManagerTokens?.get(token);
+
+    if (!tokenData) {
+        return res.status(403).render('error', { title: 'Link Expired', message: 'This form has expired. Your changes were not saved.' });
+    }
+
+    const { interaction } = tokenData;
+
+    try {
+        const [quiz] = await db.query('SELECT name FROM quizzes WHERE quiz_id = ?', [quizId]);
+        if (!quiz) {
+            return res.status(404).render('error', { title: 'Not Found', message: 'Quiz to delete was not found.' });
+        }
+
+        await db.query('DELETE FROM quizzes WHERE quiz_id = ?', [quizId]);
+
+        const successMsg = `Quiz '${quiz.name}' has been successfully deleted.`;
+        await interaction.followUp({ content: `✅ ${successMsg}`, ephemeral: true });
+
+        res.redirect(`/quizmanager/${token}`);
+
+    } catch (error) {
+        logger.error(`Error deleting quiz ${quizId}:`, error);
+        const errorMsg = `A database error occurred while deleting the quiz. Error: ${error.message}`;
+        await interaction.followUp({ content: `❌ ${errorMsg}`, ephemeral: true });
+        res.status(500).render('error', { title: 'Database Error', message: errorMsg });
     }
 };
 

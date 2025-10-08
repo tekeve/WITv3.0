@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quiz Manager</title>
+    <title>Quiz Editor</title>
     <style>
         :root {
             --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569;
@@ -13,7 +13,9 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 2rem; }
         .container { max-width: 900px; margin: auto; }
         .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 2rem; border: 1px solid var(--border-color); margin-bottom: 2rem; }
-        h1, h2 { color: #f8fafc; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-top: 0; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        h1 { margin: 0; color: #f8fafc; }
+        h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-top: 0; font-size: 1.25rem; color: #f8fafc;}
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         .full-width { grid-column: 1 / -1; }
         .readonly { background-color: var(--bg-tertiary) !important; cursor: not-allowed; }
@@ -21,10 +23,10 @@
         label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500; color: var(--text-secondary); }
         input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 0.75rem; border-radius: 0.375rem; background-color: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; }
         textarea { resize: vertical; min-height: 80px; }
-        button, .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 0.375rem; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
-        .btn-primary { background-color: var(--accent-blue); color: #fff; }
-        .btn-danger { background-color: var(--accent-red); color: #fff; }
-        .btn-secondary { background-color: var(--bg-tertiary); color: #fff; }
+        button, .btn, a.btn { padding: 0.75rem 1.5rem; border: none; border-radius: 0.375rem; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; text-decoration: none; display: inline-block; text-align: center; }
+        .btn-primary { background-color: var(--accent-blue); color: #fff; } .btn-primary:hover { background-color: #0ea5e9; }
+        .btn-danger { background-color: var(--accent-red); color: #fff; } .btn-danger:hover { background-color: #c53030; }
+        .btn-secondary { background-color: var(--bg-tertiary); color: #fff; } .btn-secondary:hover { background-color: #55667d; }
         .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
         
         .question-card { background-color: var(--bg-tertiary); padding: 1.5rem; border-radius: 0.5rem; margin-top: 1.5rem; }
@@ -35,46 +37,39 @@
         .answer-group input[type="text"] { flex-grow: 1; }
         .hidden-inputs { display: none; }
 
-        /* Styles for Drag and Drop */
-        .drag-handle {
-            cursor: move;
-            color: var(--text-secondary);
-            font-size: 1.5rem;
-            padding: 0 0.5rem;
-            user-select: none;
-        }
-        .question-header-left {
-            display: flex;
-            align-items: center;
-        }
-        .question-card.dragging, .answer-group.dragging {
-            opacity: 0.5;
-            border: 2px dashed var(--accent-blue);
-            background-color: #475569;
-        }
+        .drag-handle { cursor: move; color: var(--text-secondary); font-size: 1.5rem; padding: 0 0.5rem; user-select: none; }
+        .question-header-left { display: flex; align-items: center; }
+        .question-card.dragging, .answer-group.dragging { opacity: 0.5; border: 2px dashed var(--accent-blue); background-color: #475569; }
     </style>
 </head>
 <body>
 <div class="container">
-    <form id="quiz-form" action="/quizmanager/<%= token %>" method="POST">
+    <div class="header">
+        <h1><%= mode === 'edit' ? 'Edit Quiz' : 'Create New Quiz' %></h1>
+        <a href="/quizmanager/<%= token %>" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+
+    <form id="quiz-form" action="/quizmanager/<%= token %>/save" method="POST">
+        <% if (mode === 'edit') { %>
+            <input type="hidden" name="quizId" value="<%= quizData.quiz_id %>">
+        <% } %>
+
         <div class="panel">
-            <h1>Quiz Settings</h1>
+            <h2>Quiz Settings</h2>
             <div class="form-grid">
-                <div class="form-group full-width">
-                    <label for="quiz-name">Quiz Name</label>
-                    <input type="text" id="quiz-name" name="quiz[name]" value="<%= quizData.name %>" <%= mode === 'create' ? 'readonly class="readonly"' : '' %> required>
-                </div>
                 <div class="form-group">
+                    <label for="quiz-name">Quiz Name</label>
+                    <input type="text" id="quiz-name" name="quiz[name]" value="<%= quizData.name %>" required>
+                </div>
+                 <div class="form-group">
                     <label for="pass-mark">Pass Mark (%)</label>
                     <input type="number" name="quiz[pass_mark_percentage]" id="pass-mark" value="<%= quizData.pass_mark_percentage %>" min="0" max="100" required>
                 </div>
-                <div class="form-group">
-                    <label for="update-field">Tracker Field to Update on Pass</label>
-                    <select name="quiz[update_field]" id="update-field" required>
-                        <option value="" disabled <%= !quizData.update_field ? 'selected' : '' %>>Select a field...</option>
-                        <% updateFields.forEach(field => { %>
-                            <option value="<%= field %>" <%= quizData.update_field === field ? 'selected' : '' %>><%= field %></option>
-                        <% }); %>
+                <div class="form-group full-width">
+                    <label for="quiz-category">Quiz Category</label>
+                    <select name="quiz[category]" id="quiz-category" required>
+                        <option value="resident" <%= quizData.category === 'resident' ? 'selected' : '' %>>Resident Quiz</option>
+                        <option value="training_fc" <%= quizData.category === 'training_fc' ? 'selected' : '' %>>Training FC Quiz</option>
                     </select>
                 </div>
             </div>
@@ -186,7 +181,6 @@
                     answersList.appendChild(createAnswerElement(questionKey, questionType, answer));
                 });
             } else {
-                // Add two blank answers by default for new questions
                 answersList.appendChild(createAnswerElement(questionKey, questionType));
                 answersList.appendChild(createAnswerElement(questionKey, questionType));
             }
@@ -224,17 +218,16 @@
 
             return card;
         }
-
-        // --- DRAG AND DROP LOGIC ---
+        
         function updateOrderInputs() {
             const questionCards = questionsArea.querySelectorAll('.question-card');
             questionCards.forEach((card, index) => {
-                const orderInput = card.querySelector('.order-input');
+                const orderInput = card.querySelector('input[name*="[order_index]"]');
                 if (orderInput) orderInput.value = index;
                 
                 const answerGroups = card.querySelectorAll('.answer-group');
                 answerGroups.forEach((answer, answerIndex) => {
-                    const answerOrderInput = answer.querySelector('.order-input');
+                    const answerOrderInput = answer.querySelector('input[name*="[order_index]"]');
                     if (answerOrderInput) answerOrderInput.value = answerIndex;
                 });
             });
@@ -257,7 +250,6 @@
             if (e.target.classList.contains('drag-handle')) {
                 const draggableItem = e.target.closest('.question-card, .answer-group');
                 if (draggableItem) {
-                    // A tiny delay is needed for the browser to properly capture the drag image
                     setTimeout(() => {
                         draggableItem.classList.add('dragging');
                     }, 0);
@@ -276,14 +268,10 @@
         questionsArea.addEventListener('dragover', e => {
             const draggingElement = document.querySelector('.dragging');
             if (!draggingElement) return;
-
-            // Determine if we're dragging a question or an answer
-            const isQuestion = draggingElement.classList.contains('question-card');
             
-            // The container is either the main questions area or a specific answer list
+            const isQuestion = draggingElement.classList.contains('question-card');
             const container = isQuestion ? questionsArea : e.target.closest('.answers-list');
             
-            // Only allow dropping if the dragged item belongs in this container
             if (!container || !container.contains(draggingElement)) return;
             
             e.preventDefault();
@@ -296,8 +284,6 @@
             }
         });
 
-
-        // --- INITIALIZATION ---
         addQuestionBtn.addEventListener('click', () => {
             questionsArea.appendChild(createQuestionElement());
             updateOrderInputs();
@@ -309,9 +295,9 @@
             });
         }
 
-        // Set initial order on load
         updateOrderInputs();
     });
 </script>
 </body>
 </html>
+

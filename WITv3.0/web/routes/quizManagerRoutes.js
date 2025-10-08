@@ -8,11 +8,21 @@ const quizManagerController = require('../controllers/quizManagerController');
  * @returns The configured Express router.
  */
 module.exports = (client) => {
-    // Route to display the manager page
-    router.get('/quizmanager/:token', quizManagerController.showManager(client));
+    // Route to display the main dashboard
+    router.get('/quizmanager/:token', quizManagerController.showDashboard(client));
 
-    // Route to handle the form submission
-    router.post('/quizmanager/:token', quizManagerController.handleManagerSubmission(client));
+    // Route to show the editor for a new quiz
+    router.get('/quizmanager/:token/create', quizManagerController.showEditor(client));
+
+    // Route to show the editor for an existing quiz
+    router.get('/quizmanager/:token/edit/:quizId', quizManagerController.showEditor(client));
+
+    // Route to handle the form submission for both create and edit
+    router.post('/quizmanager/:token/save', quizManagerController.handleManagerSubmission(client));
+
+    // Route to handle deleting a quiz
+    router.post('/quizmanager/:token/delete/:quizId', quizManagerController.handleDelete(client));
 
     return router;
 };
+

@@ -8,16 +8,19 @@ const trainingController = require('../controllers/trainingController');
  * @returns The configured Express router.
  */
 module.exports = (client) => {
-    // Route to display the tracker page (matches GET /training/:token)
+    // Route to display the tracker page
     router.get('/:token', trainingController.showTracker(client));
 
-    // API routes are now relative to /training (e.g., /training/api/update/:token)
+    // API routes
     router.post('/api/add-resident/:token', trainingController.addResident(client));
-    router.post('/api/update/:token', trainingController.updateProgress(client));
+    router.post('/api/promote-to-tfc/:token', trainingController.promoteToTfc(client));
+    router.post('/api/update-resident/:token', trainingController.updateResidentProgress(client));
+    router.post('/api/update-tfc/:token', trainingController.updateTfcProgress(client));
     router.post('/api/add-comment/:token', trainingController.addComment(client));
-    router.get('/api/pilots/:token', trainingController.getPilotsData(client));
+    router.get('/api/data/:token', trainingController.getTrackerData(client));
     router.post('/api/add-signoff/:token', trainingController.addSignoff(client));
     router.post('/api/remove-signoff/:token', trainingController.removeSignoff(client));
 
     return router;
 };
+

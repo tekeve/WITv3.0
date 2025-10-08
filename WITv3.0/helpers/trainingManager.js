@@ -2,79 +2,97 @@ const db = require('@helpers/database');
 const logger = require('@helpers/logger');
 const charManager = require('@helpers/characterManager');
 
-// A set of fields that are allowed to be updated via the simple update route
-const allowedSimpleFields = new Set([
+const residentSimpleFields = new Set([
     'last_active', 'resident_orientation_by',
     'signoff_bastion', 'exam_multiple_choice', 'exam_ct'
 ]);
 
-// A set of fields that are managed via the detailed signoff functions
-const allowedComplexSignoffFields = new Set([
+const residentComplexSignoffFields = new Set([
     'signoff_scouting', 'signoff_new_pilot_orientation'
 ]);
 
+const tfcSimpleFields = new Set([
+    't1_tagging', 't1_voicing', 't1_waitlist',
+    't2_situational_awareness', 't2_evacuations',
+    'practice_fleet_speed', 'practice_system_awareness',
+    'competency_final', 'last_reported_active', 'special_notes'
+]);
+
 /**
- * Fetches all pilots from the commander_training table.
- * @returns {Promise<Array<object>>} A list of pilots with their training progress.
+ * Fetches all pilots and their associated training data.
+ * @returns {Promise<object>} An object containing resident and tfc data.
  */
-async function getAllPilots() {
+async function getAllTrackerData() {
     try {
-        const pilots = await db.query('SELECT * FROM commander_training ORDER BY pilot_name ASC');
-        // Process fields that are stored as JSON strings into actual arrays
-        pilots.forEach(pilot => {
-            // Make JSON parsing more robust to prevent crashes on malformed data.
-            try {
-                pilot.signoff_scouting = pilot.signoff_scouting ? JSON.parse(pilot.signoff_scouting) : [];
-                if (!Array.isArray(pilot.signoff_scouting)) pilot.signoff_scouting = [];
-            } catch { pilot.signoff_scouting = []; }
+        const residentsQuery = `
+            SELECT ct.*, GROUP_CONCAT(qc.quiz_id) as completed_quizzes
+            FROM commander_training ct
+            LEFT JOIN quiz_completions qc ON ct.discord_id = qc.discord_id
+            WHERE ct.status = 'resident'
+            GROUP BY ct.pilot_id
+            ORDER BY ct.pilot_name ASC;
+        `;
+        const residents = await db.query(residentsQuery);
 
-            try {
-                pilot.signoff_new_pilot_orientation = pilot.signoff_new_pilot_orientation ? JSON.parse(pilot.signoff_new_pilot_orientation) : [];
-                if (!Array.isArray(pilot.signoff_new_pilot_orientation)) pilot.signoff_new_pilot_orientation = [];
-            } catch { pilot.signoff_new_pilot_orientation = []; }
+        const tfcsQuery = `
+            SELECT ct.pilot_id, ct.pilot_name, ct.discord_id, ct.last_active, tfc.*, GROUP_CONCAT(qc.quiz_id) as completed_quizzes
+            FROM commander_training ct
+            JOIN training_fc_tracker tfc ON ct.pilot_id = tfc.pilot_id
+            LEFT JOIN quiz_completions qc ON ct.discord_id = qc.discord_id
+            WHERE ct.status = 'training_fc'
+            GROUP BY ct.pilot_id
+            ORDER BY ct.pilot_name ASC;
+        `;
+        const tfcs = await db.query(tfcsQuery);
 
-            try {
-                pilot.comments = pilot.comments ? JSON.parse(pilot.comments) : [];
-                if (!Array.isArray(pilot.comments)) pilot.comments = [];
-            } catch { pilot.comments = []; }
-        });
-        return pilots;
+        const processPilot = (pilot) => {
+            pilot.completed_quizzes = pilot.completed_quizzes ? pilot.completed_quizzes.split(',').map(Number) : [];
+            try { pilot.signoff_scouting = pilot.signoff_scouting ? JSON.parse(pilot.signoff_scouting) : []; } catch { pilot.signoff_scouting = []; }
+            try { pilot.signoff_new_pilot_orientation = pilot.signoff_new_pilot_orientation ? JSON.parse(pilot.signoff_new_pilot_orientation) : []; } catch { pilot.signoff_new_pilot_orientation = []; }
+            try { pilot.comments = pilot.comments ? JSON.parse(pilot.comments) : []; } catch { pilot.comments = []; }
+        };
+
+        const processTfc = (pilot) => {
+            pilot.completed_quizzes = pilot.completed_quizzes ? pilot.completed_quizzes.split(',').map(Number) : [];
+            try { pilot.comments = pilot.comments ? JSON.parse(pilot.comments) : []; } catch { pilot.comments = []; }
+        }
+
+        residents.forEach(processPilot);
+        tfcs.forEach(processTfc);
+
+        const nonTfcCommanders = await db.query(`
+            SELECT pilot_id, pilot_name 
+            FROM commander_training 
+            WHERE status IN ('line_commander', 'resident')
+            ORDER BY pilot_name ASC
+        `);
+
+        return { residents, tfcs, nonTfcCommanders };
     } catch (error) {
-        logger.error('Failed to get all pilots from training tracker:', error);
-        return [];
+        logger.error('Failed to get all tracker data:', error);
+        return { residents: [], tfcs: [], nonTfcCommanders: [] };
     }
 }
 
-/**
- * Adds a new resident to the training program.
- * @param {string} pilotName - The EVE character name of the pilot.
- * @param {string} discordId - The Discord ID of the user.
- * @returns {Promise<{success: boolean, message: string}>}
- */
 async function addResident(pilotName, discordId) {
     try {
-        // Check if the user is already in the training program
         const [existing] = await db.query('SELECT * FROM commander_training WHERE discord_id = ? OR pilot_name = ?', [discordId, pilotName]);
         if (existing) {
             return { success: false, message: 'This user or pilot name is already in the training program.' };
         }
 
-        // Register them as a main character if they aren't already
         const charData = await charManager.getChars(discordId);
         if (!charData || !charData.main) {
             await charManager.addMain(discordId, pilotName, []);
             logger.info(`Auto-registered ${pilotName} as a main character for discord ID ${discordId}`);
         }
 
-        // Add to the training table with today's date as start and last active
-        const sql = 'INSERT INTO commander_training (pilot_name, discord_id, start_date, last_active) VALUES (?, ?, UTC_DATE(), UTC_DATE())';
+        const sql = 'INSERT INTO commander_training (pilot_name, discord_id, start_date, last_active, status) VALUES (?, ?, UTC_DATE(), UTC_DATE(), \'resident\')';
         const result = await db.query(sql, [pilotName, discordId]);
 
-        if (result.affectedRows > 0) {
-            return { success: true, message: `Successfully added ${pilotName} to the training tracker.` };
-        } else {
-            return { success: false, message: 'Failed to add pilot to the database.' };
-        }
+        return result.affectedRows > 0
+            ? { success: true, message: `Successfully added ${pilotName} to the training tracker.` }
+            : { success: false, message: 'Failed to add pilot to the database.' };
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
             return { success: false, message: `A pilot with the name ${pilotName} or a user with that Discord ID is already in the training program.` };
@@ -84,214 +102,166 @@ async function addResident(pilotName, discordId) {
     }
 }
 
-/**
- * Updates a simple field for a pilot in the training tracker (dates, booleans, text).
- * Also updates the `last_active` date.
- * @param {number} pilotId - The database ID of the pilot.
- * @param {string} field - The name of the field to update.
- * @param {any} value - The new value for the field.
- * @returns {Promise<{success: boolean, message: string}>}
- */
-async function updatePilotProgress(pilotId, field, value) {
-    if (!allowedSimpleFields.has(field) && !field.startsWith('quiz_')) { // Allow all quiz fields
-        return { success: false, message: 'Invalid field specified for simple update.' };
-    }
+async function promoteToTfc(pilotId) {
+    const connection = await db.pool.getConnection();
+    try {
+        await connection.beginTransaction();
 
-    const [pilot] = await db.query('SELECT pilot_name FROM commander_training WHERE pilot_id = ?', [pilotId]);
-    if (!pilot) {
-        return { success: false, message: 'Pilot not found.' };
+        const [pilot] = await connection.query('SELECT status FROM commander_training WHERE pilot_id = ?', [pilotId]);
+        if (!pilot) {
+            throw new Error('Pilot not found.');
+        }
+        if (pilot.status === 'training_fc') {
+            return { success: false, message: 'Pilot is already a Training FC.' };
+        }
+
+        await connection.query("UPDATE commander_training SET status = 'training_fc', last_active = UTC_DATE() WHERE pilot_id = ?", [pilotId]);
+        await connection.query("INSERT INTO training_fc_tracker (pilot_id) VALUES (?) ON DUPLICATE KEY UPDATE pilot_id = pilot_id", [pilotId]);
+
+        await connection.commit();
+        return { success: true, message: 'Pilot has been promoted to Training FC.' };
+    } catch (error) {
+        await connection.rollback();
+        logger.error(`Error promoting pilot ${pilotId} to TFC:`, error);
+        return { success: false, message: 'A database error occurred during promotion.' };
+    } finally {
+        connection.release();
     }
+}
+
+async function updateResidentProgress(pilotId, field, value) {
+    if (!residentSimpleFields.has(field)) {
+        return { success: false, message: 'Invalid field specified for update.' };
+    }
+    return await updateLastActiveAndField('commander_training', pilotId, field, value);
+}
+
+async function updateTfcProgress(pilotId, field, value) {
+    if (!tfcSimpleFields.has(field)) {
+        return { success: false, message: 'Invalid field specified for update.' };
+    }
+    const table = (field === 'last_reported_active') ? 'training_fc_tracker' : 'training_fc_tracker';
+    const pilotName = await updateLastActive(pilotId);
+    if (!pilotName) return { success: false, message: 'Pilot not found.' };
 
     try {
-        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = UTC_DATE() WHERE pilot_id = ?`;
+        const sql = `UPDATE \`${table}\` SET \`${field}\` = ? WHERE pilot_id = ?`;
         await db.query(sql, [value, pilotId]);
-
-        const friendlyFieldName = field.replace(/_/g, ' ');
-        return { success: true, message: `Updated ${friendlyFieldName} for ${pilot.pilot_name}.` };
+        return { success: true, message: `Updated ${field.replace(/_/g, ' ')} for ${pilotName}.` };
     } catch (error) {
-        logger.error(`Failed to update pilot progress for pilotId ${pilotId}:`, error);
+        logger.error(`Failed to update TFC progress for pilotId ${pilotId}:`, error);
         return { success: false, message: 'Database update failed.' };
     }
 }
 
-/**
- * Updates just the last_active timestamp for a pilot.
- * @param {number} pilotId - The database ID of the pilot.
- * @returns {Promise<{success: boolean, message: string}>}
- */
 async function updateLastActive(pilotId) {
     const [pilot] = await db.query('SELECT pilot_name FROM commander_training WHERE pilot_id = ?', [pilotId]);
-    if (!pilot) {
-        return { success: false, message: 'Pilot not found.' };
-    }
+    if (!pilot) return null;
+    await db.query('UPDATE commander_training SET last_active = UTC_DATE() WHERE pilot_id = ?', [pilotId]);
+    return pilot.pilot_name;
+}
 
+async function updateLastActiveAndField(table, pilotId, field, value) {
+    const pilotName = await updateLastActive(pilotId);
+    if (!pilotName) return { success: false, message: 'Pilot not found.' };
     try {
-        const sql = `UPDATE commander_training SET last_active = UTC_DATE() WHERE pilot_id = ?`;
-        await db.query(sql, [pilotId]);
-        return { success: true, message: `Updated last active time for ${pilot.pilot_name}.` };
+        const sql = `UPDATE \`${table}\` SET \`${field}\` = ? WHERE pilot_id = ?`;
+        await db.query(sql, [value, pilotId]);
+        return { success: true, message: `Updated ${field.replace(/_/g, ' ')} for ${pilotName}.` };
     } catch (error) {
-        logger.error(`Failed to update last active for pilotId ${pilotId}:`, error);
+        logger.error(`Failed to update progress for pilotId ${pilotId}:`, error);
         return { success: false, message: 'Database update failed.' };
     }
 }
 
-
-/**
- * Adds a detailed signoff to a pilot's training record.
- * @param {number} pilotId - The database ID of the pilot.
- * @param {string} field - The signoff field to update (e.g., 'signoff_scouting').
- * @param {string} commanderName - The name of the commander giving the signoff.
- * @param {string} comment - The comment for the signoff.
- * @param {string} discordId - The Discord ID of the commander.
- * @returns {Promise<{success: boolean, message: string}>}
- */
 async function addSignoff(pilotId, field, commanderName, comment, discordId) {
-    if (!allowedComplexSignoffFields.has(field)) {
+    if (!residentComplexSignoffFields.has(field)) {
         return { success: false, message: 'Invalid sign-off field specified.' };
     }
     try {
         const [pilot] = await db.query(`SELECT pilot_name, \`${field}\` FROM commander_training WHERE pilot_id = ?`, [pilotId]);
-        if (!pilot) {
-            return { success: false, message: 'Pilot not found.' };
-        }
+        if (!pilot) return { success: false, message: 'Pilot not found.' };
 
-        let currentSignoffs = [];
-        try {
-            currentSignoffs = pilot[field] ? JSON.parse(pilot[field]) : [];
-            if (!Array.isArray(currentSignoffs)) currentSignoffs = [];
-        } catch (e) {
-            logger.warn(`Could not parse JSON for ${field} on pilot ${pilotId}. Resetting.`);
-            currentSignoffs = [];
-        }
+        let currentSignoffs = pilot[field] ? JSON.parse(pilot[field]) : [];
+        if (!Array.isArray(currentSignoffs)) currentSignoffs = [];
 
         if (currentSignoffs.length >= 3) {
             return { success: false, message: 'This skill already has the maximum of 3 sign-offs.' };
         }
-        // Check if the commander has already signed off using the new discordId property.
-        // The `s &&` check prevents errors if an old signoff record is not an object.
         if (currentSignoffs.some(s => s && s.discordId === discordId)) {
             return { success: false, message: 'You have already signed off this pilot for this skill.' };
         }
 
-        currentSignoffs.push({
-            discordId: discordId,
-            commander: commanderName,
-            comment: comment,
-            date: new Date().toISOString()
-        });
+        currentSignoffs.push({ discordId, commander: commanderName, comment, date: new Date().toISOString() });
         const updatedValue = JSON.stringify(currentSignoffs);
         const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = UTC_DATE() WHERE pilot_id = ?`;
         await db.query(sql, [updatedValue, pilotId]);
 
-        const friendlyFieldName = field.replace('signoff_', '').replace(/_/g, ' ');
-        return { success: true, message: `Sign-off for ${pilot.pilot_name} on ${friendlyFieldName} added.` };
-
+        return { success: true, message: `Sign-off for ${pilot.pilot_name} on ${field.replace(/_/g, ' ')} added.` };
     } catch (error) {
         logger.error(`Failed to add sign-off for pilotId ${pilotId}:`, error);
         return { success: false, message: 'Database error while adding sign-off.' };
     }
 }
 
-/**
- * Removes a commander's specific signoff from a pilot's record.
- * @param {number} pilotId - The database ID of the pilot.
- * @param {string} field - The signoff field to update.
- * @param {string} discordId - The Discord ID of the commander whose signoff to remove.
- * @returns {Promise<{success: boolean, message: string}>}
- */
 async function removeSignoff(pilotId, field, discordId) {
-    if (!allowedComplexSignoffFields.has(field)) {
+    if (!residentComplexSignoffFields.has(field)) {
         return { success: false, message: 'Invalid sign-off field specified.' };
     }
     try {
         const [pilot] = await db.query(`SELECT pilot_name, \`${field}\` FROM commander_training WHERE pilot_id = ?`, [pilotId]);
-        if (!pilot) {
-            return { success: false, message: 'Pilot not found.' };
-        }
+        if (!pilot) return { success: false, message: 'Pilot not found.' };
 
-        let currentSignoffs = [];
-        try {
-            currentSignoffs = pilot[field] ? JSON.parse(pilot[field]) : [];
-            if (!Array.isArray(currentSignoffs)) currentSignoffs = [];
-        } catch (e) {
-            logger.warn(`Could not parse JSON for ${field} on pilot ${pilotId}. No action taken.`);
-            return { success: false, message: 'Could not parse existing sign-off data.' };
-        }
+        let currentSignoffs = pilot[field] ? JSON.parse(pilot[field]) : [];
+        if (!Array.isArray(currentSignoffs)) currentSignoffs = [];
 
         const initialLength = currentSignoffs.length;
-        // Filter out the commander's signoff using the unique discordId.
-        // The `s &&` check prevents errors if an old signoff record is not an object.
         const updatedSignoffs = currentSignoffs.filter(s => s && s.discordId !== discordId);
 
         if (updatedSignoffs.length === initialLength) {
-            return { success: false, message: `Your sign-off was not found for ${pilot.pilot_name} on this skill.` };
+            return { success: false, message: 'Your sign-off was not found for this skill.' };
         }
 
         const updatedValue = JSON.stringify(updatedSignoffs);
         const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = UTC_DATE() WHERE pilot_id = ?`;
         await db.query(sql, [updatedValue, pilotId]);
 
-        const friendlyFieldName = field.replace('signoff_', '').replace(/_/g, ' ');
-        return { success: true, message: `Removed sign-off for ${pilot.pilot_name} on ${friendlyFieldName}.` };
+        return { success: true, message: `Removed sign-off for ${pilot.pilot_name} on ${field.replace(/_/g, ' ')}.` };
     } catch (error) {
         logger.error(`Failed to remove sign-off for pilotId ${pilotId}:`, error);
         return { success: false, message: 'Database error while removing sign-off.' };
     }
 }
 
-
-/**
- * Adds a comment to a pilot's training record.
- * @param {number} pilotId - The database ID of the pilot.
- * @param {string} comment - The comment text.
- * @param {string} commanderName - The name of the commander leaving the comment.
- * @param {string} discordId - The Discord ID of the commander.
- * @returns {Promise<{success: boolean, message: string}>}
- */
-async function addComment(pilotId, comment, commanderName, discordId) {
-    if (!pilotId || !comment || !commanderName) {
-        return { success: false, message: 'Missing required information for comment.' };
+async function addComment(pilotId, comment, commanderName, discordId, type) {
+    if (!pilotId || !comment || !commanderName || !type) {
+        return { success: false, message: 'Missing required information.' };
     }
 
+    const table = type === 'tfc' ? 'training_fc_tracker' : 'commander_training';
+
     try {
-        const [pilot] = await db.query('SELECT comments FROM commander_training WHERE pilot_id = ?', [pilotId]);
-        if (!pilot) {
-            return { success: false, message: 'Pilot not found.' };
-        }
+        const [pilot] = await db.query(`SELECT comments FROM ${table} WHERE pilot_id = ?`, [pilotId]);
+        if (!pilot) return { success: false, message: 'Pilot not found.' };
 
         let currentComments = [];
         try {
             currentComments = pilot.comments ? JSON.parse(pilot.comments) : [];
             if (!Array.isArray(currentComments)) currentComments = [];
-        } catch (e) {
-            logger.warn(`Could not parse comments JSON for pilot ${pilotId}. Resetting.`);
-            currentComments = [];
-        }
+        } catch (e) { currentComments = []; }
 
-        currentComments.push({
-            discordId: discordId,
-            commander: commanderName,
-            comment: comment,
-            date: new Date().toISOString()
-        });
+        currentComments.push({ discordId, commander: commanderName, comment, date: new Date().toISOString() });
 
-        const sql = 'UPDATE commander_training SET comments = ?, last_active = UTC_DATE() WHERE pilot_id = ?';
-        await db.query(sql, [JSON.stringify(currentComments), pilotId]);
+        await db.query(`UPDATE ${table} SET comments = ? WHERE pilot_id = ?`, [JSON.stringify(currentComments), pilotId]);
+        await updateLastActive(pilotId);
 
         return { success: true, message: 'Comment added successfully.' };
     } catch (error) {
-        logger.error(`Failed to add comment for pilotId ${pilotId}:`, error);
+        logger.error(`Failed to add comment for pilotId ${pilotId} in ${table}:`, error);
         return { success: false, message: 'Database error while adding comment.' };
     }
 }
 
-
-/**
- * Updates a pilot's trusted logi status. Called by the sync manager.
- * @param {string} pilotName - The EVE character name of the pilot.
- * @param {boolean} isTrusted - The new trusted status.
- * @returns {Promise<{success: boolean, message?: string}>}
- */
 async function updateTrustedLogiStatus(pilotName, isTrusted) {
     try {
         const sql = 'UPDATE commander_training SET signoff_trusted_logi = ? WHERE pilot_name = ?';
@@ -307,14 +277,16 @@ async function updateTrustedLogiStatus(pilotName, isTrusted) {
     }
 }
 
-
 module.exports = {
-    getAllPilots,
+    getAllTrackerData,
     addResident,
-    updatePilotProgress,
+    promoteToTfc,
+    updateResidentProgress,
+    updateTfcProgress,
     addComment,
-    updateTrustedLogiStatus,
     addSignoff,
     removeSignoff,
-    updateLastActive
+    updateLastActive,
+    updateTrustedLogiStatus
 };
+

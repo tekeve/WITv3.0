@@ -3,6 +3,8 @@ const trainingManager = require('@helpers/trainingManager');
 const roleManager = require('@helpers/roleManager');
 const charManager = require('@helpers/characterManager');
 const { syncLogiStatus } = require('@helpers/trainingSyncManager');
+const db = require('@helpers/database');
+
 
 /**
  * Middleware to validate the token and user permissions for all training routes.
@@ -21,7 +23,14 @@ const validateTokenAndPermissions = (client, requiredPermission = 'commander') =
         return res.status(403).render('error', { title: 'Link Invalid', message: 'This link is invalid or has expired.' });
     }
 
-    if (!roleManager.hasPermission(tokenData.member, [requiredPermission, 'admin'])) {
+    // Use isCouncilOrHigher for this specific check, otherwise use the general permission check.
+    const isPromoteRoute = req.path.includes('/api/promote-to-tfc');
+    const hasRequiredPermission = isPromoteRoute
+        ? roleManager.isCouncilOrHigher(tokenData.member)
+        : roleManager.hasPermission(tokenData.member, [requiredPermission, 'admin']);
+
+
+    if (!hasRequiredPermission) {
         if (req.path.includes('/api/')) {
             return res.status(403).json({ success: false, message: 'You do not have permission for this action.' });
         }
@@ -35,7 +44,6 @@ const validateTokenAndPermissions = (client, requiredPermission = 'commander') =
 
 /**
  * Renders the Commander Training Tracker page.
- * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.showTracker = (client) => [
     validateTokenAndPermissions(client, 'commander'),
@@ -44,23 +52,22 @@ exports.showTracker = (client) => [
             const { member } = req.tokenData;
             const commanderChar = await charManager.getChars(member.id);
             const commanderName = commanderChar?.main?.character_name || member.user.tag;
-            const commanderDiscordId = member.id; // Pass the Discord ID to the frontend
+            const commanderDiscordId = member.id;
 
-            const io = req.app.get('io');
-            if (io) {
-                await syncLogiStatus(io);
-            }
-
-            const pilots = await trainingManager.getAllPilots();
+            // Fetch all quizzes and categorize them
+            const allQuizzes = await db.query('SELECT quiz_id, name, category FROM quizzes');
+            const residentQuizzes = allQuizzes.filter(q => q.category === 'resident');
+            const tfcQuizzes = allQuizzes.filter(q => q.category === 'training_fc');
 
             res.render('trainingTracker', {
                 token: req.params.token,
-                pilots,
                 commanderName,
-                commanderDiscordId, // Pass ID to EJS template
+                commanderDiscordId,
+                residentQuizzes,
+                tfcQuizzes,
                 permissions: {
                     canEdit: roleManager.hasPermission(member, ['line_commander', 'admin']),
-                    canAddResidents: roleManager.hasPermission(member, ['council', 'admin'])
+                    canPromoteToTfc: roleManager.isCouncilOrHigher(member),
                 }
             });
         } catch (error) {
@@ -72,7 +79,6 @@ exports.showTracker = (client) => [
 
 /**
  * Handles adding a new resident to the tracker.
- * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.addResident = (client) => [
     validateTokenAndPermissions(client, 'council'),
@@ -98,10 +104,35 @@ exports.addResident = (client) => [
 ];
 
 /**
- * Handles updating a pilot's progress for simple fields.
- * @param {import('discord.js').Client} client - The Discord client instance.
+ * Handles promoting a pilot to Training FC status.
  */
-exports.updateProgress = (client) => [
+exports.promoteToTfc = (client) => [
+    validateTokenAndPermissions(client, 'council'), // Special permission check is handled in the middleware now
+    async (req, res) => {
+        const { pilotId } = req.body;
+        const io = req.app.get('io');
+
+        if (!pilotId) {
+            return res.status(400).json({ success: false, message: 'Pilot ID is required.' });
+        }
+
+        try {
+            const result = await trainingManager.promoteToTfc(pilotId);
+            if (result.success && io) {
+                io.emit('training-update');
+            }
+            res.json(result);
+        } catch (error) {
+            logger.error('Error in promoteToTfc controller:', error);
+            res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+        }
+    }
+];
+
+/**
+ * Handles updating a resident's progress for simple fields.
+ */
+exports.updateResidentProgress = (client) => [
     validateTokenAndPermissions(client, 'line_commander'),
     async (req, res) => {
         const { pilotId, field, value } = req.body;
@@ -112,38 +143,56 @@ exports.updateProgress = (client) => [
         }
 
         try {
-            const result = await trainingManager.updatePilotProgress(pilotId, field, value);
+            const result = await trainingManager.updateResidentProgress(pilotId, field, value);
             if (result.success && io) {
                 io.emit('training-update');
             }
             res.json(result);
         } catch (error) {
-            logger.error('Error in updateProgress controller:', error);
+            logger.error('Error in updateResidentProgress controller:', error);
             res.status(500).json({ success: false, message: 'An internal server error occurred.' });
         }
     }
 ];
 
 /**
+ * Handles updating a Training FC's progress.
+ */
+exports.updateTfcProgress = (client) => [
+    validateTokenAndPermissions(client, 'certified_trainer'), // Requires CT or higher
+    async (req, res) => {
+        const { pilotId, field, value } = req.body;
+        const io = req.app.get('io');
+
+        if (pilotId === undefined || field === undefined || value === undefined) {
+            return res.status(400).json({ success: false, message: 'Missing pilotId, field, or value.' });
+        }
+
+        try {
+            const result = await trainingManager.updateTfcProgress(pilotId, field, value);
+            if (result.success && io) {
+                io.emit('training-update');
+            }
+            res.json(result);
+        } catch (error) {
+            logger.error('Error in updateTfcProgress controller:', error);
+            res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+        }
+    }
+];
+
+
+/**
  * Handles adding a comment to a pilot's record.
- * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.addComment = (client) => [
     validateTokenAndPermissions(client, 'line_commander'),
     async (req, res) => {
-        const { token } = req.params;
-        const tokenData = client.activeTrainingTokens?.get(token);
-
-        if (!tokenData || Date.now() > tokenData.expires) {
-            if (tokenData) client.activeTrainingTokens.delete(token);
-            return res.status(403).json({ success: false, message: 'This form session has expired. Please try again. Your changes were not saved.' });
-        }
-
-        const { pilotId, comment } = req.body;
+        const { pilotId, comment, type } = req.body; // type can be 'resident' or 'tfc'
         const io = req.app.get('io');
 
-        if (!pilotId || !comment) {
-            return res.status(400).json({ success: false, message: 'Missing pilot ID or comment.' });
+        if (!pilotId || !comment || !type) {
+            return res.status(400).json({ success: false, message: 'Missing required information.' });
         }
 
         try {
@@ -151,7 +200,7 @@ exports.addComment = (client) => [
             const commanderChar = await charManager.getChars(discordId);
             const commanderName = commanderChar?.main?.character_name || req.tokenData.user.tag;
 
-            const result = await trainingManager.addComment(pilotId, comment, commanderName, discordId);
+            const result = await trainingManager.addComment(pilotId, comment, commanderName, discordId, type);
             if (result.success && io) {
                 io.emit('training-update');
             }
@@ -165,16 +214,20 @@ exports.addComment = (client) => [
 
 /**
  * Handles fetching all pilot data as JSON for real-time updates.
- * @param {import('discord.js').Client} client - The Discord client instance.
  */
-exports.getPilotsData = (client) => [
+exports.getTrackerData = (client) => [
     validateTokenAndPermissions(client),
     async (req, res) => {
         try {
-            const pilots = await trainingManager.getAllPilots();
-            res.json({ success: true, pilots });
+            // Run logi sync before sending data to ensure it's fresh
+            const io = req.app.get('io');
+            if (io) {
+                await syncLogiStatus(io);
+            }
+            const data = await trainingManager.getAllTrackerData();
+            res.json({ success: true, data });
         } catch (error) {
-            logger.error('Error fetching pilot data for API:', error);
+            logger.error('Error fetching tracker data for API:', error);
             res.status(500).json({ success: false, message: 'Could not load training data.' });
         }
     }
@@ -182,7 +235,6 @@ exports.getPilotsData = (client) => [
 
 /**
  * Handles adding a signoff with a comment.
- * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.addSignoff = (client) => [
     validateTokenAndPermissions(client, 'line_commander'),
@@ -213,7 +265,6 @@ exports.addSignoff = (client) => [
 
 /**
  * Handles removing a signoff.
- * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.removeSignoff = (client) => [
     validateTokenAndPermissions(client, 'line_commander'),
@@ -227,7 +278,6 @@ exports.removeSignoff = (client) => [
 
         try {
             const discordId = req.tokenData.user.id;
-
             const result = await trainingManager.removeSignoff(pilotId, field, discordId);
             if (result.success && io) {
                 io.emit('training-update');
@@ -239,3 +289,4 @@ exports.removeSignoff = (client) => [
         }
     }
 ];
+

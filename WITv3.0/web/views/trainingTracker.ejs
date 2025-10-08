@@ -14,119 +14,48 @@
             --accent-blue: #38bdf8; --accent-green: #4ade80; --accent-red: #f87171;
             --accent-yellow: #facc15; --border-color: #4a5568;
         }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            margin: 0;
-            padding: 1.5rem;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 1.5rem; }
         .container { max-width: 98%; margin: auto; }
-        .add-resident-panel {
-            max-width: 900px;
-            margin-left: auto;
-            margin-right: auto;
-            margin-bottom: 2rem;
-        }
-        h1 { text-align: center; color: #f8fafc; margin-bottom: 2rem; }
+        h1, h2 { text-align: center; color: #f8fafc; }
+        h1 { margin-bottom: 0.5rem; }
+        h2 { margin-top: 2.5rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; }
+        .subtitle { text-align: center; margin-bottom: 2rem; color: var(--text-secondary); }
         .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; border: 1px solid var(--border-color); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); }
-        .pilots-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 1.5rem;
-            margin-top: 1.5rem;
-        }
-        .pilot-card {
-            background-color: var(--bg-card);
-            border-radius: 0.5rem;
-            padding: 1.25rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            border: 1px solid var(--border-color);
-        }
-        .pilot-card h3 {
-            margin: 0;
-            font-size: 1.25rem;
-            color: var(--accent-blue);
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .pilot-card h4 {
-            margin: 0 0 0.75rem 0;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .info-grid, .progress-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-        }
+        
+        .top-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; max-width: 1400px; margin: auto; margin-bottom: 2rem; }
+        
+        .pilots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+        .pilot-card { background-color: var(--bg-card); border-radius: 0.5rem; padding: 1.25rem; display: flex; flex-direction: column; gap: 1.5rem; border: 1px solid var(--border-color); }
+        .pilot-card h3 { margin: 0; font-size: 1.25rem; color: var(--accent-blue); padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); }
+        .pilot-card h4 { margin: 0 0 0.75rem 0; font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .info-grid, .progress-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .tfc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+
         .form-group { margin-bottom: 0; }
         label { display: block; margin-bottom: 0.35rem; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); }
-        input[type="text"], input[type="date"] {
-            width: 100%;
-            padding: 0.5rem;
-            border-radius: 0.375rem;
-            background-color: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            font-size: 0.875rem;
-            box-sizing: border-box;
-        }
+        input[type="text"], input[type="date"], select { width: 100%; padding: 0.5rem; border-radius: 0.375rem; background-color: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.875rem; box-sizing: border-box; }
         input:disabled, textarea:disabled { background-color: #3d4c5f; cursor: not-allowed; }
-        .progress-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background-color: var(--bg-secondary);
-            padding: 0.6rem 0.8rem;
-            border-radius: 0.375rem;
-        }
+        
+        .progress-item { display: flex; align-items: center; justify-content: space-between; background-color: var(--bg-secondary); padding: 0.6rem 0.8rem; border-radius: 0.375rem; }
         .progress-item label { margin: 0; color: var(--text-primary); font-size: 0.875rem; }
-        
-        .progress-item.completed {
-            background-color: var(--accent-green);
-        }
-        .progress-item.completed label {
-            color: var(--bg-primary);
-            font-weight: 600;
-        }
-        
+        .progress-item.completed { background-color: var(--accent-green); }
+        .progress-item.completed label { color: var(--bg-primary); font-weight: 600; }
         input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: var(--accent-green); }
         input[type="checkbox"]:not(:disabled) { cursor: pointer; }
-        input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.6; }
-        
-        input[type="checkbox"]:disabled:checked {
-            opacity: 1;
-        }
-
         .signoff-dots { display: flex; gap: 4px; }
         .signoff-dot { width: 12px; height: 12px; border-radius: 50%; background-color: var(--bg-tertiary); }
         .signoff-dot.filled { background-color: var(--accent-green); }
         .signoff-dot.mine { background-color: var(--accent-blue); }
-
+        
         .comments-section { margin-top: 1rem; }
-        .latest-comment {
-            background-color: var(--bg-secondary);
-            padding: 0.75rem;
-            border-radius: 0.375rem;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.5rem;
-            border-left: 3px solid var(--accent-yellow);
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
+        .latest-comment { background-color: var(--bg-secondary); padding: 0.75rem; border-radius: 0.375rem; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; border-left: 3px solid var(--accent-yellow); white-space: pre-wrap; word-break: break-word; }
         .latest-comment strong { color: var(--text-primary); }
         .comments-actions { text-align: right; }
         .comments-actions a, .complex-signoff-item .view-signoffs-btn { color: var(--accent-blue); cursor: pointer; text-decoration: none; font-size: 0.875rem; }
-
-        .add-resident-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end; }
         
+        .add-resident-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end; }
+        .promote-tfc-grid { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end; }
+
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal { background: var(--bg-secondary); padding: 2rem; border-radius: 0.5rem; max-width: 600px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
         .modal h2 { margin: 0 0 1rem 0; text-align: left; border: none; font-size: 1.25rem; color: #f8fafc;}
@@ -150,55 +79,76 @@
         .toast.success { background-color: var(--accent-green); color: black; }
         .toast.error { background-color: var(--accent-red); color: white; }
         .toast.info { background-color: var(--accent-blue); color: white; }
-
-        .complex-signoff-item { display: flex; justify-content: space-between; align-items: center; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Commander Training Tracker</h1>
+    <p class="subtitle">Welcome, <%= commanderName %></p>
     
-    <% if (permissions.canAddResidents) { %>
-    <div class="panel add-resident-panel">
-        <h2>Add New Resident</h2>
-        <div class="add-resident-grid">
-            <div class="form-group">
-                <label for="new-pilot-name">Pilot Name</label>
-                <input type="text" id="new-pilot-name" placeholder="EVE Character Name">
-            </div>
-            <div class="form-group">
-                <label for="new-pilot-discord-id">User's Discord ID</label>
-                <input type="text" id="new-pilot-discord-id" placeholder="Right-click user -> Copy User ID">
-            </div>
-            <div class="form-group">
-                <button id="add-resident-btn" class="btn-primary" style="width: 100%; padding: 0.75rem;">Add Resident</button>
+    <div class="top-panels">
+        <% if (permissions.canAddResidents) { %>
+        <div class="panel add-resident-panel">
+            <h2>Add New Resident</h2>
+            <div class="add-resident-grid">
+                <div class="form-group">
+                    <label for="new-pilot-name">Pilot Name</label>
+                    <input type="text" id="new-pilot-name" placeholder="EVE Character Name">
+                </div>
+                <div class="form-group">
+                    <label for="new-pilot-discord-id">User's Discord ID</label>
+                    <input type="text" id="new-pilot-discord-id" placeholder="Copy User ID">
+                </div>
+                <div class="form-group">
+                    <button id="add-resident-btn" class="btn-primary" style="width: 100%; padding: 0.75rem;">Add</button>
+                </div>
             </div>
         </div>
-    </div>
-    <% } %>
+        <% } %>
 
-    <div class="pilots-grid" id="pilots-container">
-         <!-- Pilot cards will be dynamically inserted here by JavaScript -->
+        <% if (permissions.canPromoteToTfc) { %>
+        <div class="panel promote-tfc-panel">
+            <h2>Promote to Training FC</h2>
+            <div class="promote-tfc-grid">
+                <div class="form-group">
+                    <label for="promote-pilot-select">Select Commander</label>
+                    <select id="promote-pilot-select">
+                        <option value="" disabled selected>Choose a pilot to promote...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button id="promote-tfc-btn" class="btn-primary" style="width: 100%; padding: 0.75rem;">Promote</button>
+                </div>
+            </div>
+        </div>
+        <% } %>
+    </div>
+
+
+    <div id="tfc-section">
+        <h2>Training FCs</h2>
+        <div class="pilots-grid" id="tfc-container"></div>
+    </div>
+
+    <div id="resident-section">
+        <h2>Residents</h2>
+        <div class="pilots-grid" id="residents-container"></div>
     </div>
 </div>
 
 <!-- Comments Modal -->
 <div id="commentsModal" class="modal-overlay">
     <div class="modal">
-        <h2 id="commentsModalTitle">Comments for Pilot</h2>
+        <h2 id="commentsModalTitle">Comments</h2>
         <div class="modal-content" id="commentsModalContent"></div>
-        <% if (permissions.canEdit) { %>
         <div class="form-group" style="margin-top: 1.5rem;">
             <label for="newComment">Add New Comment</label>
             <textarea id="newComment" rows="3" placeholder="Enter your comment..."></textarea>
         </div>
-        <% } %>
         <div class="modal-actions">
             <button class="btn-secondary" onclick="closeModal('commentsModal')">Close</button>
-            <% if (permissions.canEdit) { %>
             <button id="addCommentBtn" class="btn-primary">Add Comment</button>
-            <% } %>
         </div>
     </div>
 </div>
@@ -208,7 +158,6 @@
     <div class="modal">
         <h2 id="signoffsModalTitle">Sign-offs</h2>
         <div class="modal-content" id="signoffsModalContent"></div>
-         <% if (permissions.canEdit) { %>
         <div id="addSignoffForm" style="display: none; margin-top: 1.5rem;">
             <div class="form-group">
                 <label for="newSignoffComment">Add Your Sign-off (Comment Optional)</label>
@@ -217,9 +166,8 @@
             <button id="addSignoffBtn" class="btn-primary">Add Sign-off</button>
         </div>
         <div id="removeSignoffAction" style="display: none; margin-top: 1.5rem;">
-             <button id="removeSignoffBtn" class="btn-danger">Remove My Sign-off</button>
+            <button id="removeSignoffBtn" class="btn-danger">Remove My Sign-off</button>
         </div>
-        <% } %>
         <div class="modal-actions">
             <button class="btn-secondary" onclick="closeModal('signoffsModal')">Close</button>
         </div>
@@ -230,21 +178,19 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    // --- GLOBAL STATE ---
     const token = "<%= token %>";
     const commanderName = "<%= commanderName %>";
     const commanderDiscordId = "<%= commanderDiscordId %>";
     const permissions = <%- JSON.stringify(permissions) %>;
-    let pilotsData = <%- JSON.stringify(pilots) %>;
+    const residentQuizzes = <%- JSON.stringify(residentQuizzes) %>;
+    const tfcQuizzes = <%- JSON.stringify(tfcQuizzes) %>;
+    let trackerData = { residents: [], tfcs: [], nonTfcCommanders: [] };
 
-    // --- UTILITY FUNCTIONS ---
     function showToast(message, type = 'info') {
         const toast = document.getElementById('toast');
         toast.textContent = message;
         toast.className = `toast show ${type}`;
-        setTimeout(() => {
-            toast.className = 'toast';
-        }, 3000);
+        setTimeout(() => { toast.className = 'toast'; }, 3000);
     }
 
     async function apiCall(endpoint, method = 'POST', body = null) {
@@ -253,23 +199,12 @@
                 method: method.toUpperCase(),
                 headers: { 'Content-Type': 'application/json' },
             };
-            if (body && method.toUpperCase() !== 'GET') {
-                options.body = JSON.stringify(body);
-            }
-
+            if (body) options.body = JSON.stringify(body);
             const response = await fetch(endpoint, options);
-            
             if (!response.ok) {
-                const errorText = await response.text();
-                try {
-                    const errorJson = JSON.parse(errorText);
-                    throw new Error(errorJson.message || `API Error: ${response.statusText}`);
-                } catch (e) {
-                    console.error("Received non-JSON error response:", errorText.substring(0, 500));
-                    throw new Error(`Server error: ${response.status} ${response.statusText}.`);
-                }
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'An API error occurred.');
             }
-            
             return await response.json();
         } catch (error) {
             console.error('API Call Failed:', error);
@@ -278,15 +213,18 @@
         }
     }
 
-    // --- MODAL FUNCTIONS ---
-    function openModal(modalId) {
-        document.getElementById(modalId).style.display = 'flex';
-    }
-    function closeModal(modalId) {
-        document.getElementById(modalId).style.display = 'none';
-    }
+    function openModal(modalId) { document.getElementById(modalId).style.display = 'flex'; }
+    function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
     
-    // --- DYNAMIC RENDERING FUNCTIONS ---
+    function createQuizProgressHTML(quizzes, completedQuizIds) {
+        if (!quizzes || quizzes.length === 0) return '<p class="no-quizzes">No quizzes available for this category.</p>';
+        return quizzes.map(quiz => `
+            <div class="progress-item ${completedQuizIds.includes(quiz.quiz_id) ? 'completed' : ''}">
+                <label>${quiz.name}</label>
+            </div>
+        `).join('');
+    }
+
     function createComplexSignoffHTML(pilot, field, label) {
         const signoffs = pilot[field] || [];
         let dotsHTML = '';
@@ -298,218 +236,195 @@
                 dotsHTML += `<div class="signoff-dot"></div>`;
             }
         }
-
         return `
-            <div class="complex-signoff-item" data-field="${field}">
+            <div class="complex-signoff-item" data-field="${field}" data-pilot-type="resident">
                 <label>${label}</label>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <div class="signoff-dots">${dotsHTML}</div>
-                    <a href="#" class="view-signoffs-btn">View/Add</a>
+                    ${permissions.canEdit ? '<a href="#" class="view-signoffs-btn">View/Add</a>' : ''}
                 </div>
-            </div>
-        `;
+            </div>`;
     }
-    
-    function createPilotCardHTML(pilot) {
-        const lastComment = pilot.comments.length > 0 ? pilot.comments[pilot.comments.length - 1] : null;
-        const canEditSimple = permissions.canEdit; // Editing simple fields is line_commander+
 
+    function createResidentCardHTML(pilot) {
+        const lastComment = pilot.comments.length > 0 ? pilot.comments[pilot.comments.length - 1] : null;
         return `
-            <div class="pilot-card" data-pilot-id="${pilot.pilot_id}">
+            <div class="pilot-card" data-pilot-id="${pilot.pilot_id}" data-pilot-type="resident">
                 <h3>${pilot.pilot_name}</h3>
-                <div class="info-section">
+                <div>
                     <h4>General</h4>
                     <div class="info-grid">
-                        <div class="form-group">
-                            <label>Start Date</label>
-                            <input type="date" value="${pilot.start_date ? new Date(pilot.start_date).toISOString().split('T')[0] : ''}" data-field="start_date" disabled>
-                        </div>
-                         <div class="form-group">
-                            <label>Last Active</label>
-                            <input type="date" value="${pilot.last_active ? new Date(pilot.last_active).toISOString().split('T')[0] : ''}" data-field="last_active" disabled>
-                        </div>
+                        <div class="form-group"><label>Start Date</label><input type="date" value="${pilot.start_date ? new Date(pilot.start_date).toISOString().split('T')[0] : ''}" disabled></div>
+                        <div class="form-group"><label>Last Active</label><input type="date" value="${pilot.last_active ? new Date(pilot.last_active).toISOString().split('T')[0] : ''}" disabled></div>
                     </div>
-                     <div class="form-group" style="margin-top: 1rem;">
-                        <label>Resident Orientation</label>
-                        <input type="text" value="${pilot.resident_orientation_by || ''}" data-field="resident_orientation_by" placeholder="FC Name" ${!canEditSimple ? 'disabled' : ''}>
-                    </div>
+                    <div class="form-group" style="margin-top: 1rem;"><label>Resident Orientation</label><input type="text" value="${pilot.resident_orientation_by || ''}" data-field="resident_orientation_by" placeholder="FC Name" ${!permissions.canEdit ? 'disabled' : ''}></div>
                 </div>
-                <div class="progress-section">
-                    <h4>Quizzes</h4>
-                    <div class="progress-grid">
-                        <div class="progress-item ${pilot.quiz_scouting ? 'completed' : ''}"><label>Scouting</label></div>
-                        <div class="progress-item ${pilot.quiz_fitting ? 'completed' : ''}"><label>Fitting</label></div>
-                        <div class="progress-item ${pilot.quiz_fleet_roles ? 'completed' : ''}"><label>Fleet Roles</label></div>
-                        <div class="progress-item ${pilot.quiz_site_mechanics ? 'completed' : ''}"><label>Site Mechanics</label></div>
-                    </div>
-                </div>
-                <div class="progress-section">
+                <div><h4>Quizzes</h4><div class="progress-grid">${createQuizProgressHTML(residentQuizzes, pilot.completed_quizzes)}</div></div>
+                <div>
                     <h4>In Fleet Sign-Offs</h4>
                     <div class="progress-grid">
-                        <div class="progress-item ${pilot.signoff_bastion ? 'completed' : ''}"><label>Bastion Badge</label></div>
+                        <div class="progress-item"><label>Bastion Badge</label><input type="checkbox" ${pilot.signoff_bastion ? 'checked' : ''} data-field="signoff_bastion" ${!permissions.canEdit ? 'disabled' : ''}></div>
                         <div class="progress-item ${pilot.signoff_trusted_logi ? 'completed' : ''}"><label>Trusted Logi</label></div>
                         ${createComplexSignoffHTML(pilot, 'signoff_scouting', 'Scouting')}
                         ${createComplexSignoffHTML(pilot, 'signoff_new_pilot_orientation', 'New Pilot Orientation')}
                     </div>
                 </div>
-                <div class="progress-section">
+                <div>
                     <h4>Exam</h4>
                     <div class="progress-grid">
-                        <div class="progress-item"><label>Multiple Choice</label><input type="checkbox" id="exam_mc_${pilot.pilot_id}" ${pilot.exam_multiple_choice ? 'checked' : ''} data-field="exam_multiple_choice" ${!canEditSimple ? 'disabled' : ''}></div>
-                        <div class="progress-item"><label>CT Exam</label><input type="checkbox" id="exam_ct_${pilot.pilot_id}" ${pilot.exam_ct ? 'checked' : ''} data-field="exam_ct" ${!canEditSimple ? 'disabled' : ''}></div>
+                        <div class="progress-item"><label>Multiple Choice</label><input type="checkbox" ${pilot.exam_multiple_choice ? 'checked' : ''} data-field="exam_multiple_choice" ${!permissions.canEdit ? 'disabled' : ''}></div>
+                        <div class="progress-item"><label>CT Exam</label><input type="checkbox" ${pilot.exam_ct ? 'checked' : ''} data-field="exam_ct" ${!permissions.canEdit ? 'disabled' : ''}></div>
                     </div>
                 </div>
                 <div class="comments-section">
-                     <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}">
-                        ${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}
-                    </div>
-                    <div class="comments-actions">
-                         <a href="#" class="view-comments">View All (${pilot.comments.length}) / Add Comment</a>
+                    <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}">${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}</div>
+                    <div class="comments-actions"><a href="#" class="view-comments">View All (${pilot.comments.length}) / Add Comment</a></div>
+                </div>
+            </div>`;
+    }
+    
+    function createTfcCardHTML(pilot) {
+        const lastComment = pilot.comments && pilot.comments.length > 0 ? pilot.comments[pilot.comments.length - 1] : null;
+        const canEditTfc = permissions.canPromoteToTfc; // Certified Trainers and above
+        return `
+            <div class="pilot-card" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc">
+                <h3>${pilot.pilot_name}</h3>
+                <div><h4>Quizzes</h4><div class="progress-grid">${createQuizProgressHTML(tfcQuizzes, pilot.completed_quizzes)}</div></div>
+                <div>
+                    <h4>Modules</h4>
+                    <div class="tfc-grid">
+                        <div class="form-group"><label>T1 - Tagging</label><input type="text" value="${pilot.t1_tagging || ''}" data-field="t1_tagging" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
+                        <div class="form-group"><label>T1 - Voicing</label><input type="text" value="${pilot.t1_voicing || ''}" data-field="t1_voicing" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
+                        <div class="form-group"><label>T1 - Waitlist & Comp</label><input type="text" value="${pilot.t1_waitlist || ''}" data-field="t1_waitlist" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
+                        <div class="form-group"><label>T2 - Situational Awareness</label><input type="text" value="${pilot.t2_situational_awareness || ''}" data-field="t2_situational_awareness" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
+                        <div class="form-group"><label>T2 - Evacuations</label><input type="text" value="${pilot.t2_evacuations || ''}" data-field="t2_evacuations" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
                     </div>
                 </div>
-            </div>
-        `;
+                 <div>
+                    <h4>Practice & Competency</h4>
+                    <div class="tfc-grid">
+                         <div class="form-group"><label>Fleet Speed</label><input type="text" value="${pilot.practice_fleet_speed || ''}" data-field="practice_fleet_speed" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
+                         <div class="form-group"><label>System Awareness</label><input type="text" value="${pilot.practice_system_awareness || ''}" data-field="practice_system_awareness" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
+                         <div class="form-group"><label>Final Sign-off</label><input type="text" value="${pilot.competency_final || ''}" data-field="competency_final" placeholder="Council Name" ${!canEditTfc ? 'disabled' : ''}></div>
+                    </div>
+                </div>
+                <div class="comments-section">
+                    <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}">${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}</div>
+                    <div class="comments-actions"><a href="#" class="view-comments">View All (${pilot.comments ? pilot.comments.length : 0}) / Add Comment</a></div>
+                </div>
+            </div>`;
     }
 
-    function renderAllPilots() {
-        const pilotsContainer = document.getElementById('pilots-container');
-        pilotsContainer.innerHTML = pilotsData.map(createPilotCardHTML).join('');
-    }
 
-    async function fetchAndRenderPilots() {
-        const result = await apiCall(`/training/api/pilots/${token}`, 'GET');
-        if (result && result.success) {
-            pilotsData = result.pilots;
-            renderAllPilots();
-        }
-    }
+    function renderAllData() {
+        const residentsContainer = document.getElementById('residents-container');
+        const tfcContainer = document.getElementById('tfc-container');
+        const promoteSelect = document.getElementById('promote-pilot-select');
 
-    // --- EVENT HANDLERS & INITIALIZATION ---
-    document.addEventListener('DOMContentLoaded', () => {
-        const pilotsContainer = document.getElementById('pilots-container');
-
-        // Main event listener for the entire grid
-        pilotsContainer.addEventListener('change', handleSimpleInputChange);
-        pilotsContainer.addEventListener('click', handleGridClick);
+        residentsContainer.innerHTML = trackerData.residents.map(createResidentCardHTML).join('');
+        tfcContainer.innerHTML = trackerData.tfcs.map(createTfcCardHTML).join('');
         
-        // Setup for "Add Resident" form if it exists
-        if (permissions.canAddResidents) {
-            const addResidentBtn = document.getElementById('add-resident-btn');
-            addResidentBtn.addEventListener('click', handleAddResident);
-        }
-
-        // Setup for modals
-        document.getElementById('addCommentBtn')?.addEventListener('click', handleAddComment);
-        document.getElementById('addSignoffBtn')?.addEventListener('click', handleAddSignoff);
-        document.getElementById('removeSignoffBtn')?.addEventListener('click', handleRemoveSignoff);
-        document.querySelectorAll('.modal-overlay').forEach(overlay => {
-            overlay.addEventListener('click', e => {
-                if (e.target === overlay) closeModal(overlay.id);
+        if (permissions.canPromoteToTfc && promoteSelect) {
+            promoteSelect.innerHTML = '<option value="" disabled selected>Choose a pilot to promote...</option>';
+            trackerData.nonTfcCommanders.forEach(p => {
+                const option = new Option(p.pilot_name, p.pilot_id);
+                promoteSelect.add(option);
             });
-        });
+        }
+    }
 
-        // WebSocket listener
-        const socket = io();
-        socket.on('connect', () => console.log('Successfully connected to WebSocket server.'));
-        socket.on('training-update', () => {
-            console.log('Received training-update event. Fetching new data...');
-            showToast('Data updated. Refreshing list...', 'info');
-            fetchAndRenderPilots();
-        });
-        socket.on('disconnect', () => {
-            console.warn('Disconnected from WebSocket server. Real-time updates will be paused.');
-            showToast('Connection lost. Real-time updates paused.', 'error');
-        });
+    async function fetchAndRenderData() {
+        const result = await apiCall(`/training/api/data/${token}`, 'GET');
+        if (result && result.success) {
+            trackerData = result.data;
+            renderAllData();
+        }
+    }
 
-        // Initial render on page load
-        renderAllPilots();
-    });
-
-    // --- EVENT HANDLER FUNCTIONS ---
-
-    async function handleSimpleInputChange(event) {
+    // --- EVENT HANDLERS ---
+    async function handleInputChange(event) {
         const input = event.target;
         const field = input.dataset.field;
         if (!field) return;
 
         const card = input.closest('.pilot-card');
         const pilotId = card.dataset.pilotId;
+        const pilotType = card.dataset.pilotType;
         const value = (input.type === 'checkbox') ? input.checked : input.value;
-
-        const result = await apiCall(`/training/api/update/${token}`, 'POST', { pilotId, field, value });
+        
+        const endpoint = pilotType === 'resident' ? `/training/api/update-resident/${token}` : `/training/api/update-tfc/${token}`;
+        const result = await apiCall(endpoint, 'POST', { pilotId, field, value });
         
         if (result && result.success) {
             showToast(result.message, 'success');
-            // The socket event will trigger the UI update, so we don't need to do it here.
+            // Data will be re-rendered via socket event
         } else {
-            showToast(result ? result.message : 'Update failed', 'error');
-            // Revert the change on failure
-            if (input.type === 'checkbox') {
-                input.checked = !input.checked;
-            } else {
-                 // You might want to store the old value to revert text/date inputs
-            }
+            // Revert failed change
+            if (input.type === 'checkbox') input.checked = !input.checked;
         }
     }
 
     function handleGridClick(e) {
         const target = e.target;
+        const card = target.closest('.pilot-card');
+        if (!card) return;
+
+        const pilotId = card.dataset.pilotId;
+        const pilotType = card.dataset.pilotType;
+
         if (target.classList.contains('view-comments')) {
             e.preventDefault();
-            const pilotId = target.closest('.pilot-card').dataset.pilotId;
-            openCommentsModal(pilotId);
-        }
-        if (target.classList.contains('view-signoffs-btn')) {
+            openCommentsModal(pilotId, pilotType);
+        } else if (target.classList.contains('view-signoffs-btn')) {
             e.preventDefault();
-            const pilotId = target.closest('.pilot-card').dataset.pilotId;
             const field = target.closest('.complex-signoff-item').dataset.field;
             openSignoffsModal(pilotId, field);
         }
     }
     
     async function handleAddResident() {
-        const addResidentBtn = document.getElementById('add-resident-btn');
+        const btn = document.getElementById('add-resident-btn');
         const pilotName = document.getElementById('new-pilot-name').value.trim();
         const discordId = document.getElementById('new-pilot-discord-id').value.trim();
+        if (!pilotName || !discordId) return showToast('Pilot Name and Discord ID are required.', 'error');
 
-        if (!pilotName || !discordId) {
-            showToast('Pilot Name and Discord ID are required.', 'error');
-            return;
-        }
-
-        addResidentBtn.disabled = true;
-        addResidentBtn.textContent = 'Adding...';
-
+        btn.disabled = true;
         const result = await apiCall(`/training/api/add-resident/${token}`, 'POST', { pilotName, discordId });
         if (result && result.success) {
             showToast(result.message, 'success');
             document.getElementById('new-pilot-name').value = '';
             document.getElementById('new-pilot-discord-id').value = '';
         }
+        btn.disabled = false;
+    }
+    
+    async function handlePromoteToTfc() {
+        const btn = document.getElementById('promote-tfc-btn');
+        const pilotId = document.getElementById('promote-pilot-select').value;
+        if (!pilotId) return showToast('Please select a pilot to promote.', 'error');
         
-        addResidentBtn.disabled = false;
-        addResidentBtn.textContent = 'Add Resident';
+        btn.disabled = true;
+        const result = await apiCall(`/training/api/promote-to-tfc/${token}`, 'POST', { pilotId });
+        if (result && result.success) {
+            showToast(result.message, 'success');
+        }
+        btn.disabled = false;
     }
 
     async function handleAddComment() {
         const modal = document.getElementById('commentsModal');
-        const pilotId = modal.dataset.pilotId;
+        const { pilotId, pilotType } = modal.dataset;
         const comment = document.getElementById('newComment').value.trim();
         if (!comment) return;
 
         const btn = document.getElementById('addCommentBtn');
         btn.disabled = true;
-        btn.textContent = 'Adding...';
-
-        const result = await apiCall(`/training/api/add-comment/${token}`, 'POST', { pilotId, comment });
+        const result = await apiCall(`/training/api/add-comment/${token}`, 'POST', { pilotId, comment, type: pilotType });
         if (result && result.success) {
             showToast(result.message, 'success');
-            document.getElementById('newComment').value = '';
             closeModal('commentsModal');
         }
-        
         btn.disabled = false;
-        btn.textContent = 'Add Comment';
     }
 
     async function handleAddSignoff() {
@@ -519,65 +434,58 @@
         
         const btn = document.getElementById('addSignoffBtn');
         btn.disabled = true;
-
         const result = await apiCall(`/training/api/add-signoff/${token}`, 'POST', { pilotId, field, comment });
         if (result && result.success) {
             showToast(result.message, 'success');
             closeModal('signoffsModal');
         }
-        
         btn.disabled = false;
     }
 
     async function handleRemoveSignoff() {
         if (!confirm('Are you sure you want to remove your sign-off?')) return;
-        
         const modal = document.getElementById('signoffsModal');
         const { pilotId, field } = modal.dataset;
         
         const btn = document.getElementById('removeSignoffBtn');
         btn.disabled = true;
-
         const result = await apiCall(`/training/api/remove-signoff/${token}`, 'POST', { pilotId, field });
         if (result && result.success) {
             showToast(result.message, 'success');
             closeModal('signoffsModal');
         }
-        
         btn.disabled = false;
     }
 
-    function openCommentsModal(pilotId) {
-        const pilot = pilotsData.find(p => p.pilot_id == pilotId);
+    function openCommentsModal(pilotId, pilotType) {
+        const pilotList = pilotType === 'resident' ? trackerData.residents : trackerData.tfcs;
+        const pilot = pilotList.find(p => p.pilot_id == pilotId);
         if (!pilot) return;
 
         const modal = document.getElementById('commentsModal');
         modal.dataset.pilotId = pilotId;
+        modal.dataset.pilotType = pilotType;
         
         document.getElementById('commentsModalTitle').textContent = `Comments for ${pilot.pilot_name}`;
         const contentEl = document.getElementById('commentsModalContent');
-        contentEl.innerHTML = '';
+        const comments = pilot.comments || [];
         
-        if (pilot.comments.length === 0) {
+        if (comments.length === 0) {
             contentEl.innerHTML = '<p style="color: var(--text-secondary);">No comments yet.</p>';
         } else {
-            pilot.comments.slice().reverse().forEach(c => {
-                const commentDiv = document.createElement('div');
-                commentDiv.className = 'comment';
-                const date = new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-                commentDiv.innerHTML = `
-                    <div class="comment-header">By <strong>${c.commander}</strong> on ${date}</div>
+            contentEl.innerHTML = comments.slice().reverse().map(c => `
+                <div class="comment">
+                    <div class="comment-header">By <strong>${c.commander}</strong> on ${new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</div>
                     <div class="comment-body">${c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
-                `;
-                contentEl.appendChild(commentDiv);
-            });
+                </div>
+            `).join('');
         }
-        
+        document.getElementById('newComment').value = '';
         openModal('commentsModal');
     }
 
     function openSignoffsModal(pilotId, field) {
-        const pilot = pilotsData.find(p => p.pilot_id == pilotId);
+        const pilot = trackerData.residents.find(p => p.pilot_id == pilotId);
         if (!pilot) return;
 
         const modal = document.getElementById('signoffsModal');
@@ -590,19 +498,12 @@
         document.getElementById('signoffsModalTitle').textContent = `Sign-offs for ${fieldName}`;
         const contentEl = document.getElementById('signoffsModalContent');
         
-        if (signoffs.length > 0) {
-            contentEl.innerHTML = signoffs.map(s => {
-                const date = new Date(s.date).toLocaleDateString([], { dateStyle: 'long' });
-                return `
-                    <div class="signoff-entry">
-                        <div class="signoff-header">By <strong>${s.commander}</strong> on ${date}</div>
-                        ${s.comment ? `<div class="signoff-body">${s.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>` : ''}
-                    </div>
-                `;
-            }).join('');
-        } else {
-            contentEl.innerHTML = '<p style="color: var(--text-secondary);">No sign-offs yet.</p>';
-        }
+        contentEl.innerHTML = signoffs.length > 0 ? signoffs.map(s => `
+            <div class="signoff-entry">
+                <div class="signoff-header">By <strong>${s.commander}</strong> on ${new Date(s.date).toLocaleDateString([], { dateStyle: 'long' })}</div>
+                ${s.comment ? `<div class="signoff-body">${s.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>` : ''}
+            </div>
+        `).join('') : '<p style="color: var(--text-secondary);">No sign-offs yet.</p>';
         
         const addForm = document.getElementById('addSignoffForm');
         const removeAction = document.getElementById('removeSignoffAction');
@@ -618,14 +519,45 @@
                 document.getElementById('newSignoffComment').value = '';
             }
         }
-        
         openModal('signoffsModal');
     }
+
+    // --- INITIALIZATION & LISTENERS ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const container = document.querySelector('.container');
+        container.addEventListener('change', handleInputChange);
+        container.addEventListener('click', handleGridClick);
+        
+        if (permissions.canAddResidents) {
+            document.getElementById('add-resident-btn').addEventListener('click', handleAddResident);
+        }
+        if (permissions.canPromoteToTfc) {
+            document.getElementById('promote-tfc-btn').addEventListener('click', handlePromoteToTfc);
+        }
+
+        document.getElementById('addCommentBtn')?.addEventListener('click', handleAddComment);
+        document.getElementById('addSignoffBtn')?.addEventListener('click', handleAddSignoff);
+        document.getElementById('removeSignoffBtn')?.addEventListener('click', handleRemoveSignoff);
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay.id); });
+        });
+
+        const socket = io();
+        socket.on('connect', () => console.log('WebSocket connected.'));
+        socket.on('training-update', () => {
+            console.log('Received training-update event.');
+            showToast('Data updated. Refreshing...', 'info');
+            fetchAndRenderData();
+        });
+        socket.on('disconnect', () => {
+            console.warn('WebSocket disconnected.');
+            showToast('Connection lost. Real-time updates paused.', 'error');
+        });
+
+        fetchAndRenderData();
+    });
 </script>
 
 </body>
 </html>
-
-
-
 
