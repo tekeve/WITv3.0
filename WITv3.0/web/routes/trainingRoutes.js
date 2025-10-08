@@ -20,6 +20,9 @@ module.exports = (client) => {
     router.get('/api/data/:token', trainingController.getTrackerData(client));
     router.post('/api/add-signoff/:token', trainingController.addSignoff(client));
     router.post('/api/remove-signoff/:token', trainingController.removeSignoff(client));
+    router.post('/api/search-residents/:token', trainingController.searchForResidents(client));
+    router.post('/api/search-tfc-candidates/:token', trainingController.searchForTfcCandidates(client));
+    router.post('/api/remove-pilot/:token', trainingController.removePilot(client));
 
     return router;
 };

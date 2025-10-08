@@ -13,6 +13,8 @@
             --bg-card: #2d3748; --text-primary: #e2e8f0; --text-secondary: #94a3b8;
             --accent-blue: #38bdf8; --accent-green: #4ade80; --accent-red: #f87171;
             --accent-yellow: #facc15; --border-color: #4a5568;
+            --bg-card-resident: #4a4a38; /* Pale Yellow */
+            --bg-card-tfc: #384a5c;      /* Pale Blue */
         }
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 1.5rem; }
         .container { max-width: 98%; margin: auto; }
@@ -26,10 +28,13 @@
         
         .pilots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
         .pilot-card { background-color: var(--bg-card); border-radius: 0.5rem; padding: 1.25rem; display: flex; flex-direction: column; gap: 1.5rem; border: 1px solid var(--border-color); }
+        
+        .pilot-card.resident { background-color: var(--bg-card-resident); }
+        .pilot-card.tfc { background-color: var(--bg-card-tfc); }
+
         .pilot-card h3 { margin: 0; font-size: 1.25rem; color: var(--accent-blue); padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); }
         .pilot-card h4 { margin: 0 0 0.75rem 0; font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-        .info-grid, .progress-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-        .tfc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+        .info-grid, .progress-grid, .tfc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
 
         .form-group { margin-bottom: 0; }
         label { display: block; margin-bottom: 0.35rem; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); }
@@ -50,11 +55,11 @@
         .comments-section { margin-top: 1rem; }
         .latest-comment { background-color: var(--bg-secondary); padding: 0.75rem; border-radius: 0.375rem; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; border-left: 3px solid var(--accent-yellow); white-space: pre-wrap; word-break: break-word; }
         .latest-comment strong { color: var(--text-primary); }
-        .comments-actions { text-align: right; }
+        
+        .pilot-card-footer { display: flex; justify-content: space-between; align-items: center; }
         .comments-actions a, .complex-signoff-item .view-signoffs-btn { color: var(--accent-blue); cursor: pointer; text-decoration: none; font-size: 0.875rem; }
         
-        .add-resident-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end; }
-        .promote-tfc-grid { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end; }
+        .action-grid { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end; }
 
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal { background: var(--bg-secondary); padding: 2rem; border-radius: 0.5rem; max-width: 600px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
@@ -66,6 +71,8 @@
         .btn-primary { background-color: var(--accent-blue); color: white; }
         .btn-secondary { background-color: var(--bg-tertiary); color: var(--text-primary); }
         .btn-danger { background-color: var(--accent-red); color: white; }
+        .delete-pilot-btn { padding: 0.5rem; line-height: 1; }
+        .delete-pilot-btn svg { width: 16px; height: 16px; pointer-events: none; }
         
         .comment, .signoff-entry { border-bottom: 1px solid var(--border-color); padding: 0.75rem 0; }
         .comment:last-child, .signoff-entry:last-child { border-bottom: none; }
@@ -79,6 +86,25 @@
         .toast.success { background-color: var(--accent-green); color: black; }
         .toast.error { background-color: var(--accent-red); color: white; }
         .toast.info { background-color: var(--accent-blue); color: white; }
+
+        .search-results {
+            position: absolute;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-radius: 0 0 0.375rem 0.375rem;
+            z-index: 10;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .search-result-item {
+            padding: 0.75rem;
+            cursor: pointer;
+        }
+        .search-result-item:hover {
+            background-color: var(--bg-tertiary);
+        }
     </style>
 </head>
 <body>
@@ -90,19 +116,14 @@
     <div class="top-panels">
         <% if (permissions.canAddResidents) { %>
         <div class="panel add-resident-panel">
-            <h2>Add New Resident</h2>
-            <div class="add-resident-grid">
-                <div class="form-group">
-                    <label for="new-pilot-name">Pilot Name</label>
-                    <input type="text" id="new-pilot-name" placeholder="EVE Character Name">
+            <h2>Add New Resident from Applications</h2>
+            <div class="action-grid">
+                <div class="form-group" style="position: relative;">
+                    <label for="resident-search">Search by Pilot Name or Discord ID</label>
+                    <input type="text" id="resident-search" placeholder="Start typing to search eligible pilots..." autocomplete="off">
+                    <div id="resident-search-results" class="search-results" style="display: none;"></div>
                 </div>
-                <div class="form-group">
-                    <label for="new-pilot-discord-id">User's Discord ID</label>
-                    <input type="text" id="new-pilot-discord-id" placeholder="Copy User ID">
-                </div>
-                <div class="form-group">
-                    <button id="add-resident-btn" class="btn-primary" style="width: 100%; padding: 0.75rem;">Add</button>
-                </div>
+                <button id="add-resident-btn" class="btn-primary" style="padding: 0.75rem;" disabled>Add</button>
             </div>
         </div>
         <% } %>
@@ -110,30 +131,22 @@
         <% if (permissions.canPromoteToTfc) { %>
         <div class="panel promote-tfc-panel">
             <h2>Promote to Training FC</h2>
-            <div class="promote-tfc-grid">
-                <div class="form-group">
-                    <label for="promote-pilot-select">Select Commander</label>
-                    <select id="promote-pilot-select">
-                        <option value="" disabled selected>Choose a pilot to promote...</option>
-                    </select>
+            <div class="action-grid">
+                <div class="form-group" style="position: relative;">
+                    <label for="tfc-promote-search">Search by Pilot Name</label>
+                    <input type="text" id="tfc-promote-search" placeholder="Start typing to search eligible commanders..." autocomplete="off">
+                     <div id="tfc-promote-search-results" class="search-results" style="display: none;"></div>
                 </div>
-                <div class="form-group">
-                    <button id="promote-tfc-btn" class="btn-primary" style="width: 100%; padding: 0.75rem;">Promote</button>
-                </div>
+                <button id="promote-tfc-btn" class="btn-primary" style="padding: 0.75rem;" disabled>Promote</button>
             </div>
         </div>
         <% } %>
     </div>
 
 
-    <div id="tfc-section">
-        <h2>Training FCs</h2>
-        <div class="pilots-grid" id="tfc-container"></div>
-    </div>
-
-    <div id="resident-section">
-        <h2>Residents</h2>
-        <div class="pilots-grid" id="residents-container"></div>
+    <div id="all-pilots-section">
+        <h2>Commander Training Progress</h2>
+        <div class="pilots-grid" id="all-pilots-container"></div>
     </div>
 </div>
 
@@ -174,6 +187,18 @@
     </div>
 </div>
 
+<!-- Delete Pilot Modal -->
+<div id="deletePilotModal" class="modal-overlay">
+    <div class="modal">
+        <h2 id="deletePilotModalTitle">Confirm Removal</h2>
+        <p id="deletePilotModalText"></p>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModal('deletePilotModal')">Cancel</button>
+            <button id="deletePilotConfirmBtn" class="btn-danger">Confirm Removal</button>
+        </div>
+    </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -184,7 +209,9 @@
     const permissions = <%- JSON.stringify(permissions) %>;
     const residentQuizzes = <%- JSON.stringify(residentQuizzes) %>;
     const tfcQuizzes = <%- JSON.stringify(tfcQuizzes) %>;
-    let trackerData = { residents: [], tfcs: [], nonTfcCommanders: [] };
+    let trackerData = { residents: [], tfcs: [] };
+    const deleteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/></svg>`;
+
 
     function showToast(message, type = 'info') {
         const toast = document.getElementById('toast');
@@ -248,8 +275,14 @@
 
     function createResidentCardHTML(pilot) {
         const lastComment = pilot.comments.length > 0 ? pilot.comments[pilot.comments.length - 1] : null;
+        const adminActionsHTML = permissions.canDelete
+            ? `<div class="pilot-card-admin-actions">
+                   <button class="btn-danger delete-pilot-btn" data-pilot-name="${pilot.pilot_name}" data-pilot-id="${pilot.pilot_id}" data-pilot-type="resident" title="Remove from Tracker">${deleteSVG}</button>
+               </div>`
+            : '';
+
         return `
-            <div class="pilot-card" data-pilot-id="${pilot.pilot_id}" data-pilot-type="resident">
+            <div class="pilot-card resident" data-pilot-id="${pilot.pilot_id}" data-pilot-type="resident">
                 <h3>${pilot.pilot_name}</h3>
                 <div>
                     <h4>General</h4>
@@ -278,16 +311,24 @@
                 </div>
                 <div class="comments-section">
                     <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}">${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}</div>
-                    <div class="comments-actions"><a href="#" class="view-comments">View All (${pilot.comments.length}) / Add Comment</a></div>
+                    <div class="pilot-card-footer">
+                        <div class="comments-actions"><a href="#" class="view-comments">View All (${pilot.comments.length}) / Add Comment</a></div>
+                         ${adminActionsHTML}
+                    </div>
                 </div>
             </div>`;
     }
     
     function createTfcCardHTML(pilot) {
         const lastComment = pilot.comments && pilot.comments.length > 0 ? pilot.comments[pilot.comments.length - 1] : null;
-        const canEditTfc = permissions.canPromoteToTfc; // Certified Trainers and above
+        const canEditTfc = permissions.canPromoteToTfc;
+         const adminActionsHTML = permissions.canDelete
+            ? `<div class="pilot-card-admin-actions">
+                   <button class="btn-danger delete-pilot-btn" data-pilot-name="${pilot.pilot_name}" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc" title="Remove from Tracker">${deleteSVG}</button>
+               </div>`
+            : '';
         return `
-            <div class="pilot-card" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc">
+            <div class="pilot-card tfc" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc">
                 <h3>${pilot.pilot_name}</h3>
                 <div><h4>Quizzes</h4><div class="progress-grid">${createQuizProgressHTML(tfcQuizzes, pilot.completed_quizzes)}</div></div>
                 <div>
@@ -310,27 +351,25 @@
                 </div>
                 <div class="comments-section">
                     <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}">${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}</div>
-                    <div class="comments-actions"><a href="#" class="view-comments">View All (${pilot.comments ? pilot.comments.length : 0}) / Add Comment</a></div>
+                     <div class="pilot-card-footer">
+                        <div class="comments-actions"><a href="#" class="view-comments">View All (${pilot.comments ? pilot.comments.length : 0}) / Add Comment</a></div>
+                        ${adminActionsHTML}
+                    </div>
                 </div>
             </div>`;
     }
 
 
     function renderAllData() {
-        const residentsContainer = document.getElementById('residents-container');
-        const tfcContainer = document.getElementById('tfc-container');
-        const promoteSelect = document.getElementById('promote-pilot-select');
-
-        residentsContainer.innerHTML = trackerData.residents.map(createResidentCardHTML).join('');
-        tfcContainer.innerHTML = trackerData.tfcs.map(createTfcCardHTML).join('');
+        const allPilotsContainer = document.getElementById('all-pilots-container');
         
-        if (permissions.canPromoteToTfc && promoteSelect) {
-            promoteSelect.innerHTML = '<option value="" disabled selected>Choose a pilot to promote...</option>';
-            trackerData.nonTfcCommanders.forEach(p => {
-                const option = new Option(p.pilot_name, p.pilot_id);
-                promoteSelect.add(option);
-            });
-        }
+        allPilotsContainer.innerHTML = ''; // Clear the container first
+
+        // Render TFCs first, then residents
+        const tfcHtml = trackerData.tfcs.map(createTfcCardHTML).join('');
+        const residentHtml = trackerData.residents.map(createResidentCardHTML).join('');
+
+        allPilotsContainer.innerHTML = tfcHtml + residentHtml;
     }
 
     async function fetchAndRenderData() {
@@ -371,6 +410,7 @@
 
         const pilotId = card.dataset.pilotId;
         const pilotType = card.dataset.pilotType;
+        const pilotName = card.querySelector('h3').textContent;
 
         if (target.classList.contains('view-comments')) {
             e.preventDefault();
@@ -379,36 +419,56 @@
             e.preventDefault();
             const field = target.closest('.complex-signoff-item').dataset.field;
             openSignoffsModal(pilotId, field);
+        } else if (target.closest('.delete-pilot-btn')) {
+            e.preventDefault();
+            openDeletePilotModal(pilotName, pilotId);
         }
     }
     
     async function handleAddResident() {
-        const btn = document.getElementById('add-resident-btn');
-        const pilotName = document.getElementById('new-pilot-name').value.trim();
-        const discordId = document.getElementById('new-pilot-discord-id').value.trim();
-        if (!pilotName || !discordId) return showToast('Pilot Name and Discord ID are required.', 'error');
+        if (!selectedUserForAddition) {
+            showToast('Please select a pilot from the search results first.', 'error');
+            return;
+        }
 
+        const btn = document.getElementById('add-resident-btn');
         btn.disabled = true;
+        const { character_name: pilotName, discord_id: discordId } = selectedUserForAddition;
+
         const result = await apiCall(`/training/api/add-resident/${token}`, 'POST', { pilotName, discordId });
         if (result && result.success) {
             showToast(result.message, 'success');
-            document.getElementById('new-pilot-name').value = '';
-            document.getElementById('new-pilot-discord-id').value = '';
+            // Clear selection and search
+            document.getElementById('resident-search').value = '';
+            document.getElementById('resident-search-results').style.display = 'none';
+            selectedUserForAddition = null;
+            btn.disabled = true;
+        } else {
+            btn.disabled = false;
         }
-        btn.disabled = false;
     }
     
     async function handlePromoteToTfc() {
+        if (!selectedTfcForPromotion) {
+            showToast('Please select a pilot from the search results to promote.', 'error');
+            return;
+        }
+
         const btn = document.getElementById('promote-tfc-btn');
-        const pilotId = document.getElementById('promote-pilot-select').value;
-        if (!pilotId) return showToast('Please select a pilot to promote.', 'error');
-        
         btn.disabled = true;
+        const { pilot_id: pilotId } = selectedTfcForPromotion;
+        
         const result = await apiCall(`/training/api/promote-to-tfc/${token}`, 'POST', { pilotId });
         if (result && result.success) {
             showToast(result.message, 'success');
+            // Clear selection and search
+            document.getElementById('tfc-promote-search').value = '';
+            document.getElementById('tfc-promote-search-results').style.display = 'none';
+            selectedTfcForPromotion = null;
+            btn.disabled = true;
+        } else {
+            btn.disabled = false; // Re-enable on failure
         }
-        btn.disabled = false;
     }
 
     async function handleAddComment() {
@@ -476,7 +536,7 @@
             contentEl.innerHTML = comments.slice().reverse().map(c => `
                 <div class="comment">
                     <div class="comment-header">By <strong>${c.commander}</strong> on ${new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</div>
-                    <div class="comment-body">${c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+                    <div class="comment-body">${c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}</div>
                 </div>
             `).join('');
         }
@@ -521,43 +581,103 @@
         }
         openModal('signoffsModal');
     }
+    
+    function openDeletePilotModal(pilotName, pilotId) {
+        const modal = document.getElementById('deletePilotModal');
+        document.getElementById('deletePilotModalText').innerHTML = `Are you sure you want to permanently remove <strong>${pilotName}</strong> from the training tracker? This action cannot be undone.`;
+        const confirmBtn = document.getElementById('deletePilotConfirmBtn');
+        confirmBtn.onclick = () => handleDeletePilot(pilotId); // Set the action for the confirm button
+        openModal('deletePilotModal');
+    }
+
+    async function handleDeletePilot(pilotId) {
+        const result = await apiCall(`/training/api/remove-pilot/${token}`, 'POST', { pilotId });
+        if (result && result.success) {
+            showToast(result.message, 'success');
+            closeModal('deletePilotModal');
+        }
+    }
+
 
     // --- INITIALIZATION & LISTENERS ---
     document.addEventListener('DOMContentLoaded', () => {
+        let searchDebounceTimeout;
+        let selectedUserForAddition = null;
+        const residentSearchInput = document.getElementById('resident-search');
+        const residentSearchResults = document.getElementById('resident-search-results');
+        const addResidentBtn = document.getElementById('add-resident-btn');
+
+        let tfcSearchDebounceTimeout;
+        let selectedTfcForPromotion = null;
+        const tfcSearchInput = document.getElementById('tfc-promote-search');
+        const tfcSearchResults = document.getElementById('tfc-promote-search-results');
+        const promoteTfcBtn = document.getElementById('promote-tfc-btn');
+
+        async function handleResidentSearch() {
+// ... existing code ... -->
+                    item.addEventListener('click', () => {
+                        selectedUserForAddition = user;
+                        addResidentBtn.disabled = false;
+                        residentSearchInput.value = user.character_name;
+                        residentSearchResults.style.display = 'none'; // Hide results after selection
+                    });
+                    residentSearchResults.appendChild(item);
+                });
+            } else {
+                residentSearchResults.style.display = 'none'; // Hide on API error
+            }
+        }
+        
+        async function handleTfcSearch() {
+// ... existing code ... -->
+                    item.addEventListener('click', () => {
+                        selectedTfcForPromotion = user;
+                        promoteTfcBtn.disabled = false;
+                        tfcSearchInput.value = user.pilot_name;
+                        tfcSearchResults.style.display = 'none'; // Hide results after selection
+                    });
+                    tfcSearchResults.appendChild(item);
+                });
+            } else {
+                tfcSearchResults.style.display = 'none'; // Hide on API error
+            }
+        }
+
+        document.addEventListener('click', function(event) {
+            if (residentSearchInput && !residentSearchInput.contains(event.target) && residentSearchResults && !residentSearchResults.contains(event.target)) {
+                residentSearchResults.style.display = 'none';
+            }
+            if (tfcSearchInput && !tfcSearchInput.contains(event.target) && tfcSearchResults && !tfcSearchResults.contains(event.target)) {
+                tfcSearchResults.style.display = 'none';
+            }
+        });
+
+        if (residentSearchInput) {
+            residentSearchInput.addEventListener('input', () => {
+                clearTimeout(searchDebounceTimeout);
+                searchDebounceTimeout = setTimeout(handleResidentSearch, 300);
+            });
+        }
+        
+        if (tfcSearchInput) {
+            tfcSearchInput.addEventListener('input', () => {
+                clearTimeout(tfcSearchDebounceTimeout);
+                tfcSearchDebounceTimeout = setTimeout(handleTfcSearch, 300);
+            });
+        }
+        
         const container = document.querySelector('.container');
         container.addEventListener('change', handleInputChange);
         container.addEventListener('click', handleGridClick);
         
-        if (permissions.canAddResidents) {
-            document.getElementById('add-resident-btn').addEventListener('click', handleAddResident);
+        if (addResidentBtn) {
+            addResidentBtn.addEventListener('click', handleAddResident);
         }
-        if (permissions.canPromoteToTfc) {
-            document.getElementById('promote-tfc-btn').addEventListener('click', handlePromoteToTfc);
+        if (promoteTfcBtn) {
+            promoteTfcBtn.addEventListener('click', handlePromoteToTfc);
         }
 
         document.getElementById('addCommentBtn')?.addEventListener('click', handleAddComment);
         document.getElementById('addSignoffBtn')?.addEventListener('click', handleAddSignoff);
-        document.getElementById('removeSignoffBtn')?.addEventListener('click', handleRemoveSignoff);
-        document.querySelectorAll('.modal-overlay').forEach(overlay => {
-            overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay.id); });
-        });
-
-        const socket = io();
-        socket.on('connect', () => console.log('WebSocket connected.'));
-        socket.on('training-update', () => {
-            console.log('Received training-update event.');
-            showToast('Data updated. Refreshing...', 'info');
-            fetchAndRenderData();
-        });
-        socket.on('disconnect', () => {
-            console.warn('WebSocket disconnected.');
-            showToast('Connection lost. Real-time updates paused.', 'error');
-        });
-
-        fetchAndRenderData();
-    });
-</script>
-
-</body>
-</html>
+// ... existing code ... -->
 

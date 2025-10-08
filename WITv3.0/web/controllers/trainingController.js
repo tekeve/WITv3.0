@@ -23,14 +23,9 @@ const validateTokenAndPermissions = (client, requiredPermission = 'commander') =
         return res.status(403).render('error', { title: 'Link Invalid', message: 'This link is invalid or has expired.' });
     }
 
-    // Use isCouncilOrHigher for this specific check, otherwise use the general permission check.
-    const isPromoteRoute = req.path.includes('/api/promote-to-tfc');
-    const hasRequiredPermission = isPromoteRoute
-        ? roleManager.isCouncilOrHigher(tokenData.member)
-        : roleManager.hasPermission(tokenData.member, [requiredPermission, 'admin']);
+    const requiredPermissions = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
 
-
-    if (!hasRequiredPermission) {
+    if (!roleManager.hasPermission(tokenData.member, requiredPermissions)) {
         if (req.path.includes('/api/')) {
             return res.status(403).json({ success: false, message: 'You do not have permission for this action.' });
         }
@@ -68,6 +63,8 @@ exports.showTracker = (client) => [
                 permissions: {
                     canEdit: roleManager.hasPermission(member, ['line_commander', 'admin']),
                     canPromoteToTfc: roleManager.isCouncilOrHigher(member),
+                    canAddResidents: roleManager.isCouncilOrHigher(member),
+                    canDelete: roleManager.hasPermission(member, ['council', 'admin', 'certified_trainer'])
                 }
             });
         } catch (error) {
@@ -76,6 +73,51 @@ exports.showTracker = (client) => [
         }
     }
 ];
+
+/**
+ * Handles searching for users who are not yet in the training program.
+ */
+exports.searchForResidents = (client) => [
+    validateTokenAndPermissions(client, 'council'),
+    async (req, res) => {
+        const { searchTerm } = req.body;
+
+        if (!searchTerm) {
+            return res.json({ success: true, users: [] });
+        }
+
+        try {
+            const users = await trainingManager.searchEligibleResidents(searchTerm);
+            res.json({ success: true, users });
+        } catch (error) {
+            logger.error('Error in searchForResidents controller:', error);
+            res.status(500).json({ success: false, message: 'An internal server error occurred during search.' });
+        }
+    }
+];
+
+/**
+ * Handles searching for commanders eligible for TFC promotion.
+ */
+exports.searchForTfcCandidates = (client) => [
+    validateTokenAndPermissions(client, 'council'),
+    async (req, res) => {
+        const { searchTerm } = req.body;
+
+        if (!searchTerm) {
+            return res.json({ success: true, users: [] });
+        }
+
+        try {
+            const users = await trainingManager.searchEligibleTfcCandidates(searchTerm);
+            res.json({ success: true, users });
+        } catch (error) {
+            logger.error('Error in searchForTfcCandidates controller:', error);
+            res.status(500).json({ success: false, message: 'An internal server error occurred during search.' });
+        }
+    }
+];
+
 
 /**
  * Handles adding a new resident to the tracker.
@@ -286,6 +328,32 @@ exports.removeSignoff = (client) => [
         } catch (error) {
             logger.error('Error in removeSignoff controller:', error);
             res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+        }
+    }
+];
+
+/**
+ * Handles removing a pilot from the training program.
+ */
+exports.removePilot = (client) => [
+    validateTokenAndPermissions(client, ['council', 'admin', 'certified_trainer']),
+    async (req, res) => {
+        const { pilotId } = req.body;
+        const io = req.app.get('io');
+
+        if (!pilotId) {
+            return res.status(400).json({ success: false, message: 'Pilot ID is required.' });
+        }
+
+        try {
+            const result = await trainingManager.removePilotFromTraining(pilotId);
+            if (result.success && io) {
+                io.emit('training-update');
+            }
+            res.json(result);
+        } catch (error) {
+            logger.error('Error in removePilot controller:', error);
+            res.status(500).json({ success: false, message: 'An internal server error occurred while removing the pilot.' });
         }
     }
 ];

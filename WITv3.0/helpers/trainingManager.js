@@ -60,17 +60,10 @@ async function getAllTrackerData() {
         residents.forEach(processPilot);
         tfcs.forEach(processTfc);
 
-        const nonTfcCommanders = await db.query(`
-            SELECT pilot_id, pilot_name 
-            FROM commander_training 
-            WHERE status IN ('line_commander', 'resident')
-            ORDER BY pilot_name ASC
-        `);
-
-        return { residents, tfcs, nonTfcCommanders };
+        return { residents, tfcs };
     } catch (error) {
         logger.error('Failed to get all tracker data:', error);
-        return { residents: [], tfcs: [], nonTfcCommanders: [] };
+        return { residents: [], tfcs: [] };
     }
 }
 
@@ -277,6 +270,85 @@ async function updateTrustedLogiStatus(pilotName, isTrusted) {
     }
 }
 
+async function searchEligibleResidents(searchTerm) {
+    if (!searchTerm || searchTerm.length < 2) {
+        return [];
+    }
+    try {
+        const searchQuery = `%${searchTerm}%`;
+        const sql = `
+            SELECT u.discord_id, u.character_name
+            FROM users u
+            LEFT JOIN commander_training ct ON u.discord_id = ct.discord_id
+            WHERE u.is_main = 1
+              AND ct.pilot_id IS NULL
+              AND (u.character_name LIKE ? OR u.discord_id LIKE ?)
+            LIMIT 10;
+        `;
+        const results = await db.query(sql, [searchQuery, searchQuery]);
+        return results;
+    } catch (error) {
+        logger.error('Failed to search for eligible residents:', error);
+        return [];
+    }
+}
+
+async function searchEligibleTfcCandidates(searchTerm) {
+    if (!searchTerm || searchTerm.length < 2) {
+        return [];
+    }
+    try {
+        const searchQuery = `%${searchTerm}%`;
+        // Find residents or line commanders who are not already TFCs or higher
+        const sql = `
+            SELECT pilot_id, pilot_name
+            FROM commander_training
+            WHERE status IN ('resident', 'line_commander')
+              AND pilot_name LIKE ?
+            ORDER BY pilot_name ASC
+            LIMIT 10;
+        `;
+        const results = await db.query(sql, [searchQuery]);
+        return results;
+    } catch (error) {
+        logger.error('Failed to search for eligible TFC candidates:', error);
+        return [];
+    }
+}
+
+async function removePilotFromTraining(pilotId) {
+    if (!pilotId) {
+        return { success: false, message: 'Pilot ID is required.' };
+    }
+    const connection = await db.pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const [pilot] = await connection.query('SELECT pilot_name FROM commander_training WHERE pilot_id = ?', [pilotId]);
+        if (!pilot) {
+            throw new Error('Pilot not found in training tracker.');
+        }
+
+        // Deleting from commander_training will cascade and delete from training_fc_tracker
+        const result = await connection.query('DELETE FROM commander_training WHERE pilot_id = ?', [pilotId]);
+
+        await connection.commit();
+
+        if (result[0].affectedRows > 0) {
+            logger.info(`Admin deleted pilot ${pilot.pilot_name} (ID: ${pilotId}) from the training tracker.`);
+            return { success: true, message: `Successfully removed ${pilot.pilot_name} from the training program.` };
+        } else {
+            return { success: false, message: 'Pilot was not found in the training tracker.' };
+        }
+    } catch (error) {
+        await connection.rollback();
+        logger.error(`Error removing pilot ${pilotId} from training:`, error);
+        return { success: false, message: 'A database error occurred during deletion.' };
+    } finally {
+        connection.release();
+    }
+}
+
 module.exports = {
     getAllTrackerData,
     addResident,
@@ -287,6 +359,9 @@ module.exports = {
     addSignoff,
     removeSignoff,
     updateLastActive,
-    updateTrustedLogiStatus
+    updateTrustedLogiStatus,
+    searchEligibleResidents,
+    searchEligibleTfcCandidates,
+    removePilotFromTraining
 };
 
