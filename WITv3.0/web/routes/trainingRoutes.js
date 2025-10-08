@@ -16,7 +16,8 @@ module.exports = (client) => {
     router.post('/training/api/update/:token', trainingController.updateProgress(client));
     router.post('/training/api/add-comment/:token', trainingController.addComment(client));
     router.get('/training/api/pilots/:token', trainingController.getPilotsData(client));
-
+    router.post('/training/api/add-signoff/:token', trainingController.addSignoff(client));
+    router.post('/training/api/remove-signoff/:token', trainingController.removeSignoff(client));
 
     return router;
 };

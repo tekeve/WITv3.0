@@ -6,7 +6,6 @@ const { syncLogiStatus } = require('@helpers/trainingSyncManager');
 
 /**
  * Middleware to validate the token and user permissions for all training routes.
- * It also provides access to the Socket.IO instance via req.app.get('io').
  */
 const validateTokenAndPermissions = (client, requiredPermission = 'commander') => (req, res, next) => {
     const { token } = req.params;
@@ -16,22 +15,19 @@ const validateTokenAndPermissions = (client, requiredPermission = 'commander') =
         if (client.activeTrainingTokens?.has(token)) {
             client.activeTrainingTokens.delete(token);
         }
-        // If it's an API call, send JSON, otherwise render an error page.
         if (req.path.includes('/api/')) {
             return res.status(403).json({ success: false, message: 'Session expired. Please generate a new link in Discord.' });
         }
         return res.status(403).render('error', { title: 'Link Invalid', message: 'This link is invalid or has expired.' });
     }
 
-    // Use the generic hasPermission check
-    if (!roleManager.hasPermission(tokenData.member, [requiredPermission, 'admin'])) { // Admins can always access
+    if (!roleManager.hasPermission(tokenData.member, [requiredPermission, 'admin'])) {
         if (req.path.includes('/api/')) {
             return res.status(403).json({ success: false, message: 'You do not have permission for this action.' });
         }
         return res.status(403).render('error', { title: 'Permission Denied', message: `You do not have the required role to access this page.` });
     }
 
-    // Attach validated data to the request object for later use
     req.tokenData = tokenData;
     next();
 };
@@ -49,7 +45,6 @@ exports.showTracker = (client) => [
             const commanderChar = await charManager.getChars(member.id);
             const commanderName = commanderChar?.main?.character_name || member.user.tag;
 
-            // Run a quick sync on page load to ensure data is fresh
             const io = req.app.get('io');
             if (io) {
                 await syncLogiStatus(io);
@@ -61,9 +56,8 @@ exports.showTracker = (client) => [
                 token: req.params.token,
                 pilots,
                 commanderName,
-                // Pass a permissions object to the frontend
                 permissions: {
-                    canEdit: roleManager.hasPermission(member, ['certified_trainer', 'council', 'admin']),
+                    canEdit: roleManager.hasPermission(member, ['line_commander', 'admin']),
                     canAddResidents: roleManager.hasPermission(member, ['council', 'admin'])
                 }
             });
@@ -79,7 +73,7 @@ exports.showTracker = (client) => [
  * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.addResident = (client) => [
-    validateTokenAndPermissions(client, 'council'), // Requires council+ to add new residents
+    validateTokenAndPermissions(client, 'council'),
     async (req, res) => {
         const { pilotName, discordId } = req.body;
         const io = req.app.get('io');
@@ -102,11 +96,11 @@ exports.addResident = (client) => [
 ];
 
 /**
- * Handles updating a pilot's progress.
+ * Handles updating a pilot's progress for simple fields.
  * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.updateProgress = (client) => [
-    validateTokenAndPermissions(client, 'certified_trainer'),
+    validateTokenAndPermissions(client, 'line_commander'),
     async (req, res) => {
         const { pilotId, field, value } = req.body;
         const io = req.app.get('io');
@@ -116,10 +110,7 @@ exports.updateProgress = (client) => [
         }
 
         try {
-            const commanderChar = await charManager.getChars(req.tokenData.user.id);
-            const name = commanderChar?.main?.character_name || req.tokenData.user.tag;
-
-            const result = await trainingManager.updatePilotProgress(pilotId, field, value, name);
+            const result = await trainingManager.updatePilotProgress(pilotId, field, value);
             if (result.success && io) {
                 io.emit('training-update');
             }
@@ -136,13 +127,21 @@ exports.updateProgress = (client) => [
  * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.addComment = (client) => [
-    validateTokenAndPermissions(client, 'certified_trainer'),
+    validateTokenAndPermissions(client, 'line_commander'),
     async (req, res) => {
+        const { token } = req.params;
+        const tokenData = client.activeTrainingTokens?.get(token);
+
+        if (!tokenData || Date.now() > tokenData.expires) {
+            if (tokenData) client.activeTrainingTokens.delete(token);
+            return res.status(403).json({ success: false, message: 'This form session has expired. Please try again. Your changes were not saved.' });
+        }
+
         const { pilotId, comment } = req.body;
         const io = req.app.get('io');
 
         if (!pilotId || !comment) {
-            return res.status(400).json({ success: false, message: 'Missing pilotId or comment text.' });
+            return res.status(400).json({ success: false, message: 'Missing pilot ID or comment.' });
         }
 
         try {
@@ -166,7 +165,7 @@ exports.addComment = (client) => [
  * @param {import('discord.js').Client} client - The Discord client instance.
  */
 exports.getPilotsData = (client) => [
-    validateTokenAndPermissions(client), // Reuse the same validation
+    validateTokenAndPermissions(client),
     async (req, res) => {
         try {
             const pilots = await trainingManager.getAllPilots();
@@ -178,3 +177,62 @@ exports.getPilotsData = (client) => [
     }
 ];
 
+/**
+ * Handles adding a signoff with a comment.
+ * @param {import('discord.js').Client} client - The Discord client instance.
+ */
+exports.addSignoff = (client) => [
+    validateTokenAndPermissions(client, 'line_commander'),
+    async (req, res) => {
+        const { pilotId, field, comment } = req.body;
+        const io = req.app.get('io');
+
+        if (!pilotId || !field) {
+            return res.status(400).json({ success: false, message: 'Missing pilot ID or sign-off field.' });
+        }
+
+        try {
+            const commanderChar = await charManager.getChars(req.tokenData.user.id);
+            const commanderName = commanderChar?.main?.character_name || req.tokenData.user.tag;
+
+            const result = await trainingManager.addSignoff(pilotId, field, commanderName, comment);
+            if (result.success && io) {
+                io.emit('training-update');
+            }
+            res.json(result);
+        } catch (error) {
+            logger.error('Error in addSignoff controller:', error);
+            res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+        }
+    }
+];
+
+/**
+ * Handles removing a signoff.
+ * @param {import('discord.js').Client} client - The Discord client instance.
+ */
+exports.removeSignoff = (client) => [
+    validateTokenAndPermissions(client, 'line_commander'),
+    async (req, res) => {
+        const { pilotId, field } = req.body;
+        const io = req.app.get('io');
+
+        if (!pilotId || !field) {
+            return res.status(400).json({ success: false, message: 'Missing pilot ID or sign-off field.' });
+        }
+
+        try {
+            const commanderChar = await charManager.getChars(req.tokenData.user.id);
+            const commanderName = commanderChar?.main?.character_name || req.tokenData.user.tag;
+
+            const result = await trainingManager.removeSignoff(pilotId, field, commanderName);
+            if (result.success && io) {
+                io.emit('training-update');
+            }
+            res.json(result);
+        } catch (error) {
+            logger.error('Error in removeSignoff controller:', error);
+            res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+        }
+    }
+];

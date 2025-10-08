@@ -2,12 +2,15 @@ const db = require('@helpers/database');
 const logger = require('@helpers/logger');
 const charManager = require('@helpers/characterManager');
 
-// A set of fields that are allowed to be updated via the web UI
-const allowedFields = new Set([
+// A set of fields that are allowed to be updated via the simple update route
+const allowedSimpleFields = new Set([
     'start_date', 'last_active', 'resident_orientation_by',
-    'quiz_scouting', 'quiz_fitting', 'quiz_fleet_roles', 'quiz_site_mechanics',
-    'signoff_scouting_by', 'signoff_trusted_logi', 'signoff_bastion', 'signoff_new_pilot_orientation_by',
-    'exam_multiple_choice', 'exam_ct'
+    'signoff_bastion', 'exam_multiple_choice', 'exam_ct'
+]);
+
+// A set of fields that are managed via the detailed signoff functions
+const allowedComplexSignoffFields = new Set([
+    'signoff_scouting', 'signoff_new_pilot_orientation'
 ]);
 
 /**
@@ -19,8 +22,8 @@ async function getAllPilots() {
         const pilots = await db.query('SELECT * FROM commander_training ORDER BY pilot_name ASC');
         // Process fields that are stored as JSON strings into actual arrays
         pilots.forEach(pilot => {
-            pilot.signoff_scouting_by = pilot.signoff_scouting_by ? JSON.parse(pilot.signoff_scouting_by) : [];
-            pilot.signoff_new_pilot_orientation_by = pilot.signoff_new_pilot_orientation_by ? JSON.parse(pilot.signoff_new_pilot_orientation_by) : [];
+            pilot.signoff_scouting = pilot.signoff_scouting ? JSON.parse(pilot.signoff_scouting) : [];
+            pilot.signoff_new_pilot_orientation = pilot.signoff_new_pilot_orientation ? JSON.parse(pilot.signoff_new_pilot_orientation) : [];
             pilot.comments = pilot.comments ? JSON.parse(pilot.comments) : [];
         });
         return pilots;
@@ -70,79 +73,134 @@ async function addResident(pilotName, discordId) {
 }
 
 /**
- * Updates a specific field for a pilot in the training tracker.
+ * Updates a simple field for a pilot in the training tracker (dates, booleans, text).
  * @param {number} pilotId - The database ID of the pilot.
  * @param {string} field - The name of the field to update.
  * @param {any} value - The new value for the field.
- * @param {string} commanderName - The name of the commander making the change.
- * @returns {Promise<{success: boolean, message: string, lastActive?: string}>}
+ * @returns {Promise<{success: boolean, message: string}>}
  */
-async function updatePilotProgress(pilotId, field, value, commanderName) {
-    if (!allowedFields.has(field)) {
-        return { success: false, message: 'Invalid field specified.' };
+async function updatePilotProgress(pilotId, field, value) {
+    if (!allowedSimpleFields.has(field)) {
+        return { success: false, message: 'Invalid field specified for simple update.' };
     }
 
-    const [pilot] = await db.query('SELECT * FROM commander_training WHERE pilot_id = ?', [pilotId]);
+    const [pilot] = await db.query('SELECT pilot_name FROM commander_training WHERE pilot_id = ?', [pilotId]);
     if (!pilot) {
         return { success: false, message: 'Pilot not found.' };
     }
 
-    // Determine if this update should also refresh the 'last_active' date
-    const shouldUpdateLastActive = field.startsWith('quiz_') || field.startsWith('signoff_') || field.startsWith('exam_') || field === 'resident_orientation_by';
-
     try {
-        let lastActiveDate = pilot.last_active;
-        // Handle fields that store a list of commanders (JSON arrays)
-        if (field.endsWith('_by')) {
-            let currentSignoffs = [];
-            try {
-                currentSignoffs = pilot[field] ? JSON.parse(pilot[field]) : [];
-                if (!Array.isArray(currentSignoffs)) currentSignoffs = [];
-            } catch (e) {
-                logger.warn(`Could not parse JSON for ${field} on pilot ${pilotId}. Resetting.`);
-                currentSignoffs = [];
-            }
+        let setClauses = `\`${field}\` = ?, last_active = NOW()`;
+        const params = [value, pilotId];
+        
+        const sql = `UPDATE commander_training SET ${setClauses} WHERE pilot_id = ?`;
+        await db.query(sql, params);
 
-            const commanderIndex = currentSignoffs.indexOf(commanderName);
-            let actionMessage;
-
-            if (value && commanderIndex === -1) { // Add commander
-                currentSignoffs.push(commanderName);
-                actionMessage = `Added your sign-off for ${pilot.pilot_name}.`;
-            } else if (!value && commanderIndex > -1) { // Remove commander
-                currentSignoffs.splice(commanderIndex, 1);
-                actionMessage = `Removed your sign-off for ${pilot.pilot_name}.`;
-            } else {
-                return { success: true, message: 'No changes made to sign-offs.' }; // No change needed
-            }
-
-            const updatedValue = JSON.stringify(currentSignoffs);
-            const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = NOW() WHERE pilot_id = ?`;
-            await db.query(sql, [updatedValue, pilotId]);
-            lastActiveDate = new Date().toISOString();
-            return { success: true, message: actionMessage, lastActive: lastActiveDate };
-
-        } else { // Handle simple fields (dates, booleans, text)
-            let setClauses = `\`${field}\` = ?`;
-            const params = [value];
-
-            if (shouldUpdateLastActive) {
-                setClauses += ', last_active = NOW()';
-                lastActiveDate = new Date().toISOString();
-            }
-
-            params.push(pilotId);
-            const sql = `UPDATE commander_training SET ${setClauses} WHERE pilot_id = ?`;
-            await db.query(sql, params);
-
-            const friendlyFieldName = field.replace(/_/g, ' ');
-            return { success: true, message: `Updated ${friendlyFieldName} for ${pilot.pilot_name}.`, lastActive: lastActiveDate };
-        }
+        const friendlyFieldName = field.replace(/_/g, ' ');
+        return { success: true, message: `Updated ${friendlyFieldName} for ${pilot.pilot_name}.`};
     } catch (error) {
         logger.error(`Failed to update pilot progress for pilotId ${pilotId}:`, error);
         return { success: false, message: 'Database update failed.' };
     }
 }
+
+/**
+ * Adds a detailed signoff to a pilot's training record.
+ * @param {number} pilotId - The database ID of the pilot.
+ * @param {string} field - The signoff field to update (e.g., 'signoff_scouting').
+ * @param {string} commanderName - The name of the commander giving the signoff.
+ * @param {string} comment - The comment for the signoff.
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+async function addSignoff(pilotId, field, commanderName, comment) {
+    if (!allowedComplexSignoffFields.has(field)) {
+        return { success: false, message: 'Invalid sign-off field specified.' };
+    }
+    try {
+        const [pilot] = await db.query(`SELECT pilot_name, \`${field}\` FROM commander_training WHERE pilot_id = ?`, [pilotId]);
+        if (!pilot) {
+            return { success: false, message: 'Pilot not found.' };
+        }
+
+        let currentSignoffs = [];
+        try {
+            currentSignoffs = pilot[field] ? JSON.parse(pilot[field]) : [];
+            if (!Array.isArray(currentSignoffs)) currentSignoffs = [];
+        } catch (e) {
+            logger.warn(`Could not parse JSON for ${field} on pilot ${pilotId}. Resetting.`);
+            currentSignoffs = [];
+        }
+
+        if (currentSignoffs.length >= 3) {
+            return { success: false, message: 'This skill already has the maximum of 3 sign-offs.' };
+        }
+        if (currentSignoffs.some(s => s.commander === commanderName)) {
+            return { success: false, message: 'You have already signed off this pilot for this skill.' };
+        }
+
+        currentSignoffs.push({
+            commander: commanderName,
+            comment: comment,
+            date: new Date().toISOString()
+        });
+        const updatedValue = JSON.stringify(currentSignoffs);
+        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = NOW() WHERE pilot_id = ?`;
+        await db.query(sql, [updatedValue, pilotId]);
+
+        const friendlyFieldName = field.replace('signoff_', '').replace(/_/g, ' ');
+        return { success: true, message: `Sign-off for ${pilot.pilot_name} on ${friendlyFieldName} added.` };
+
+    } catch (error) {
+        logger.error(`Failed to add sign-off for pilotId ${pilotId}:`, error);
+        return { success: false, message: 'Database error while adding sign-off.' };
+    }
+}
+
+/**
+ * Removes a commander's specific signoff from a pilot's record.
+ * @param {number} pilotId - The database ID of the pilot.
+ * @param {string} field - The signoff field to update.
+ * @param {string} commanderName - The name of the commander whose signoff to remove.
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+async function removeSignoff(pilotId, field, commanderName) {
+    if (!allowedComplexSignoffFields.has(field)) {
+        return { success: false, message: 'Invalid sign-off field specified.' };
+    }
+    try {
+        const [pilot] = await db.query(`SELECT pilot_name, \`${field}\` FROM commander_training WHERE pilot_id = ?`, [pilotId]);
+        if (!pilot) {
+            return { success: false, message: 'Pilot not found.' };
+        }
+
+        let currentSignoffs = [];
+        try {
+            currentSignoffs = pilot[field] ? JSON.parse(pilot[field]) : [];
+            if (!Array.isArray(currentSignoffs)) currentSignoffs = [];
+        } catch (e) {
+            logger.warn(`Could not parse JSON for ${field} on pilot ${pilotId}. No action taken.`);
+            return { success: false, message: 'Could not parse existing sign-off data.' };
+        }
+
+        const initialLength = currentSignoffs.length;
+        const updatedSignoffs = currentSignoffs.filter(s => s.commander !== commanderName);
+
+        if (updatedSignoffs.length === initialLength) {
+            return { success: false, message: `Your sign-off was not found for ${pilot.pilot_name} on this skill.` };
+        }
+
+        const updatedValue = JSON.stringify(updatedSignoffs);
+        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = NOW() WHERE pilot_id = ?`;
+        await db.query(sql, [updatedValue, pilotId]);
+
+        const friendlyFieldName = field.replace('signoff_', '').replace(/_/g, ' ');
+        return { success: true, message: `Removed sign-off for ${pilot.pilot_name} on ${friendlyFieldName}.` };
+    } catch (error) {
+        logger.error(`Failed to remove sign-off for pilotId ${pilotId}:`, error);
+        return { success: false, message: 'Database error while removing sign-off.' };
+    }
+}
+
 
 /**
  * Adds a comment to a pilot's training record.
@@ -215,6 +273,8 @@ module.exports = {
     addResident,
     updatePilotProgress,
     addComment,
-    updateTrustedLogiStatus
+    updateTrustedLogiStatus,
+    addSignoff,
+    removeSignoff
 };
 
