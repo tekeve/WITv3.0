@@ -47,14 +47,37 @@ async function getAllTrackerData() {
 
         const processPilot = (pilot) => {
             pilot.completed_quizzes = pilot.completed_quizzes ? pilot.completed_quizzes.split(',').map(Number) : [];
-            try { pilot.signoff_scouting = pilot.signoff_scouting ? JSON.parse(pilot.signoff_scouting) : []; } catch { pilot.signoff_scouting = []; }
-            try { pilot.signoff_new_pilot_orientation = pilot.signoff_new_pilot_orientation ? JSON.parse(pilot.signoff_new_pilot_orientation) : []; } catch { pilot.signoff_new_pilot_orientation = []; }
-            try { pilot.comments = pilot.comments ? JSON.parse(pilot.comments) : []; } catch { pilot.comments = []; }
+
+            const scoutingSignoffs = pilot.signoff_scouting ? JSON.parse(pilot.signoff_scouting) : [];
+            const orientationSignoffs = pilot.signoff_new_pilot_orientation ? JSON.parse(pilot.signoff_new_pilot_orientation) : [];
+            const generalComments = pilot.comments ? JSON.parse(pilot.comments) : [];
+
+            const allComments = [
+                ...(Array.isArray(generalComments) ? generalComments.map(c => ({ ...c, type: 'General' })) : []),
+                ...(Array.isArray(scoutingSignoffs) ? scoutingSignoffs.map(c => ({ ...c, type: 'Scouting' })) : []),
+                ...(Array.isArray(orientationSignoffs) ? orientationSignoffs.map(c => ({ ...c, type: 'Orientation' })) : [])
+            ].filter(c => c.comment); // Only keep items that have a comment
+
+            allComments.sort((a, b) => new Date(b.date) - new Date(a.date));
+            pilot.comments = allComments;
+
+            // Keep original parsed arrays for dots
+            pilot.signoff_scouting = Array.isArray(scoutingSignoffs) ? scoutingSignoffs : [];
+            pilot.signoff_new_pilot_orientation = Array.isArray(orientationSignoffs) ? orientationSignoffs : [];
         };
 
         const processTfc = (pilot) => {
             pilot.completed_quizzes = pilot.completed_quizzes ? pilot.completed_quizzes.split(',').map(Number) : [];
-            try { pilot.comments = pilot.comments ? JSON.parse(pilot.comments) : []; } catch { pilot.comments = []; }
+            let currentComments = [];
+            try {
+                currentComments = pilot.comments ? JSON.parse(pilot.comments) : [];
+                if (!Array.isArray(currentComments)) currentComments = [];
+            } catch { currentComments = []; }
+
+            pilot.comments = currentComments
+                .filter(c => c && c.comment)
+                .map(c => ({ type: 'TFC', ...c }))
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
         }
 
         residents.forEach(processPilot);
@@ -68,30 +91,46 @@ async function getAllTrackerData() {
 }
 
 async function addResident(pilotName, discordId) {
+    const connection = await db.pool.getConnection(); // Use a connection for transaction
     try {
-        const [existing] = await db.query('SELECT * FROM commander_training WHERE discord_id = ? OR pilot_name = ?', [discordId, pilotName]);
-        if (existing) {
+        await connection.beginTransaction();
+
+        const [existing] = await connection.query('SELECT * FROM commander_training WHERE discord_id = ? OR pilot_name = ?', [discordId, pilotName]);
+        if (existing.length > 0) {
+            await connection.rollback();
             return { success: false, message: 'This user or pilot name is already in the training program.' };
         }
 
         const charData = await charManager.getChars(discordId);
         if (!charData || !charData.main) {
+            // This part doesn't need to be in the transaction as it's a separate concern
             await charManager.addMain(discordId, pilotName, []);
             logger.info(`Auto-registered ${pilotName} as a main character for discord ID ${discordId}`);
         }
 
+        // Explicitly delete any previous quiz completions for this user.
+        const [deleteResult] = await connection.query('DELETE FROM quiz_completions WHERE discord_id = ?', [discordId]);
+        if (deleteResult.affectedRows > 0) {
+            logger.info(`Cleared ${deleteResult.affectedRows} previous quiz completions for user ${discordId} upon re-adding to tracker.`);
+        }
+
         const sql = 'INSERT INTO commander_training (pilot_name, discord_id, start_date, last_active, status) VALUES (?, ?, UTC_DATE(), UTC_DATE(), \'resident\')';
-        const result = await db.query(sql, [pilotName, discordId]);
+        const [result] = await connection.query(sql, [pilotName, discordId]);
+
+        await connection.commit();
 
         return result.affectedRows > 0
             ? { success: true, message: `Successfully added ${pilotName} to the training tracker.` }
             : { success: false, message: 'Failed to add pilot to the database.' };
     } catch (error) {
+        await connection.rollback();
         if (error.code === 'ER_DUP_ENTRY') {
             return { success: false, message: `A pilot with the name ${pilotName} or a user with that Discord ID is already in the training program.` };
         }
         logger.error(`Error adding resident ${pilotName}:`, error);
         return { success: false, message: 'A database error occurred.' };
+    } finally {
+        if (connection) connection.release();
     }
 }
 
@@ -271,21 +310,25 @@ async function updateTrustedLogiStatus(pilotName, isTrusted) {
 }
 
 async function searchEligibleResidents(searchTerm) {
-    if (!searchTerm || searchTerm.length < 2) {
-        return [];
-    }
     try {
-        const searchQuery = `%${searchTerm}%`;
-        const sql = `
+        let sql;
+        let params;
+        const baseSql = `
             SELECT u.discord_id, u.character_name
             FROM users u
             LEFT JOIN commander_training ct ON u.discord_id = ct.discord_id
-            WHERE u.is_main = 1
-              AND ct.pilot_id IS NULL
-              AND (u.character_name LIKE ? OR u.discord_id LIKE ?)
-            LIMIT 10;
+            WHERE u.is_main = 1 AND ct.pilot_id IS NULL
         `;
-        const results = await db.query(sql, [searchQuery, searchQuery]);
+
+        if (searchTerm && searchTerm.trim().length > 0) {
+            sql = `${baseSql} AND (u.character_name LIKE ? OR u.discord_id LIKE ?) ORDER BY u.character_name ASC LIMIT 25;`;
+            params = [`%${searchTerm.trim()}%`, `%${searchTerm.trim()}%`];
+        } else {
+            sql = `${baseSql} ORDER BY u.character_name ASC LIMIT 25;`;
+            params = [];
+        }
+
+        const results = await db.query(sql, params);
         return results;
     } catch (error) {
         logger.error('Failed to search for eligible residents:', error);
@@ -294,21 +337,23 @@ async function searchEligibleResidents(searchTerm) {
 }
 
 async function searchEligibleTfcCandidates(searchTerm) {
-    if (!searchTerm || searchTerm.length < 2) {
-        return [];
-    }
     try {
-        const searchQuery = `%${searchTerm}%`;
-        // Find residents or line commanders who are not already TFCs or higher
-        const sql = `
+        let sql;
+        let params;
+        const baseSql = `
             SELECT pilot_id, pilot_name
             FROM commander_training
             WHERE status IN ('resident', 'line_commander')
-              AND pilot_name LIKE ?
-            ORDER BY pilot_name ASC
-            LIMIT 10;
         `;
-        const results = await db.query(sql, [searchQuery]);
+        if (searchTerm && searchTerm.trim().length > 0) {
+            sql = `${baseSql} AND pilot_name LIKE ? ORDER BY pilot_name ASC LIMIT 25;`;
+            params = [`%${searchTerm.trim()}%`];
+        } else {
+            sql = `${baseSql} ORDER BY pilot_name ASC LIMIT 25;`;
+            params = [];
+        }
+
+        const results = await db.query(sql, params);
         return results;
     } catch (error) {
         logger.error('Failed to search for eligible TFC candidates:', error);
@@ -324,9 +369,15 @@ async function removePilotFromTraining(pilotId) {
     try {
         await connection.beginTransaction();
 
-        const [pilot] = await connection.query('SELECT pilot_name FROM commander_training WHERE pilot_id = ?', [pilotId]);
+        const [pilot] = await connection.query('SELECT pilot_name, discord_id FROM commander_training WHERE pilot_id = ?', [pilotId]);
         if (!pilot) {
             throw new Error('Pilot not found in training tracker.');
+        }
+
+        // Also delete any quiz completions associated with the user
+        if (pilot.discord_id) {
+            await connection.query('DELETE FROM quiz_completions WHERE discord_id = ?', [pilot.discord_id]);
+            logger.info(`Deleted quiz completions for ${pilot.pilot_name} (Discord ID: ${pilot.discord_id}).`);
         }
 
         // Deleting from commander_training will cascade and delete from training_fc_tracker
@@ -364,4 +415,9 @@ module.exports = {
     searchEligibleTfcCandidates,
     removePilotFromTraining
 };
+
+
+
+
+
 

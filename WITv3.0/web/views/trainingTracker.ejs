@@ -13,6 +13,10 @@
             --bg-card: #2d3748; --text-primary: #e2e8f0; --text-secondary: #94a3b8;
             --accent-blue: #38bdf8; --accent-green: #4ade80; --accent-red: #f87171;
             --accent-yellow: #facc15; --border-color: #4a5568;
+            --accent-scouting: #4ade80; /* green */
+            --accent-orientation: #38bdf8; /* blue */
+            --accent-tfc: #facc15; /* yellow */
+            --accent-general: #a78bfa; /* purple */
             --bg-card-resident: #4a4a38; /* Pale Yellow */
             --bg-card-tfc: #384a5c;      /* Pale Blue */
         }
@@ -53,11 +57,12 @@
         .signoff-dot.mine { background-color: var(--accent-blue); }
         
         .comments-section { margin-top: 1rem; }
-        .latest-comment { background-color: var(--bg-secondary); padding: 0.75rem; border-radius: 0.375rem; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; border-left: 3px solid var(--accent-yellow); white-space: pre-wrap; word-break: break-word; }
+        .latest-comment { background-color: var(--bg-secondary); padding: 0.75rem; border-radius: 0.375rem; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; border-left: 3px solid var(--accent-yellow); white-space: pre-wrap; word-break: break-word; text-align: left; }
         .latest-comment strong { color: var(--text-primary); }
         
-        .pilot-card-footer { display: flex; justify-content: space-between; align-items: center; }
-        .comments-actions a, .complex-signoff-item .view-signoffs-btn { color: var(--accent-blue); cursor: pointer; text-decoration: none; font-size: 0.875rem; }
+        .pilot-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;}
+        .comments-actions { display: flex; gap: 1rem; align-items: center; }
+        .comments-actions a, .complex-signoff-item .view-signoffs-btn, .history-toggle-btn { color: var(--accent-blue); cursor: pointer; text-decoration: none; font-size: 0.875rem; }
         
         .action-grid { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end; }
 
@@ -105,6 +110,39 @@
         .search-result-item:hover {
             background-color: var(--bg-tertiary);
         }
+
+        .history-toggle-btn {
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        .history-toggle-btn svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s ease-in-out;
+            margin-right: 4px;
+        }
+        .history-toggle-btn.expanded svg {
+            transform: rotate(180deg);
+        }
+        .signoff-history {
+            display: none;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--bg-tertiary);
+            font-size: 0.8rem;
+            list-style: none;
+            padding-left: 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .signoff-history li {
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+        .signoff-history strong { color: var(--text-primary); }
+
     </style>
 </head>
 <body>
@@ -211,9 +249,18 @@
     const tfcQuizzes = <%- JSON.stringify(tfcQuizzes) %>;
     let trackerData = { residents: [], tfcs: [] };
     const deleteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/></svg>`;
+    const chevronSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
     let selectedUserForAddition = null;
     let selectedTfcForPromotion = null;
 
+    function getCommentTypeColor(type) {
+        switch (type) {
+            case 'Scouting': return 'scouting';
+            case 'Orientation': return 'orientation';
+            case 'TFC': return 'tfc';
+            default: return 'general';
+        }
+    }
 
     function showToast(message, type = 'info') {
         const toast = document.getElementById('toast');
@@ -276,12 +323,17 @@
     }
 
     function createResidentCardHTML(pilot) {
-        const lastComment = pilot.comments.length > 0 ? pilot.comments[pilot.comments.length - 1] : null;
+        const lastComment = pilot.comments.length > 0 ? pilot.comments[0] : null;
         const adminActionsHTML = permissions.canDelete
             ? `<div class="pilot-card-admin-actions">
                    <button class="btn-danger delete-pilot-btn" data-pilot-name="${pilot.pilot_name}" data-pilot-id="${pilot.pilot_id}" data-pilot-type="resident" title="Remove from Tracker">${deleteSVG}</button>
                </div>`
             : '';
+        
+        const historyListHTML = pilot.comments.slice(1).map(c => {
+            const itemColor = getCommentTypeColor(c.type);
+            return `<li style="border-left: 3px solid var(--accent-${itemColor}); padding-left: 8px;"><strong>${c.type} from ${c.commander}</strong> (${new Date(c.date).toLocaleDateString([], { dateStyle: 'medium' })}): ${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '<em>No comment</em>'}</li>`;
+        }).join('');
 
         return `
             <div class="pilot-card resident" data-pilot-id="${pilot.pilot_id}" data-pilot-type="resident">
@@ -312,23 +364,37 @@
                     </div>
                 </div>
                 <div class="comments-section">
-                    <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}">${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}</div>
+                    <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}; border-left-color: var(--accent-${lastComment ? getCommentTypeColor(lastComment.type) : 'general'})">
+                        ${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}
+                    </div>
                     <div class="pilot-card-footer">
-                        <div class="comments-actions"><a href="#" class="view-comments">View All (${pilot.comments.length}) / Add Comment</a></div>
+                        <div class="comments-actions">
+                            ${pilot.comments.length > 1 ? `<button class="history-toggle-btn">${chevronSVG} View Older (${pilot.comments.length - 1})</button>` : '<div></div>'}
+                            <a href="#" class="view-comments">Add General Comment</a>
+                        </div>
                          ${adminActionsHTML}
                     </div>
+                    <ul class="signoff-history" style="display: none;">
+                        ${historyListHTML}
+                    </ul>
                 </div>
             </div>`;
     }
     
     function createTfcCardHTML(pilot) {
-        const lastComment = pilot.comments && pilot.comments.length > 0 ? pilot.comments[pilot.comments.length - 1] : null;
+        const lastComment = pilot.comments && pilot.comments.length > 0 ? pilot.comments[0] : null;
         const canEditTfc = permissions.canPromoteToTfc;
          const adminActionsHTML = permissions.canDelete
             ? `<div class="pilot-card-admin-actions">
                    <button class="btn-danger delete-pilot-btn" data-pilot-name="${pilot.pilot_name}" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc" title="Remove from Tracker">${deleteSVG}</button>
                </div>`
             : '';
+        
+        const historyListHTML = pilot.comments.slice(1).map(c => {
+            const itemColor = getCommentTypeColor(c.type);
+            return `<li style="border-left: 3px solid var(--accent-${itemColor}); padding-left: 8px;"><strong>${c.type} from ${c.commander}</strong> (${new Date(c.date).toLocaleDateString([], { dateStyle: 'medium' })}): ${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '<em>No comment</em>'}</li>`;
+        }).join('');
+
         return `
             <div class="pilot-card tfc" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc">
                 <h3>${pilot.pilot_name}</h3>
@@ -352,11 +418,19 @@
                     </div>
                 </div>
                 <div class="comments-section">
-                    <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}">${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}</div>
-                     <div class="pilot-card-footer">
-                        <div class="comments-actions"><a href="#" class="view-comments">View All (${pilot.comments ? pilot.comments.length : 0}) / Add Comment</a></div>
-                        ${adminActionsHTML}
+                    <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}; border-left-color: var(--accent-tfc)">
+                        ${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}
                     </div>
+                    <div class="pilot-card-footer">
+                        <div class="comments-actions">
+                            ${pilot.comments.length > 1 ? `<button class="history-toggle-btn">${chevronSVG} View Older (${pilot.comments.length - 1})</button>` : '<div></div>'}
+                            <a href="#" class="view-comments">Add TFC Comment</a>
+                        </div>
+                         ${adminActionsHTML}
+                    </div>
+                    <ul class="signoff-history" style="display: none;">
+                        ${historyListHTML}
+                    </ul>
                 </div>
             </div>`;
     }
@@ -424,6 +498,15 @@
         } else if (target.closest('.delete-pilot-btn')) {
             e.preventDefault();
             openDeletePilotModal(pilotName, pilotId);
+        } else if (target.closest('.history-toggle-btn')) {
+            e.preventDefault();
+            const historyEl = card.querySelector('.signoff-history');
+            const btn = target.closest('.history-toggle-btn');
+            if (historyEl) {
+                const isExpanded = historyEl.style.display === 'block';
+                historyEl.style.display = isExpanded ? 'none' : 'block';
+                btn.classList.toggle('expanded', !isExpanded);
+            }
         }
     }
     
@@ -528,20 +611,10 @@
         modal.dataset.pilotId = pilotId;
         modal.dataset.pilotType = pilotType;
         
-        document.getElementById('commentsModalTitle').textContent = `Comments for ${pilot.pilot_name}`;
+        document.getElementById('commentsModalTitle').textContent = `Add Comment for ${pilot.pilot_name}`;
         const contentEl = document.getElementById('commentsModalContent');
-        const comments = pilot.comments || [];
+        contentEl.innerHTML = ''; // Clear it, we're not showing history here anymore.
         
-        if (comments.length === 0) {
-            contentEl.innerHTML = '<p style="color: var(--text-secondary);">No comments yet.</p>';
-        } else {
-            contentEl.innerHTML = comments.slice().reverse().map(c => `
-                <div class="comment">
-                    <div class="comment-header">By <strong>${c.commander}</strong> on ${new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</div>
-                    <div class="comment-body">${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''}</div>
-                </div>
-            `).join('');
-        }
         document.getElementById('newComment').value = '';
         openModal('commentsModal');
     }
@@ -619,11 +692,6 @@
             selectedUserForAddition = null;
             residentSearchResults.innerHTML = '';
 
-            if (searchTerm.length < 2) {
-                residentSearchResults.style.display = 'none';
-                return;
-            }
-
             const result = await apiCall(`/training/api/search-residents/${token}`, 'POST', { searchTerm });
 
             if (result && result.success && result.users.length > 0) {
@@ -641,7 +709,7 @@
                     residentSearchResults.appendChild(item);
                 });
             } else {
-                residentSearchResults.style.display = 'none'; // Hide on API error
+                residentSearchResults.style.display = 'none'; // Hide on API error or no results
             }
         }
         
@@ -650,11 +718,6 @@
             promoteTfcBtn.disabled = true;
             selectedTfcForPromotion = null;
             tfcSearchResults.innerHTML = '';
-
-            if (searchTerm.length < 2) {
-                tfcSearchResults.style.display = 'none';
-                return;
-            }
 
             const result = await apiCall(`/training/api/search-tfc-candidates/${token}`, 'POST', { searchTerm });
             
@@ -673,7 +736,7 @@
                     tfcSearchResults.appendChild(item);
                 });
             } else {
-                tfcSearchResults.style.display = 'none'; // Hide on API error
+                tfcSearchResults.style.display = 'none'; // Hide on API error or no results
             }
         }
 
@@ -691,6 +754,7 @@
                 clearTimeout(searchDebounceTimeout);
                 searchDebounceTimeout = setTimeout(handleResidentSearch, 300);
             });
+            residentSearchInput.addEventListener('focus', handleResidentSearch);
         }
         
         if (tfcSearchInput) {
@@ -698,6 +762,7 @@
                 clearTimeout(tfcSearchDebounceTimeout);
                 tfcSearchDebounceTimeout = setTimeout(handleTfcSearch, 300);
             });
+            tfcSearchInput.addEventListener('focus', handleTfcSearch);
         }
         
         const container = document.querySelector('.container');
@@ -732,7 +797,5 @@
 
 </body>
 </html>
-
-
 
 

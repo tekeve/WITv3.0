@@ -82,8 +82,8 @@ exports.searchForResidents = (client) => [
     async (req, res) => {
         const { searchTerm } = req.body;
 
-        if (!searchTerm) {
-            return res.json({ success: true, users: [] });
+        if (searchTerm === undefined || searchTerm === null) {
+            return res.status(400).json({ success: false, message: 'Search term not provided.' });
         }
 
         try {
@@ -104,8 +104,8 @@ exports.searchForTfcCandidates = (client) => [
     async (req, res) => {
         const { searchTerm } = req.body;
 
-        if (!searchTerm) {
-            return res.json({ success: true, users: [] });
+        if (searchTerm === undefined || searchTerm === null) {
+            return res.status(400).json({ success: false, message: 'Search term not provided.' });
         }
 
         try {
@@ -357,4 +357,5 @@ exports.removePilot = (client) => [
         }
     }
 ];
+
 
