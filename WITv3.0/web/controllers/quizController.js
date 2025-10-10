@@ -78,6 +78,7 @@ exports.getQuizData = (client) => [
 
             questions.forEach(q => {
                 q.answers = answers.filter(a => a.question_id === q.question_id);
+                // Randomize answer order for display
                 for (let i = q.answers.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [q.answers[i], q.answers[j]] = [q.answers[j], q.answers[i]];
@@ -167,8 +168,8 @@ exports.handleQuizSubmission = (client) => [
 
             const [pilot] = await db.query('SELECT pilot_id FROM commander_training WHERE discord_id = ?', [user.id]);
             if (pilot) {
-                const result = await trainingManager.updateLastActive(pilot.pilot_id);
-                if (result && result.success && io) {
+                const pilotName = await trainingManager.updateLastActive(pilot.pilot_id);
+                if (pilotName && io) {
                     io.emit('training-update');
                 }
             }

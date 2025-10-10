@@ -26,7 +26,7 @@
         
         .top-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; max-width: 1400px; margin: auto; margin-bottom: 2rem; }
         
-        .pilots-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+        .pilots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; justify-content: center; }
         .pilot-card { background-color: var(--bg-card); border-radius: 0.5rem; padding: 1.25rem; display: flex; flex-direction: column; gap: 1.5rem; border: 1px solid var(--border-color); }
         
         .pilot-card.resident { background-color: var(--bg-card-resident); }
@@ -211,6 +211,8 @@
     const tfcQuizzes = <%- JSON.stringify(tfcQuizzes) %>;
     let trackerData = { residents: [], tfcs: [] };
     const deleteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/></svg>`;
+    let selectedUserForAddition = null;
+    let selectedTfcForPromotion = null;
 
 
     function showToast(message, type = 'info') {
@@ -536,7 +538,7 @@
             contentEl.innerHTML = comments.slice().reverse().map(c => `
                 <div class="comment">
                     <div class="comment-header">By <strong>${c.commander}</strong> on ${new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</div>
-                    <div class="comment-body">${c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}</div>
+                    <div class="comment-body">${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''}</div>
                 </div>
             `).join('');
         }
@@ -602,19 +604,34 @@
     // --- INITIALIZATION & LISTENERS ---
     document.addEventListener('DOMContentLoaded', () => {
         let searchDebounceTimeout;
-        let selectedUserForAddition = null;
         const residentSearchInput = document.getElementById('resident-search');
         const residentSearchResults = document.getElementById('resident-search-results');
         const addResidentBtn = document.getElementById('add-resident-btn');
 
         let tfcSearchDebounceTimeout;
-        let selectedTfcForPromotion = null;
         const tfcSearchInput = document.getElementById('tfc-promote-search');
         const tfcSearchResults = document.getElementById('tfc-promote-search-results');
         const promoteTfcBtn = document.getElementById('promote-tfc-btn');
 
         async function handleResidentSearch() {
-// ... existing code ... -->
+            const searchTerm = residentSearchInput.value.trim();
+            addResidentBtn.disabled = true;
+            selectedUserForAddition = null;
+            residentSearchResults.innerHTML = '';
+
+            if (searchTerm.length < 2) {
+                residentSearchResults.style.display = 'none';
+                return;
+            }
+
+            const result = await apiCall(`/training/api/search-residents/${token}`, 'POST', { searchTerm });
+
+            if (result && result.success && result.users.length > 0) {
+                residentSearchResults.style.display = 'block';
+                result.users.forEach(user => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.textContent = `${user.character_name} (${user.discord_id})`;
                     item.addEventListener('click', () => {
                         selectedUserForAddition = user;
                         addResidentBtn.disabled = false;
@@ -629,7 +646,24 @@
         }
         
         async function handleTfcSearch() {
-// ... existing code ... -->
+            const searchTerm = tfcSearchInput.value.trim();
+            promoteTfcBtn.disabled = true;
+            selectedTfcForPromotion = null;
+            tfcSearchResults.innerHTML = '';
+
+            if (searchTerm.length < 2) {
+                tfcSearchResults.style.display = 'none';
+                return;
+            }
+
+            const result = await apiCall(`/training/api/search-tfc-candidates/${token}`, 'POST', { searchTerm });
+            
+            if (result && result.success && result.users.length > 0) {
+                tfcSearchResults.style.display = 'block';
+                 result.users.forEach(user => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.textContent = user.pilot_name;
                     item.addEventListener('click', () => {
                         selectedTfcForPromotion = user;
                         promoteTfcBtn.disabled = false;
@@ -679,5 +713,26 @@
 
         document.getElementById('addCommentBtn')?.addEventListener('click', handleAddComment);
         document.getElementById('addSignoffBtn')?.addEventListener('click', handleAddSignoff);
-// ... existing code ... -->
+        document.getElementById('removeSignoffBtn')?.addEventListener('click', handleRemoveSignoff);
+
+        // --- WebSocket Logic ---
+        const socket = io();
+        socket.on('connect', () => console.log('Connected to WebSocket server.'));
+        socket.on('training-update', () => {
+            console.log('Received training-update event. Fetching new data.');
+            showToast('Data updated by another user. Refreshing...', 'info');
+            fetchAndRenderData();
+        });
+        socket.on('disconnect', () => console.log('Disconnected from WebSocket server.'));
+
+        // Initial data load
+        fetchAndRenderData();
+    });
+</script>
+
+</body>
+</html>
+
+
+
 
