@@ -95,8 +95,8 @@ async function addResident(pilotName, discordId) {
     try {
         await connection.beginTransaction();
 
-        const [existing] = await connection.query('SELECT * FROM commander_training WHERE discord_id = ? OR pilot_name = ?', [discordId, pilotName]);
-        if (existing.length > 0) {
+        const [existingRows] = await connection.query('SELECT pilot_id FROM commander_training WHERE discord_id = ? OR pilot_name = ?', [discordId, pilotName]);
+        if (existingRows.length > 0) {
             await connection.rollback();
             return { success: false, message: 'This user or pilot name is already in the training program.' };
         }
@@ -114,7 +114,7 @@ async function addResident(pilotName, discordId) {
             logger.info(`Cleared ${deleteResult.affectedRows} previous quiz completions for user ${discordId} upon re-adding to tracker.`);
         }
 
-        const sql = 'INSERT INTO commander_training (pilot_name, discord_id, start_date, last_active, status) VALUES (?, ?, UTC_DATE(), UTC_DATE(), \'resident\')';
+        const sql = 'INSERT INTO commander_training (pilot_name, discord_id, start_date, last_active, status) VALUES (?, ?, NOW(), NOW(), \'resident\')';
         const [result] = await connection.query(sql, [pilotName, discordId]);
 
         await connection.commit();
@@ -147,7 +147,7 @@ async function promoteToTfc(pilotId) {
             return { success: false, message: 'Pilot is already a Training FC.' };
         }
 
-        await connection.query("UPDATE commander_training SET status = 'training_fc', last_active = UTC_DATE() WHERE pilot_id = ?", [pilotId]);
+        await connection.query("UPDATE commander_training SET status = 'training_fc', last_active = NOW() WHERE pilot_id = ?", [pilotId]);
         await connection.query("INSERT INTO training_fc_tracker (pilot_id) VALUES (?) ON DUPLICATE KEY UPDATE pilot_id = pilot_id", [pilotId]);
 
         await connection.commit();
@@ -189,7 +189,7 @@ async function updateTfcProgress(pilotId, field, value) {
 async function updateLastActive(pilotId) {
     const [pilot] = await db.query('SELECT pilot_name FROM commander_training WHERE pilot_id = ?', [pilotId]);
     if (!pilot) return null;
-    await db.query('UPDATE commander_training SET last_active = UTC_DATE() WHERE pilot_id = ?', [pilotId]);
+    await db.query('UPDATE commander_training SET last_active = NOW() WHERE pilot_id = ?', [pilotId]);
     return pilot.pilot_name;
 }
 
@@ -226,7 +226,7 @@ async function addSignoff(pilotId, field, commanderName, comment, discordId) {
 
         currentSignoffs.push({ discordId, commander: commanderName, comment, date: new Date().toISOString() });
         const updatedValue = JSON.stringify(currentSignoffs);
-        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = UTC_DATE() WHERE pilot_id = ?`;
+        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = NOW() WHERE pilot_id = ?`;
         await db.query(sql, [updatedValue, pilotId]);
 
         return { success: true, message: `Sign-off for ${pilot.pilot_name} on ${field.replace(/_/g, ' ')} added.` };
@@ -255,7 +255,7 @@ async function removeSignoff(pilotId, field, discordId) {
         }
 
         const updatedValue = JSON.stringify(updatedSignoffs);
-        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = UTC_DATE() WHERE pilot_id = ?`;
+        const sql = `UPDATE commander_training SET \`${field}\` = ?, last_active = NOW() WHERE pilot_id = ?`;
         await db.query(sql, [updatedValue, pilotId]);
 
         return { success: true, message: `Removed sign-off for ${pilot.pilot_name} on ${field.replace(/_/g, ' ')}.` };
@@ -415,9 +415,3 @@ module.exports = {
     searchEligibleTfcCandidates,
     removePilotFromTraining
 };
-
-
-
-
-
-

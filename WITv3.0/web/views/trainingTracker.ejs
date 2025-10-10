@@ -13,10 +13,6 @@
             --bg-card: #2d3748; --text-primary: #e2e8f0; --text-secondary: #94a3b8;
             --accent-blue: #38bdf8; --accent-green: #4ade80; --accent-red: #f87171;
             --accent-yellow: #facc15; --border-color: #4a5568;
-            --accent-scouting: #4ade80; /* green */
-            --accent-orientation: #38bdf8; /* blue */
-            --accent-tfc: #facc15; /* yellow */
-            --accent-general: #a78bfa; /* purple */
             --bg-card-resident: #4a4a38; /* Pale Yellow */
             --bg-card-tfc: #384a5c;      /* Pale Blue */
         }
@@ -57,12 +53,19 @@
         .signoff-dot.mine { background-color: var(--accent-blue); }
         
         .comments-section { margin-top: 1rem; }
-        .latest-comment { background-color: var(--bg-secondary); padding: 0.75rem; border-radius: 0.375rem; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; border-left: 3px solid var(--accent-yellow); white-space: pre-wrap; word-break: break-word; text-align: left; }
+        .comment-history { display: none; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color); }
+        .latest-comment-wrapper { display: flex; align-items: flex-start; gap: 0.5rem; }
+        .comment-bar { flex-shrink: 0; width: 3px; border-radius: 3px; align-self: stretch; }
+        .latest-comment { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; white-space: pre-wrap; word-break: break-word; flex-grow: 1; }
         .latest-comment strong { color: var(--text-primary); }
+        .comment-author { font-weight: bold; color: var(--text-primary); }
+
+        .older-comment { padding-left: 1rem; border-left: 3px solid var(--bg-tertiary); margin-bottom: 0.75rem; }
         
-        .pilot-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;}
-        .comments-actions { display: flex; gap: 1rem; align-items: center; }
-        .comments-actions a, .complex-signoff-item .view-signoffs-btn, .history-toggle-btn { color: var(--accent-blue); cursor: pointer; text-decoration: none; font-size: 0.875rem; }
+        .pilot-card-footer { display: flex; justify-content: space-between; align-items: center; }
+        .comments-actions { display: flex; gap: 1rem; }
+        .comments-actions a { color: var(--accent-blue); cursor: pointer; text-decoration: none; font-size: 0.875rem; }
+        .complex-signoff-item .view-signoffs-btn { color: var(--accent-blue); cursor: pointer; text-decoration: none; font-size: 0.875rem; }
         
         .action-grid { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end; }
 
@@ -110,39 +113,6 @@
         .search-result-item:hover {
             background-color: var(--bg-tertiary);
         }
-
-        .history-toggle-btn {
-            background: none;
-            border: none;
-            padding: 0;
-        }
-
-        .history-toggle-btn svg {
-            width: 16px;
-            height: 16px;
-            transition: transform 0.2s ease-in-out;
-            margin-right: 4px;
-        }
-        .history-toggle-btn.expanded svg {
-            transform: rotate(180deg);
-        }
-        .signoff-history {
-            display: none;
-            margin-top: 0.75rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid var(--bg-tertiary);
-            font-size: 0.8rem;
-            list-style: none;
-            padding-left: 0;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .signoff-history li {
-            margin-bottom: 0.5rem;
-            color: var(--text-secondary);
-        }
-        .signoff-history strong { color: var(--text-primary); }
-
     </style>
 </head>
 <body>
@@ -158,7 +128,7 @@
             <div class="action-grid">
                 <div class="form-group" style="position: relative;">
                     <label for="resident-search">Search by Pilot Name or Discord ID</label>
-                    <input type="text" id="resident-search" placeholder="Start typing to search eligible pilots..." autocomplete="off">
+                    <input type="text" id="resident-search" placeholder="Click to see eligible pilots..." autocomplete="off">
                     <div id="resident-search-results" class="search-results" style="display: none;"></div>
                 </div>
                 <button id="add-resident-btn" class="btn-primary" style="padding: 0.75rem;" disabled>Add</button>
@@ -172,7 +142,7 @@
             <div class="action-grid">
                 <div class="form-group" style="position: relative;">
                     <label for="tfc-promote-search">Search by Pilot Name</label>
-                    <input type="text" id="tfc-promote-search" placeholder="Start typing to search eligible commanders..." autocomplete="off">
+                    <input type="text" id="tfc-promote-search" placeholder="Click to see eligible commanders..." autocomplete="off">
                      <div id="tfc-promote-search-results" class="search-results" style="display: none;"></div>
                 </div>
                 <button id="promote-tfc-btn" class="btn-primary" style="padding: 0.75rem;" disabled>Promote</button>
@@ -237,6 +207,19 @@
     </div>
 </div>
 
+<!-- Remove Signoff Modal -->
+<div id="removeSignoffModal" class="modal-overlay">
+    <div class="modal">
+        <h2 id="removeSignoffModalTitle">Confirm Sign-off Removal</h2>
+        <p id="removeSignoffModalText">Are you sure you want to remove your sign-off for this skill? This cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModal('removeSignoffModal')">Cancel</button>
+            <button id="removeSignoffConfirmBtn" class="btn-danger">Confirm Removal</button>
+        </div>
+    </div>
+</div>
+
+
 <div id="toast" class="toast"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -249,17 +232,19 @@
     const tfcQuizzes = <%- JSON.stringify(tfcQuizzes) %>;
     let trackerData = { residents: [], tfcs: [] };
     const deleteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/></svg>`;
-    const chevronSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>`;
     let selectedUserForAddition = null;
     let selectedTfcForPromotion = null;
 
-    function getCommentTypeColor(type) {
-        switch (type) {
-            case 'Scouting': return 'scouting';
-            case 'Orientation': return 'orientation';
-            case 'TFC': return 'tfc';
-            default: return 'general';
-        }
+
+    function formatDisplayDate(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        // Handles invalid date strings gracefully
+        if (isNaN(date)) return 'Invalid Date';
+        return date.toLocaleString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true
+        });
     }
 
     function showToast(message, type = 'info') {
@@ -292,6 +277,15 @@
     function openModal(modalId) { document.getElementById(modalId).style.display = 'flex'; }
     function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
     
+    function getCommentAccentColor(type) {
+        switch (type) {
+            case 'scouting': return 'var(--accent-green)';
+            case 'orientation': return 'var(--accent-blue)';
+            case 'tfc': return 'var(--accent-yellow)';
+            default: return 'var(--accent-yellow)';
+        }
+    }
+    
     function createQuizProgressHTML(quizzes, completedQuizIds) {
         if (!quizzes || quizzes.length === 0) return '<p class="no-quizzes">No quizzes available for this category.</p>';
         return quizzes.map(quiz => `
@@ -323,17 +317,25 @@
     }
 
     function createResidentCardHTML(pilot) {
-        const lastComment = pilot.comments.length > 0 ? pilot.comments[0] : null;
+        const comments = pilot.comments || [];
+        const lastComment = comments.length > 0 ? comments[0] : null;
+        const olderComments = comments.slice(1);
+
         const adminActionsHTML = permissions.canDelete
             ? `<div class="pilot-card-admin-actions">
                    <button class="btn-danger delete-pilot-btn" data-pilot-name="${pilot.pilot_name}" data-pilot-id="${pilot.pilot_id}" data-pilot-type="resident" title="Remove from Tracker">${deleteSVG}</button>
                </div>`
             : '';
-        
-        const historyListHTML = pilot.comments.slice(1).map(c => {
-            const itemColor = getCommentTypeColor(c.type);
-            return `<li style="border-left: 3px solid var(--accent-${itemColor}); padding-left: 8px;"><strong>${c.type} from ${c.commander}</strong> (${new Date(c.date).toLocaleDateString([], { dateStyle: 'medium' })}): ${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '<em>No comment</em>'}</li>`;
-        }).join('');
+
+        let olderCommentsHTML = '';
+        if (olderComments.length > 0) {
+            olderCommentsHTML = olderComments.map(c => `
+                <div class="older-comment">
+                    <div class="comment-header">By <span class="comment-author">${c.commander}</span> on ${new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} (${c.type})</div>
+                    <div class="comment-body">${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '<i>No comment text.</i>'}</div>
+                </div>
+            `).join('');
+        }
 
         return `
             <div class="pilot-card resident" data-pilot-id="${pilot.pilot_id}" data-pilot-type="resident">
@@ -341,8 +343,8 @@
                 <div>
                     <h4>General</h4>
                     <div class="info-grid">
-                        <div class="form-group"><label>Start Date</label><input type="date" value="${pilot.start_date ? new Date(pilot.start_date).toISOString().split('T')[0] : ''}" disabled></div>
-                        <div class="form-group"><label>Last Active</label><input type="date" value="${pilot.last_active ? new Date(pilot.last_active).toISOString().split('T')[0] : ''}" disabled></div>
+                        <div class="form-group"><label>Start Date</label><input type="text" value="${formatDisplayDate(pilot.start_date)}" title="${pilot.start_date || ''}" disabled></div>
+                        <div class="form-group"><label>Last Active</label><input type="text" value="${formatDisplayDate(pilot.last_active)}" title="${pilot.last_active || ''}" disabled></div>
                     </div>
                     <div class="form-group" style="margin-top: 1rem;"><label>Resident Orientation</label><input type="text" value="${pilot.resident_orientation_by || ''}" data-field="resident_orientation_by" placeholder="FC Name" ${!permissions.canEdit ? 'disabled' : ''}></div>
                 </div>
@@ -364,36 +366,48 @@
                     </div>
                 </div>
                 <div class="comments-section">
-                    <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}; border-left-color: var(--accent-${lastComment ? getCommentTypeColor(lastComment.type) : 'general'})">
-                        ${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}
+                    ${lastComment ? `
+                        <div class="latest-comment-wrapper">
+                            <div class="comment-bar" style="background-color: ${getCommentAccentColor(lastComment.type)};"></div>
+                            <div class="latest-comment">
+                                <span class="comment-author">${lastComment.commander}:</span> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+                            </div>
+                        </div>
+                    ` : ''}
+                    <div class="comment-history">
+                        ${olderCommentsHTML}
                     </div>
                     <div class="pilot-card-footer">
                         <div class="comments-actions">
-                            ${pilot.comments.length > 1 ? `<button class="history-toggle-btn">${chevronSVG} View Older (${pilot.comments.length - 1})</button>` : '<div></div>'}
-                            <a href="#" class="view-comments">Add General Comment</a>
+                            <a href="#" class="add-comment-btn">Add Comment</a>
+                            ${olderComments.length > 0 ? `<a href="#" class="view-older-comments-btn">View Older (${olderComments.length})</a>` : ''}
                         </div>
                          ${adminActionsHTML}
                     </div>
-                    <ul class="signoff-history" style="display: none;">
-                        ${historyListHTML}
-                    </ul>
                 </div>
             </div>`;
     }
     
     function createTfcCardHTML(pilot) {
-        const lastComment = pilot.comments && pilot.comments.length > 0 ? pilot.comments[0] : null;
+        const comments = pilot.comments || [];
+        const lastComment = comments.length > 0 ? comments[0] : null;
+        const olderComments = comments.slice(1);
         const canEditTfc = permissions.canPromoteToTfc;
-         const adminActionsHTML = permissions.canDelete
+        const adminActionsHTML = permissions.canDelete
             ? `<div class="pilot-card-admin-actions">
                    <button class="btn-danger delete-pilot-btn" data-pilot-name="${pilot.pilot_name}" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc" title="Remove from Tracker">${deleteSVG}</button>
                </div>`
             : '';
-        
-        const historyListHTML = pilot.comments.slice(1).map(c => {
-            const itemColor = getCommentTypeColor(c.type);
-            return `<li style="border-left: 3px solid var(--accent-${itemColor}); padding-left: 8px;"><strong>${c.type} from ${c.commander}</strong> (${new Date(c.date).toLocaleDateString([], { dateStyle: 'medium' })}): ${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '<em>No comment</em>'}</li>`;
-        }).join('');
+            
+        let olderCommentsHTML = '';
+        if (olderComments.length > 0) {
+            olderCommentsHTML = olderComments.map(c => `
+                <div class="older-comment">
+                    <div class="comment-header">By <span class="comment-author">${c.commander}</span> on ${new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} (${c.type})</div>
+                    <div class="comment-body">${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '<i>No comment text.</i>'}</div>
+                </div>
+            `).join('');
+        }
 
         return `
             <div class="pilot-card tfc" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc">
@@ -418,19 +432,24 @@
                     </div>
                 </div>
                 <div class="comments-section">
-                    <div class="latest-comment" style="${!lastComment ? 'display: none;' : ''}; border-left-color: var(--accent-tfc)">
-                        ${lastComment ? `<strong>${lastComment.commander}:</strong> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}` : ''}
-                    </div>
-                    <div class="pilot-card-footer">
-                        <div class="comments-actions">
-                            ${pilot.comments.length > 1 ? `<button class="history-toggle-btn">${chevronSVG} View Older (${pilot.comments.length - 1})</button>` : '<div></div>'}
-                            <a href="#" class="view-comments">Add TFC Comment</a>
+                    ${lastComment ? `
+                        <div class="latest-comment-wrapper">
+                             <div class="comment-bar" style="background-color: ${getCommentAccentColor(lastComment.type)};"></div>
+                            <div class="latest-comment">
+                                <span class="comment-author">${lastComment.commander}:</span> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+                            </div>
                         </div>
-                         ${adminActionsHTML}
+                    ` : ''}
+                     <div class="comment-history">
+                        ${olderCommentsHTML}
                     </div>
-                    <ul class="signoff-history" style="display: none;">
-                        ${historyListHTML}
-                    </ul>
+                     <div class="pilot-card-footer">
+                        <div class="comments-actions">
+                            <a href="#" class="add-comment-btn">Add Comment</a>
+                             ${olderComments.length > 0 ? `<a href="#" class="view-older-comments-btn">View Older (${olderComments.length})</a>` : ''}
+                        </div>
+                        ${adminActionsHTML}
+                    </div>
                 </div>
             </div>`;
     }
@@ -488,9 +507,15 @@
         const pilotType = card.dataset.pilotType;
         const pilotName = card.querySelector('h3').textContent;
 
-        if (target.classList.contains('view-comments')) {
+        if (target.classList.contains('add-comment-btn')) {
             e.preventDefault();
             openCommentsModal(pilotId, pilotType);
+        } else if (target.classList.contains('view-older-comments-btn')) {
+            e.preventDefault();
+            const historyDiv = card.querySelector('.comment-history');
+            const isHidden = historyDiv.style.display === 'none' || !historyDiv.style.display;
+            historyDiv.style.display = isHidden ? 'block' : 'none';
+            target.textContent = isHidden ? 'Hide Older' : `View Older (${historyDiv.children.length})`;
         } else if (target.classList.contains('view-signoffs-btn')) {
             e.preventDefault();
             const field = target.closest('.complex-signoff-item').dataset.field;
@@ -498,15 +523,6 @@
         } else if (target.closest('.delete-pilot-btn')) {
             e.preventDefault();
             openDeletePilotModal(pilotName, pilotId);
-        } else if (target.closest('.history-toggle-btn')) {
-            e.preventDefault();
-            const historyEl = card.querySelector('.signoff-history');
-            const btn = target.closest('.history-toggle-btn');
-            if (historyEl) {
-                const isExpanded = historyEl.style.display === 'block';
-                historyEl.style.display = isExpanded ? 'none' : 'block';
-                btn.classList.toggle('expanded', !isExpanded);
-            }
         }
     }
     
@@ -586,20 +602,29 @@
         }
         btn.disabled = false;
     }
-
-    async function handleRemoveSignoff() {
-        if (!confirm('Are you sure you want to remove your sign-off?')) return;
-        const modal = document.getElementById('signoffsModal');
-        const { pilotId, field } = modal.dataset;
+    
+    function openRemoveSignoffModal(pilotId, field) {
+        const modal = document.getElementById('removeSignoffModal');
+        const confirmBtn = document.getElementById('removeSignoffConfirmBtn');
         
-        const btn = document.getElementById('removeSignoffBtn');
-        btn.disabled = true;
+        confirmBtn.onclick = () => handleRemoveSignoff(pilotId, field);
+        
+        openModal('removeSignoffModal');
+    }
+
+    async function handleRemoveSignoff(pilotId, field) {
+        const confirmBtn = document.getElementById('removeSignoffConfirmBtn');
+        confirmBtn.disabled = true;
+
         const result = await apiCall(`/training/api/remove-signoff/${token}`, 'POST', { pilotId, field });
+        
         if (result && result.success) {
             showToast(result.message, 'success');
+            closeModal('removeSignoffModal');
             closeModal('signoffsModal');
         }
-        btn.disabled = false;
+        
+        confirmBtn.disabled = false;
     }
 
     function openCommentsModal(pilotId, pilotType) {
@@ -611,10 +636,20 @@
         modal.dataset.pilotId = pilotId;
         modal.dataset.pilotType = pilotType;
         
-        document.getElementById('commentsModalTitle').textContent = `Add Comment for ${pilot.pilot_name}`;
+        document.getElementById('commentsModalTitle').textContent = `Comments for ${pilot.pilot_name}`;
         const contentEl = document.getElementById('commentsModalContent');
-        contentEl.innerHTML = ''; // Clear it, we're not showing history here anymore.
+        const comments = pilot.comments || [];
         
+        if (comments.length === 0) {
+            contentEl.innerHTML = '<p style="color: var(--text-secondary);">No comments yet.</p>';
+        } else {
+            contentEl.innerHTML = comments.map(c => `
+                <div class="comment">
+                    <div class="comment-header">By <span class="comment-author">${c.commander}</span> on ${new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} (${c.type})</div>
+                    <div class="comment-body">${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''}</div>
+                </div>
+            `).join('');
+        }
         document.getElementById('newComment').value = '';
         openModal('commentsModal');
     }
@@ -686,60 +721,43 @@
         const tfcSearchResults = document.getElementById('tfc-promote-search-results');
         const promoteTfcBtn = document.getElementById('promote-tfc-btn');
 
-        async function handleResidentSearch() {
-            const searchTerm = residentSearchInput.value.trim();
-            addResidentBtn.disabled = true;
-            selectedUserForAddition = null;
-            residentSearchResults.innerHTML = '';
+        async function handleSearch(type) {
+            const inputEl = type === 'resident' ? residentSearchInput : tfcSearchInput;
+            const resultsEl = type === 'resident' ? residentSearchResults : tfcSearchResults;
+            const btnEl = type === 'resident' ? addResidentBtn : promoteTfcBtn;
+            
+            const searchTerm = inputEl.value.trim();
+            btnEl.disabled = true;
+            if(type === 'resident') selectedUserForAddition = null; else selectedTfcForPromotion = null;
+            resultsEl.innerHTML = '';
 
-            const result = await apiCall(`/training/api/search-residents/${token}`, 'POST', { searchTerm });
+            const endpoint = type === 'resident' ? `/training/api/search-residents/${token}` : `/training/api/search-tfc-candidates/${token}`;
+            const result = await apiCall(endpoint, 'POST', { searchTerm });
 
             if (result && result.success && result.users.length > 0) {
-                residentSearchResults.style.display = 'block';
+                resultsEl.style.display = 'block';
                 result.users.forEach(user => {
                     const item = document.createElement('div');
                     item.className = 'search-result-item';
-                    item.textContent = `${user.character_name} (${user.discord_id})`;
+                    const displayName = user.character_name || user.pilot_name;
+                    item.textContent = type === 'resident' ? `${displayName} (${user.discord_id})` : displayName;
                     item.addEventListener('click', () => {
-                        selectedUserForAddition = user;
-                        addResidentBtn.disabled = false;
-                        residentSearchInput.value = user.character_name;
-                        residentSearchResults.style.display = 'none'; // Hide results after selection
+                        if (type === 'resident') {
+                           selectedUserForAddition = user;
+                        } else {
+                           selectedTfcForPromotion = user;
+                        }
+                        btnEl.disabled = false;
+                        inputEl.value = displayName;
+                        resultsEl.style.display = 'none';
                     });
-                    residentSearchResults.appendChild(item);
+                    resultsEl.appendChild(item);
                 });
             } else {
-                residentSearchResults.style.display = 'none'; // Hide on API error or no results
+                resultsEl.style.display = 'none';
             }
         }
         
-        async function handleTfcSearch() {
-            const searchTerm = tfcSearchInput.value.trim();
-            promoteTfcBtn.disabled = true;
-            selectedTfcForPromotion = null;
-            tfcSearchResults.innerHTML = '';
-
-            const result = await apiCall(`/training/api/search-tfc-candidates/${token}`, 'POST', { searchTerm });
-            
-            if (result && result.success && result.users.length > 0) {
-                tfcSearchResults.style.display = 'block';
-                 result.users.forEach(user => {
-                    const item = document.createElement('div');
-                    item.className = 'search-result-item';
-                    item.textContent = user.pilot_name;
-                    item.addEventListener('click', () => {
-                        selectedTfcForPromotion = user;
-                        promoteTfcBtn.disabled = false;
-                        tfcSearchInput.value = user.pilot_name;
-                        tfcSearchResults.style.display = 'none'; // Hide results after selection
-                    });
-                    tfcSearchResults.appendChild(item);
-                });
-            } else {
-                tfcSearchResults.style.display = 'none'; // Hide on API error or no results
-            }
-        }
-
         document.addEventListener('click', function(event) {
             if (residentSearchInput && !residentSearchInput.contains(event.target) && residentSearchResults && !residentSearchResults.contains(event.target)) {
                 residentSearchResults.style.display = 'none';
@@ -752,17 +770,17 @@
         if (residentSearchInput) {
             residentSearchInput.addEventListener('input', () => {
                 clearTimeout(searchDebounceTimeout);
-                searchDebounceTimeout = setTimeout(handleResidentSearch, 300);
+                searchDebounceTimeout = setTimeout(() => handleSearch('resident'), 300);
             });
-            residentSearchInput.addEventListener('focus', handleResidentSearch);
+            residentSearchInput.addEventListener('focus', () => handleSearch('resident'));
         }
         
         if (tfcSearchInput) {
             tfcSearchInput.addEventListener('input', () => {
                 clearTimeout(tfcSearchDebounceTimeout);
-                tfcSearchDebounceTimeout = setTimeout(handleTfcSearch, 300);
+                tfcSearchDebounceTimeout = setTimeout(() => handleSearch('tfc'), 300);
             });
-            tfcSearchInput.addEventListener('focus', handleTfcSearch);
+            tfcSearchInput.addEventListener('focus', () => handleSearch('tfc'));
         }
         
         const container = document.querySelector('.container');
@@ -778,7 +796,11 @@
 
         document.getElementById('addCommentBtn')?.addEventListener('click', handleAddComment);
         document.getElementById('addSignoffBtn')?.addEventListener('click', handleAddSignoff);
-        document.getElementById('removeSignoffBtn')?.addEventListener('click', handleRemoveSignoff);
+        document.getElementById('removeSignoffBtn')?.addEventListener('click', () => {
+            const modal = document.getElementById('signoffsModal');
+            const { pilotId, field } = modal.dataset;
+            openRemoveSignoffModal(pilotId, field);
+        });
 
         // --- WebSocket Logic ---
         const socket = io();
@@ -797,5 +819,4 @@
 
 </body>
 </html>
-
 

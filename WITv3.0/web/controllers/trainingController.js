@@ -41,7 +41,7 @@ const validateTokenAndPermissions = (client, requiredPermission = 'commander') =
  * Renders the Commander Training Tracker page.
  */
 exports.showTracker = (client) => [
-    validateTokenAndPermissions(client, 'commander'),
+    validateTokenAndPermissions(client, ['commander']),
     async (req, res) => {
         try {
             const { member } = req.tokenData;
@@ -78,7 +78,7 @@ exports.showTracker = (client) => [
  * Handles searching for users who are not yet in the training program.
  */
 exports.searchForResidents = (client) => [
-    validateTokenAndPermissions(client, 'council'),
+    validateTokenAndPermissions(client, ['council', 'admin', 'certified_trainer']),
     async (req, res) => {
         const { searchTerm } = req.body;
 
@@ -100,7 +100,7 @@ exports.searchForResidents = (client) => [
  * Handles searching for commanders eligible for TFC promotion.
  */
 exports.searchForTfcCandidates = (client) => [
-    validateTokenAndPermissions(client, 'council'),
+    validateTokenAndPermissions(client, ['council', 'admin', 'certified_trainer']),
     async (req, res) => {
         const { searchTerm } = req.body;
 
@@ -123,7 +123,7 @@ exports.searchForTfcCandidates = (client) => [
  * Handles adding a new resident to the tracker.
  */
 exports.addResident = (client) => [
-    validateTokenAndPermissions(client, 'council'),
+    validateTokenAndPermissions(client, ['council', 'admin', 'certified_trainer']),
     async (req, res) => {
         const { pilotName, discordId } = req.body;
         const io = req.app.get('io');
@@ -149,7 +149,7 @@ exports.addResident = (client) => [
  * Handles promoting a pilot to Training FC status.
  */
 exports.promoteToTfc = (client) => [
-    validateTokenAndPermissions(client, 'council'), // Special permission check is handled in the middleware now
+    validateTokenAndPermissions(client, ['council', 'admin', 'certified_trainer']), // Special permission check is handled in the middleware now
     async (req, res) => {
         const { pilotId } = req.body;
         const io = req.app.get('io');
@@ -201,7 +201,7 @@ exports.updateResidentProgress = (client) => [
  * Handles updating a Training FC's progress.
  */
 exports.updateTfcProgress = (client) => [
-    validateTokenAndPermissions(client, 'certified_trainer'), // Requires CT or higher
+    validateTokenAndPermissions(client, ['council', 'admin', 'certified_trainer']), // Requires CT or higher
     async (req, res) => {
         const { pilotId, field, value } = req.body;
         const io = req.app.get('io');
