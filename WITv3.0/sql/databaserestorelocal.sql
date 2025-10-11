@@ -72,8 +72,8 @@ CREATE TABLE IF NOT EXISTS `commander_training` (
   `pilot_name` varchar(255) NOT NULL,
   `discord_id` varchar(50) DEFAULT NULL,
   `status` enum('resident','line_commander','training_fc','inactive') NOT NULL DEFAULT 'resident',
-  `start_date` date DEFAULT NULL,
-  `last_active` date DEFAULT NULL,
+  `start_date` datetime DEFAULT NULL,
+  `last_active` datetime DEFAULT NULL,
   `resident_orientation_by` varchar(255) DEFAULT NULL,
   `quiz_scouting` tinyint(1) NOT NULL DEFAULT 0,
   `quiz_fitting` tinyint(1) NOT NULL DEFAULT 0,
@@ -88,15 +88,16 @@ CREATE TABLE IF NOT EXISTS `commander_training` (
   `comments` text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
   PRIMARY KEY (`pilot_id`),
   UNIQUE KEY `discord_id` (`discord_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.commander_training: ~5 rows (approximately)
+-- Dumping data for table wit-db.commander_training: ~6 rows (approximately)
 REPLACE INTO `commander_training` (`pilot_id`, `pilot_name`, `discord_id`, `status`, `start_date`, `last_active`, `resident_orientation_by`, `quiz_scouting`, `quiz_fitting`, `quiz_fleet_roles`, `quiz_site_mechanics`, `signoff_scouting`, `signoff_trusted_logi`, `signoff_bastion`, `signoff_new_pilot_orientation`, `exam_multiple_choice`, `exam_ct`, `comments`) VALUES
-	(1, 'Mirror Saisima', '368778318415265792', 'resident', '2025-10-07', '2025-10-08', NULL, 0, 0, 0, 0, '[{"commander":"Ezabella","comment":"adsafsdf","date":"2025-10-08T00:36:34.754Z"}]', 1, 0, '[]', 0, 0, '[]'),
-	(2, 'Ezabella', '107396590653698048', 'resident', '2025-10-07', '2025-10-08', NULL, 1, 0, 0, 0, '[{"discordId":"107396590653698048","commander":"Ezabella","comment":"add","date":"2025-10-08T01:06:06.931Z"}]', 1, 0, '[]', 1, 1, '[]'),
-	(3, 'Skeltek', '266657286355681280', 'resident', '2025-10-07', '2025-10-08', NULL, 0, 0, 0, 0, '[]', 0, 0, '[]', 0, 0, '[]'),
-	(4, 'tgun', '524711946268835840', 'resident', '2025-10-07', '2025-10-08', NULL, 0, 0, 0, 0, '[]', 0, 0, '[]', 0, 0, '[]'),
-	(5, 'Emerald Volpe', '473893999376334848', 'resident', '2025-10-07', '2025-10-08', NULL, 0, 0, 0, 0, '[]', 1, 0, '[]', 0, 0, '[{"commander":"Ezabella","comment":"Test comment, please ignore","date":"2025-10-07T09:38:30.480Z"}]');
+	(36, 'Bella Cadelanne', '368778318415265792', 'training_fc', '2025-10-11 09:31:45', '2025-10-11 09:32:04', NULL, 0, 0, 0, 0, NULL, 0, 0, NULL, 0, 0, NULL),
+	(37, 'Ezabella', '107396590653698048', 'training_fc', '2025-10-11 09:31:48', '2025-10-11 12:26:13', NULL, 0, 0, 0, 0, '[{"discordId":"107396590653698048","commander":"Ezabella","comment":"scouting comment","date":"2025-10-10T23:33:29.795Z"}]', 1, 0, '[{"discordId":"107396590653698048","commander":"Ezabella","comment":"","date":"2025-10-11T00:48:40.118Z"}]', 0, 0, '[{"discordId":"107396080869593088","commander":"Personal Cyno","comment":"comment","date":"2025-10-10T23:32:23.417Z"},{"discordId":"107396590653698048","commander":"Ezabella","comment":"general comment","date":"2025-10-10T23:53:33.047Z"}]'),
+	(39, 'Personal Cyno', '107396080869593088', 'resident', '2025-10-11 09:31:52', '2025-10-11 10:59:37', NULL, 0, 0, 0, 0, NULL, 0, 0, NULL, 0, 0, NULL),
+	(40, 'Skeltek', '266657286355681280', 'resident', '2025-10-11 09:31:53', '2025-10-11 10:52:12', NULL, 0, 0, 0, 0, NULL, 0, 0, NULL, 0, 0, NULL),
+	(41, 'Tee Gun', '524711946268835840', 'resident', '2025-10-11 09:31:55', '2025-10-11 09:31:55', NULL, 0, 0, 0, 0, NULL, 0, 0, NULL, 0, 0, NULL),
+	(42, 'Emerald Volpe', '473893999376334848', 'training_fc', '2025-10-11 12:26:23', '2025-10-11 12:26:26', NULL, 0, 0, 0, 0, NULL, 1, 0, NULL, 0, 0, NULL);
 
 -- Dumping structure for table wit-db.config
 CREATE TABLE IF NOT EXISTS `config` (
@@ -121,7 +122,7 @@ REPLACE INTO `config` (`key_name`, `value`) VALUES
 	('githubChannelId', '["1418129590143942718"]'),
 	('githubRepoUrl', '["https://github.com/tekeve/WITv3.0"]'),
 	('incursionChannelId', '["1364223029814759444"]'),
-	('lastCommitSha', '{"master":"c2dfe5b24f0a8599268270ea21cf8382379e25ec","v1.1":"f95cabbe7a122e9cafa7d6263a6334ac0217dc72","v1.2":"96c38cf1b1e89c0121c96b520222cc7b1a7fed8f","v1.3":"386fa92c6e4ec053d3478d0c414e1bf8eba802bd"}'),
+	('lastCommitSha', '{"master":"c2dfe5b24f0a8599268270ea21cf8382379e25ec","v1.1":"f95cabbe7a122e9cafa7d6263a6334ac0217dc72","v1.2":"96c38cf1b1e89c0121c96b520222cc7b1a7fed8f","v1.3":"d0d2f2c42b057adcc1985b2cd98a7e17e1dfd3c3"}'),
 	('leadershipRoles', '["1412546107975929917"]'),
 	('lineCommanderRoles', '["1412545877163118704"]'),
 	('logiSignoffChannelId', '["1420720850654597331"]'),
@@ -177,7 +178,7 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
 
 -- Dumping data for table wit-db.incursion_state: ~1 rows (approximately)
 REPLACE INTO `incursion_state` (`id`, `lastIncursionState`, `incursionMessageId`, `lastHqSystemId`, `spawnTimestamp`, `mobilizingTimestamp`, `withdrawingTimestamp`, `endedTimestamp`, `lastIncursionStats`, `route_data`) VALUES
-	(1, 'none', '1425007102262251596', 30003434, 1759358165, 1759560830, 1759733797, 1759818566, '{"totalDuration":"5d 7h 53m (66.61% of max)","establishedPhase":"2d 8h 17m (46.91% of max)","mobilizingPhase":"2d 2m (100.1% used)","withdrawingPeriodUsed":"23h 32m (98.11% used)"}', NULL);
+	(1, '20000434-established-1', '1425483749734486076', 30003434, 1759932207, NULL, NULL, NULL, NULL, '{"tradeHubRoutes":"**Jita**:\\n[35j (safest)](https://eve-gatecheck.space/eve/#Jita:Odin:secure) / [19j (shortest)](https://eve-gatecheck.space/eve/#Jita:Odin:shortest)\\n**Amarr**:\\n[10j (safest)](https://eve-gatecheck.space/eve/#Amarr:Odin:secure) / [8j (shortest)](https://eve-gatecheck.space/eve/#Amarr:Odin:shortest)\\n**Dodixie**:\\n[24j (safest)](https://eve-gatecheck.space/eve/#Dodixie:Odin:secure) / [10j (shortest)](https://eve-gatecheck.space/eve/#Dodixie:Odin:shortest)\\n**Rens**:\\n[10j (safest)](https://eve-gatecheck.space/eve/#Rens:Odin:secure) / [7j (shortest)](https://eve-gatecheck.space/eve/#Rens:Odin:shortest)\\n**Hek**:\\n[16j (safest)](https://eve-gatecheck.space/eve/#Hek:Odin:secure) / [11j (shortest)](https://eve-gatecheck.space/eve/#Hek:Odin:shortest)","lastHqRoute":"**Ansher**: [19j (safest)](https://eve-gatecheck.space/eve/#Ansher:Odin:secure) / [15j (shortest)](https://eve-gatecheck.space/eve/#Ansher:Odin:shortest)"}');
 
 -- Dumping structure for table wit-db.incursion_systems
 CREATE TABLE IF NOT EXISTS `incursion_systems` (
@@ -364,15 +365,18 @@ CREATE TABLE IF NOT EXISTS `quizzes` (
   `quiz_id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
   `pass_mark_percentage` int(3) NOT NULL DEFAULT 80,
-  `update_field` varchar(100) NOT NULL COMMENT 'The column name in commander_training to update on pass',
+  `category` enum('resident','training_fc') NOT NULL DEFAULT 'resident',
   PRIMARY KEY (`quiz_id`),
-  UNIQUE KEY `name` (`name`),
-  UNIQUE KEY `update_field` (`update_field`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.quizzes: ~1 rows (approximately)
-REPLACE INTO `quizzes` (`quiz_id`, `name`, `pass_mark_percentage`, `update_field`) VALUES
-	(1, 'Scouting Quiz', 90, 'quiz_scouting');
+-- Dumping data for table wit-db.quizzes: ~4 rows (approximately)
+REPLACE INTO `quizzes` (`quiz_id`, `name`, `pass_mark_percentage`, `category`) VALUES
+	(1, 'Scouting Quiz', 90, 'resident'),
+	(2, 'Fitting Quiz', 90, 'resident'),
+	(3, 'Fleet Roles', 90, 'resident'),
+	(4, 'Site Mechanics', 90, 'resident'),
+	(5, 'Test TFC Quiz', 90, 'training_fc');
 
 -- Dumping structure for table wit-db.quiz_answers
 CREATE TABLE IF NOT EXISTS `quiz_answers` (
@@ -384,9 +388,9 @@ CREATE TABLE IF NOT EXISTS `quiz_answers` (
   PRIMARY KEY (`answer_id`),
   KEY `question_id` (`question_id`),
   CONSTRAINT `fk_quiz_answers_question` FOREIGN KEY (`question_id`) REFERENCES `quiz_questions` (`question_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=147 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.quiz_answers: ~36 rows (approximately)
+-- Dumping data for table wit-db.quiz_answers: ~111 rows (approximately)
 REPLACE INTO `quiz_answers` (`answer_id`, `question_id`, `answer_text`, `is_correct`, `order_index`) VALUES
 	(34, 9, '7 minutes, 10 seconds', 0, 0),
 	(35, 9, '7 minutes, 15 seconds', 1, 1),
@@ -423,7 +427,84 @@ REPLACE INTO `quiz_answers` (`answer_id`, `question_id`, `answer_text`, `is_corr
 	(66, 17, 'Check local for gankers entering system', 1, 0),
 	(67, 17, 'Warp to the next site and inform the FC if gankers are on grid', 1, 1),
 	(68, 17, 'Tell the FC where to go', 0, 0),
-	(69, 17, 'Cloak on the WTM undock to determine undock status', 1, 0);
+	(69, 17, 'Cloak on the WTM undock to determine undock status', 1, 0),
+	(70, 18, 'Pulsemare', 1, 0),
+	(71, 18, 'Nightmare', 0, 1),
+	(72, 18, 'Paladin', 1, 2),
+	(73, 18, 'Kronos', 1, 3),
+	(74, 18, 'Vargur', 1, 4),
+	(75, 18, 'Vindicator', 0, 5),
+	(76, 19, 'T2 only', 0, 0),
+	(77, 19, 'T1 only', 0, 1),
+	(78, 19, 'Faction only', 0, 2),
+	(79, 19, 'Navy Faction or better', 1, 3),
+	(80, 20, 'T1 Armor', 1, 0),
+	(81, 20, 'Federation Navy', 1, 1),
+	(82, 20, 'T2 Shield', 0, 2),
+	(83, 20, 'Integrated', 0, 3),
+	(84, 20, 'T2 combat', 1, 4),
+	(85, 21, '1', 0, 0),
+	(86, 21, '2', 0, 1),
+	(87, 21, '3', 0, 2),
+	(88, 21, '4', 1, 3),
+	(89, 22, '2 T2 Multispectrum Hardeners', 0, 0),
+	(90, 22, 'Faction DCU', 1, 1),
+	(91, 22, 'T2 DCU', 0, 2),
+	(92, 22, 'T2 Thermal and two T2 EM Rigs', 0, 3),
+	(93, 23, 'Change from two T2 multispec hardeners to one', 1, 0),
+	(94, 23, 'Add one Pith B hardener', 0, 1),
+	(95, 23, 'Remove T2 multispec hardeners', 0, 2),
+	(96, 23, 'Change DCU to Faction', 0, 3),
+	(97, 24, 'Capacitor Emission Systems 5', 0, 0),
+	(98, 24, 'Logi Cruiser 5', 1, 1),
+	(99, 24, 'Afterburner 5', 0, 2),
+	(100, 24, 'Evasive Maneuvering 5', 0, 3),
+	(101, 25, 'T2 Multispec only', 0, 0),
+	(102, 25, 'T2 Multispec plus DCU', 0, 1),
+	(103, 25, 'Pith C Multispec only', 0, 2),
+	(104, 25, 'DCU only', 1, 3),
+	(105, 26, 'T2 or better MWD', 0, 0),
+	(106, 26, 'Any Afterburner', 0, 1),
+	(107, 26, 'T2 or better Afterburner', 1, 2),
+	(108, 26, 'Any MWD', 0, 3),
+	(109, 27, 'Shield drones only', 0, 0),
+	(110, 27, 'Armor drones only', 0, 1),
+	(111, 27, 'Hull drones only', 0, 2),
+	(112, 27, 'Any allowed combat drone or armor/hull rep drones', 1, 3),
+	(113, 28, 'Tengu', 0, 0),
+	(114, 28, 'Legion', 0, 1),
+	(115, 28, 'Loki', 1, 2),
+	(116, 28, 'Proteus', 0, 3),
+	(117, 29, 'Armor rep', 0, 0),
+	(118, 29, 'Shield rep', 0, 1),
+	(119, 29, 'Tractor beam', 1, 2),
+	(120, 29, 'Hull rep', 0, 3),
+	(121, 30, 'Golem', 0, 0),
+	(122, 30, 'Paladin', 0, 1),
+	(123, 30, 'Kronos', 1, 2),
+	(124, 30, 'Vargur', 0, 3),
+	(125, 31, 'Drop XLSB for a utility mid', 0, 0),
+	(126, 31, 'Drop one Pith A multispec for a utility mid', 1, 1),
+	(127, 31, 'Drop shield extender for a utility mid', 0, 2),
+	(128, 31, 'Drop prop mod for a utility mid', 0, 3),
+	(129, 32, 'Scimi drops utility for multispec at >50% influence', 0, 0),
+	(130, 32, 'Scimi adds a DCU if it does not already have one at >50% influence', 0, 1),
+	(131, 32, 'Single Invuln fit adds an invuln and dual adds a LSE', 0, 2),
+	(132, 32, 'All ships with utility high slots fit reps in their high slot', 1, 3),
+	(133, 33, 'Fleet Need', 0, 0),
+	(134, 33, 'Upgrade Policy Violations', 0, 1),
+	(135, 33, 'FC Preference', 1, 2),
+	(136, 33, 'Fleet Form', 0, 3),
+	(137, 34, '20 in fleet hours', 0, 0),
+	(138, 34, '40 in fleet hours', 1, 1),
+	(139, 34, '80 in fleet hours', 0, 2),
+	(140, 34, '250 in fleet hours', 0, 3),
+	(141, 35, 'Test1', 1, 0),
+	(142, 35, 'Test2', 0, 1),
+	(143, 36, 'Test1', 1, 0),
+	(144, 36, 'Test2', 0, 1),
+	(145, 37, 'Yes', 1, 0),
+	(146, 37, 'No', 0, 1);
 
 -- Dumping structure for table wit-db.quiz_attempts
 CREATE TABLE IF NOT EXISTS `quiz_attempts` (
@@ -437,13 +518,40 @@ CREATE TABLE IF NOT EXISTS `quiz_attempts` (
   KEY `discord_id` (`discord_id`),
   KEY `quiz_id` (`quiz_id`),
   CONSTRAINT `fk_quiz_attempts_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.quiz_attempts: ~3 rows (approximately)
+-- Dumping data for table wit-db.quiz_attempts: ~12 rows (approximately)
 REPLACE INTO `quiz_attempts` (`attempt_id`, `discord_id`, `quiz_id`, `score`, `passed`, `timestamp`) VALUES
 	(6, '107396590653698048', 1, 100, 1, '2025-10-07 20:13:07'),
 	(7, '107396590653698048', 1, 100, 1, '2025-10-07 20:14:44'),
-	(8, '107396590653698048', 1, 100, 1, '2025-10-07 21:53:39');
+	(8, '107396590653698048', 1, 100, 1, '2025-10-07 21:53:39'),
+	(9, '107396590653698048', 1, 100, 1, '2025-10-08 03:19:16'),
+	(10, '107396590653698048', 1, 100, 1, '2025-10-08 03:20:51'),
+	(11, '107396590653698048', 1, 100, 1, '2025-10-08 03:44:03'),
+	(12, '107396590653698048', 1, 100, 1, '2025-10-08 04:03:01'),
+	(13, '107396590653698048', 1, 100, 1, '2025-10-08 04:04:25'),
+	(14, '107396590653698048', 1, 100, 1, '2025-10-08 04:06:03'),
+	(15, '107396590653698048', 3, 100, 1, '2025-10-08 09:31:23'),
+	(16, '107396590653698048', 4, 100, 1, '2025-10-08 10:14:50'),
+	(17, '107396590653698048', 4, 100, 1, '2025-10-10 21:28:36'),
+	(18, '107396590653698048', 3, 100, 1, '2025-10-10 21:35:58'),
+	(19, '107396080869593088', 4, 100, 1, '2025-10-11 00:59:37');
+
+-- Dumping structure for table wit-db.quiz_completions
+CREATE TABLE IF NOT EXISTS `quiz_completions` (
+  `completion_id` int(11) NOT NULL AUTO_INCREMENT,
+  `discord_id` varchar(50) NOT NULL,
+  `quiz_id` int(11) NOT NULL,
+  `completed_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`completion_id`),
+  UNIQUE KEY `user_quiz` (`discord_id`,`quiz_id`),
+  KEY `quiz_id` (`quiz_id`),
+  CONSTRAINT `fk_completion_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- Dumping data for table wit-db.quiz_completions: ~1 rows (approximately)
+REPLACE INTO `quiz_completions` (`completion_id`, `discord_id`, `quiz_id`, `completed_at`) VALUES
+	(5, '107396080869593088', 4, '2025-10-11 00:59:37');
 
 -- Dumping structure for table wit-db.quiz_questions
 CREATE TABLE IF NOT EXISTS `quiz_questions` (
@@ -455,9 +563,9 @@ CREATE TABLE IF NOT EXISTS `quiz_questions` (
   PRIMARY KEY (`question_id`),
   KEY `quiz_id` (`quiz_id`),
   CONSTRAINT `fk_quiz_questions_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.quiz_questions: ~9 rows (approximately)
+-- Dumping data for table wit-db.quiz_questions: ~28 rows (approximately)
 REPLACE INTO `quiz_questions` (`question_id`, `quiz_id`, `question_text`, `question_type`, `order_index`) VALUES
 	(9, 1, 'How long does it take for a new site to spawn after completing a site?', 'single', 0),
 	(10, 1, 'What is the best way to scout?', 'single', 1),
@@ -467,7 +575,27 @@ REPLACE INTO `quiz_questions` (`question_id`, `quiz_id`, `question_text`, `quest
 	(14, 1, 'What is a characteristic of heavy multiboxing fleets? (Select all that apply)', 'multiple', 5),
 	(15, 1, 'How do you begin preloading a TCRC?', 'single', 6),
 	(16, 1, 'Which ship is last to spawn in a TCRC (signifying a full preload)?', 'multiple', 7),
-	(17, 1, 'How can a scout help the fleet when Gankers are present?  (Select all that apply)', 'multiple', 8);
+	(17, 1, 'How can a scout help the fleet when Gankers are present?  (Select all that apply)', 'multiple', 8),
+	(18, 2, 'Which ships require T2 guns?', 'multiple', 0),
+	(19, 2, 'What are the generic minimum requirements for Ammo?', 'single', 1),
+	(20, 2, 'Which types of drones are allowed?', 'multiple', 2),
+	(21, 2, 'How many Damage Modules do most WTM fits require?', 'single', 3),
+	(22, 2, 'Which is not found on our Entry battleship fits?', 'single', 4),
+	(23, 2, 'Which is not a step for upgrading from Standard Fit to Optimal?', 'single', 5),
+	(24, 2, 'Which is a requirement for a Basilisk pilot?', 'single', 6),
+	(25, 2, 'Which tank setup on a Scimi requires 20 hours in the ship to field?', 'single', 7),
+	(26, 2, 'T2 Logi should have what type of prop mod?', 'single', 8),
+	(27, 2, 'What type of drones can a logi field?', 'single', 9),
+	(28, 2, 'Which T3 ship is allowed in WTM fleets?', 'single', 10),
+	(29, 2, 'What module, in addition to boosts, is a booster required to have in it\'s high slots?', 'single', 11),
+	(30, 2, 'Which marauder is required to run Synth Blue Pill at all times?', 'single', 12),
+	(31, 2, 'What change can a marauder make to their fit in NRFs and TPPHs to make fleet run faster?', 'single', 13),
+	(32, 2, 'Which is not a change to our fits if running under influence? ', 'single', 14),
+	(33, 2, 'Which is not an exception to WTM\'s Invite Policy of first come first serve?', 'single', 15),
+	(34, 2, 'Which is not a benchmark time for the upgrade policy?', 'single', 16),
+	(35, 3, 'Test', 'single', 0),
+	(36, 4, 'Test', 'single', 0),
+	(37, 5, 'Does it work?', 'single', 0);
 
 -- Dumping structure for table wit-db.reaction_roles
 CREATE TABLE IF NOT EXISTS `reaction_roles` (
@@ -638,6 +766,30 @@ REPLACE INTO `srp_history` (`id`, `pilot_name`, `kill_report_link`, `fc_name`, `
 	(20, 'Tee Gun', NULL, 'Tee Gun', 'Full FC', NULL, 'Sleipnir', 'Yes', 'Yes', 'Warped into TCRC as meatshield, did not jump back, basi\'s did not send cap, hardeners off and it dies', 'Ofc'),
 	(21, 'Skeltek', NULL, 'Skeltek', 'Full FC', NULL, 'Eos', 'Yes', 'Yes', 'Text inserted here', 'Text inserted here');
 
+-- Dumping structure for table wit-db.training_fc_tracker
+CREATE TABLE IF NOT EXISTS `training_fc_tracker` (
+  `pilot_id` int(11) NOT NULL,
+  `t1_tagging` varchar(255) DEFAULT NULL,
+  `t1_voicing` varchar(255) DEFAULT NULL,
+  `t1_waitlist` varchar(255) DEFAULT NULL,
+  `t2_situational_awareness` varchar(255) DEFAULT NULL,
+  `t2_evacuations` varchar(255) DEFAULT NULL,
+  `practice_fleet_speed` varchar(255) DEFAULT NULL,
+  `practice_system_awareness` varchar(255) DEFAULT NULL,
+  `competency_final` varchar(255) DEFAULT NULL,
+  `last_reported_active` date DEFAULT NULL,
+  `comments` text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  `special_notes` text DEFAULT NULL,
+  PRIMARY KEY (`pilot_id`),
+  CONSTRAINT `fk_tfc_pilot` FOREIGN KEY (`pilot_id`) REFERENCES `commander_training` (`pilot_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- Dumping data for table wit-db.training_fc_tracker: ~1 rows (approximately)
+REPLACE INTO `training_fc_tracker` (`pilot_id`, `t1_tagging`, `t1_voicing`, `t1_waitlist`, `t2_situational_awareness`, `t2_evacuations`, `practice_fleet_speed`, `practice_system_awareness`, `competency_final`, `last_reported_active`, `comments`, `special_notes`) VALUES
+	(36, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+	(37, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+	(42, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+
 -- Dumping structure for table wit-db.trusted_pilots
 CREATE TABLE IF NOT EXISTS `trusted_pilots` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -690,11 +842,11 @@ REPLACE INTO `users` (`character_id`, `discord_id`, `character_name`, `roles`, `
 	(93220962, '368778318415265792', 'Bella Cadelanne', '["410301376162299906","1055468376866168853","1412545597021622383","1412545877163118704","1412546080448712826","366076789438808064"]', NULL, NULL, NULL, 1, 0),
 	(95000233, '107396590653698048', 'Mirror Saisima', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwuc2VuZF9tYWlsLnYxIiwiZXNpLW1haWwucmVhZF9tYWlsLnYxIiwiZXNpLXNlYXJjaC5zZWFyY2hfc3RydWN0dXJlcy52MSJdLCJqdGkiOiIxZDZjNTY4My1jNThhLTRlZjMtOGY1OS03NmU2YzViNTdkYjQiLCJraWQiOiJKV1QtU2lnbmF0dXJlLUtleSIsInN1YiI6IkNIQVJBQ1RFUjpFVkU6OTUwMDAyMzMiLCJhenAiOiI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsInRlbmFudCI6InRyYW5xdWlsaXR5IiwidGllciI6ImxpdmUiLCJyZWdpb24iOiJ3b3JsZCIsImF1ZCI6WyI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsIkVWRSBPbmxpbmUiXSwibmFtZSI6Ik1pcnJvciBTYWlzaW1hIiwib3duZXIiOiJMTUJWbmNBTWhJNWxpcnRVN0J2cWdPRzR5MUk9IiwiZXhwIjoxNzU5NDk2OTc5LCJpYXQiOjE3NTk0OTU3NzksImlzcyI6Imh0dHBzOi8vbG9naW4uZXZlb25saW5lLmNvbSJ9.fSP_2fI_QP-frawhgaEgXyCyBwTw0Dl1zsP8lM_xXnwKFzHjsaEtjampsf0gUqI3Xp6uoAiQUyQTiKeFrLlhovnBj8JeXKS1TTYBd-_p5KrmtvmAQjnyn0HlSQ_6gTSPI_8TuDfKWy66liEGqW3v0y_cXkESk6-4D24Qi3X7pAVtDUKNP1i0x-bX3y97MIkHCdmCQ-szIfPZXq9m8_CwfLO7WZSVQHpa5_Y5NKzk4dk1guNoXac7vPwZFUT9Kw9CfpHHOpETKm36haLUV8uSB3mJRwJW6_vVYt6xK-szaknfyN_OlAZ1ZPpY1AHvKMhQBfsWsLrklFuJrLHTjv6WEQ', 'zCny+8LAtUC+WhN3tRtRZA==', 1759496978606, 0, 1),
 	(95000238, '107396590653698048', 'Mirror Erata', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 0, 0),
-	(96408902, '107396080869593088', 'Personal Cyno', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546080448712826","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
+	(96408902, '107396080869593088', 'Personal Cyno', '["1055468376866168853","1412545597021622383","1412545820015857724","1412545877163118704","1412545912462512168","366076789438808064"]', NULL, NULL, NULL, 1, 0),
 	(96566328, '107396590653698048', 'Ezabella', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
 	(97173610, '266657286355681280', 'Kitsune Miyamoto', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 0, 0),
 	(163565361, '266657286355681280', 'Skeltek', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwuc2VuZF9tYWlsLnYxIiwiZXNpLW1haWwucmVhZF9tYWlsLnYxIl0sImp0aSI6IjM1ODY3NmQyLWQ4NzEtNDdiOS1iYjUzLWRiZWNiZDYzNGNhNiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5Iiwic3ViIjoiQ0hBUkFDVEVSOkVWRToxNjM1NjUzNjEiLCJhenAiOiI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsInRlbmFudCI6InRyYW5xdWlsaXR5IiwidGllciI6ImxpdmUiLCJyZWdpb24iOiJ3b3JsZCIsImF1ZCI6WyI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsIkVWRSBPbmxpbmUiXSwibmFtZSI6IlNrZWx0ZWsiLCJvd25lciI6IlNPN3F3dHpGOUY0eFE5c29kTEk1dVFjd0E3ST0iLCJleHAiOjE3NTgxNzA2ODEsImlhdCI6MTc1ODE2OTQ4MSwiaXNzIjoiaHR0cHM6Ly9sb2dpbi5ldmVvbmxpbmUuY29tIn0.W3DUD8CLjPaQNVXH-k1ddQ7lLRTjMVNWBX0Gtc33yGGUjKjkcjo5J203rzWhpXZsx49ySNoWI4NCL4ddeSmSrx2Bv-35uCpDhBSq65Z76O5YUrBGewDbM9Oxe3AXcPPNrN7sKxdvt7mu7eFyIgERwSF-RI4wRbeRKqxSIUmK3e93RwplPXiRl3dQf3xw2T3-MBb0j1byDXc07O6Y2Vppjh1ALVfIf10DJcjmg9NQrjoCAfaEGP77ABVbXK6IVR_NwFG0XDg-PQniQFszVu1pcA8cLsQpp4gVpQWg0e-X52PrWWnBKWsjS1l89raTJ10ZkHlZWIyZ_cDrThGukNYGWg', '4sVwNTj7ykOtLjBvPcTTtg==', 1758170679890, 1, 1),
-	(1945530066, '524711946268835840', 'Tee Gun', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546080448712826","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
+	(1945530066, '524711946268835840', 'Tee Gun', '["1055468376866168853","1412545597021622383","1412545820015857724","1412546080448712826","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
 	(2122568365, '473893999376334848', 'Emerald Volpe', '["1055468376866168853","1412545597021622383","1412545877163118704","366076789438808064"]', NULL, NULL, NULL, 1, 0);
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
