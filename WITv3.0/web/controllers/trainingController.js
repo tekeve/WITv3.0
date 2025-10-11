@@ -61,7 +61,10 @@ exports.showTracker = (client) => [
                 residentQuizzes,
                 tfcQuizzes,
                 permissions: {
-                    canEdit: roleManager.hasPermission(member, ['line_commander', 'admin']),
+                    canEditOrientation: roleManager.hasPermission(member, ['council', 'admin', 'certified_trainer']),
+                    canDoInFleetSignoffs: roleManager.hasPermission(member, ['line_commander']),
+                    canEditExams: roleManager.hasPermission(member, ['council', 'admin', 'certified_trainer']),
+                    canEditTfcModules: roleManager.hasPermission(member, ['council', 'admin', 'certified_trainer', 'fleet_commander']),
                     canPromoteToTfc: roleManager.isCouncilOrHigher(member),
                     canAddResidents: roleManager.isCouncilOrHigher(member),
                     canDelete: roleManager.hasPermission(member, ['council', 'admin', 'certified_trainer'])
@@ -179,9 +182,25 @@ exports.updateResidentProgress = (client) => [
     async (req, res) => {
         const { pilotId, field, value } = req.body;
         const io = req.app.get('io');
+        const { member } = req.tokenData;
 
         if (pilotId === undefined || field === undefined || value === undefined) {
             return res.status(400).json({ success: false, message: 'Missing pilotId, field, or value.' });
+        }
+
+        // Server-side validation for orientation field
+        if (field === 'resident_orientation_by') {
+            if (!roleManager.hasPermission(member, ['council', 'admin', 'certified_trainer'])) {
+                return res.status(403).json({ success: false, message: 'You do not have permission to update the orientation field.' });
+            }
+        }
+
+        // Server-side validation for exam fields
+        const examFields = new Set(['exam_multiple_choice', 'exam_ct']);
+        if (examFields.has(field)) {
+            if (!roleManager.hasPermission(member, ['council', 'admin', 'certified_trainer'])) {
+                return res.status(403).json({ success: false, message: 'You do not have permission to update exam fields.' });
+            }
         }
 
         try {
@@ -201,13 +220,22 @@ exports.updateResidentProgress = (client) => [
  * Handles updating a Training FC's progress.
  */
 exports.updateTfcProgress = (client) => [
-    validateTokenAndPermissions(client, ['council', 'admin', 'certified_trainer']), // Requires CT or higher
+    validateTokenAndPermissions(client, ['council', 'admin', 'certified_trainer', 'fleet_commander']), // Base permission
     async (req, res) => {
         const { pilotId, field, value } = req.body;
         const io = req.app.get('io');
+        const { member } = req.tokenData;
 
         if (pilotId === undefined || field === undefined || value === undefined) {
             return res.status(400).json({ success: false, message: 'Missing pilotId, field, or value.' });
+        }
+
+        // Server-side validation for practice & competency fields
+        const advancedTfcFields = new Set(['practice_fleet_speed', 'practice_system_awareness', 'competency_final']);
+        if (advancedTfcFields.has(field)) {
+            if (!roleManager.hasPermission(member, ['council', 'admin', 'certified_trainer'])) {
+                return res.status(403).json({ success: false, message: 'You do not have permission to update practice or competency fields.' });
+            }
         }
 
         try {
@@ -230,10 +258,10 @@ exports.updateTfcProgress = (client) => [
 exports.addComment = (client) => [
     validateTokenAndPermissions(client, 'line_commander'),
     async (req, res) => {
-        const { pilotId, comment, type } = req.body; // type can be 'resident' or 'tfc'
+        const { pilotId, comment, pilotType, commentType } = req.body;
         const io = req.app.get('io');
 
-        if (!pilotId || !comment || !type) {
+        if (!pilotId || !comment || !pilotType || !commentType) {
             return res.status(400).json({ success: false, message: 'Missing required information.' });
         }
 
@@ -242,7 +270,7 @@ exports.addComment = (client) => [
             const commanderChar = await charManager.getChars(discordId);
             const commanderName = commanderChar?.main?.character_name || req.tokenData.user.tag;
 
-            const result = await trainingManager.addComment(pilotId, comment, commanderName, discordId, type);
+            const result = await trainingManager.addComment(pilotId, comment, commanderName, discordId, pilotType, commentType);
             if (result.success && io) {
                 io.emit('training-update');
             }
@@ -357,5 +385,3 @@ exports.removePilot = (client) => [
         }
     }
 ];
-
-

@@ -35,6 +35,8 @@
         .pilot-card h3 { margin: 0; font-size: 1.25rem; color: var(--accent-blue); padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); }
         .pilot-card h4 { margin: 0 0 0.75rem 0; font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
         .info-grid, .progress-grid, .tfc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .tfc-grid .form-group, .tfc-grid .progress-item { grid-column: span 2; }
+
 
         .form-group { margin-bottom: 0; }
         label { display: block; margin-bottom: 0.35rem; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); }
@@ -45,6 +47,11 @@
         .progress-item label { margin: 0; color: var(--text-primary); font-size: 0.875rem; }
         .progress-item.completed { background-color: var(--accent-green); }
         .progress-item.completed label { color: var(--bg-primary); font-weight: 600; }
+        .progress-item .signoff-by { display: flex; align-items: center; gap: 0.5rem; }
+        .progress-item .signoff-by span { color: var(--bg-primary); font-size: 0.8rem; }
+        .progress-item .signoff-by a { color: var(--bg-secondary); text-decoration: none; font-size: 0.75rem; font-weight: bold; }
+        .progress-item .signoff-by a:hover { color: var(--accent-red); }
+
         input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: var(--accent-green); }
         input[type="checkbox"]:not(:disabled) { cursor: pointer; }
         .signoff-dots { display: flex; gap: 4px; }
@@ -81,6 +88,7 @@
         .btn-danger { background-color: var(--accent-red); color: white; }
         .delete-pilot-btn { padding: 0.5rem; line-height: 1; }
         .delete-pilot-btn svg { width: 16px; height: 16px; pointer-events: none; }
+        .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
         
         .comment, .signoff-entry { border-bottom: 1px solid var(--border-color); padding: 0.75rem 0; }
         .comment:last-child, .signoff-entry:last-child { border-bottom: none; }
@@ -195,6 +203,21 @@
     </div>
 </div>
 
+<!-- TFC Signoff Modal -->
+<div id="tfcSignoffModal" class="modal-overlay">
+    <div class="modal">
+        <h2 id="tfcSignoffModalTitle">Sign-off Module</h2>
+        <div class="form-group">
+            <label for="tfcSignoffComment">Add Optional Comment</label>
+            <textarea id="tfcSignoffComment" rows="3" placeholder="This comment will be added to the pilot's general comments..."></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModal('tfcSignoffModal')">Cancel</button>
+            <button id="confirmTfcSignoffBtn" class="btn-primary">Confirm Sign-off</button>
+        </div>
+    </div>
+</div>
+
 <!-- Delete Pilot Modal -->
 <div id="deletePilotModal" class="modal-overlay">
     <div class="modal">
@@ -228,6 +251,9 @@
     const commanderName = "<%= commanderName %>";
     const commanderDiscordId = "<%= commanderDiscordId %>";
     const permissions = <%- JSON.stringify(permissions) %>;
+    const canDoInFleetSignoffs = <%- JSON.stringify(permissions.canDoInFleetSignoffs) %>;
+    const canEditTfcModules = <%- JSON.stringify(permissions.canEditTfcModules) %>;
+    const canEditExams = <%- JSON.stringify(permissions.canEditExams) %>;
     const residentQuizzes = <%- JSON.stringify(residentQuizzes) %>;
     const tfcQuizzes = <%- JSON.stringify(tfcQuizzes) %>;
     let trackerData = { residents: [], tfcs: [] };
@@ -281,8 +307,10 @@
         switch (type) {
             case 'scouting': return 'var(--accent-green)';
             case 'orientation': return 'var(--accent-blue)';
-            case 'tfc': return 'var(--accent-yellow)';
-            default: return 'var(--accent-yellow)';
+            case 'signoff': return 'var(--accent-green)';
+            case 'general':
+            default:
+                return 'var(--accent-yellow)';
         }
     }
     
@@ -311,7 +339,7 @@
                 <label>${label}</label>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <div class="signoff-dots">${dotsHTML}</div>
-                    ${permissions.canEdit ? '<a href="#" class="view-signoffs-btn">View/Add</a>' : ''}
+                    ${canDoInFleetSignoffs ? '<a href="#" class="view-signoffs-btn">View/Add</a>' : ''}
                 </div>
             </div>`;
     }
@@ -346,13 +374,13 @@
                         <div class="form-group"><label>Start Date</label><input type="text" value="${formatDisplayDate(pilot.start_date)}" title="${pilot.start_date || ''}" disabled></div>
                         <div class="form-group"><label>Last Active</label><input type="text" value="${formatDisplayDate(pilot.last_active)}" title="${pilot.last_active || ''}" disabled></div>
                     </div>
-                    <div class="form-group" style="margin-top: 1rem;"><label>Resident Orientation</label><input type="text" value="${pilot.resident_orientation_by || ''}" data-field="resident_orientation_by" placeholder="FC Name" ${!permissions.canEdit ? 'disabled' : ''}></div>
+                    <div class="form-group" style="margin-top: 1rem;"><label>Resident Orientation</label><input type="text" value="${pilot.resident_orientation_by || ''}" data-field="resident_orientation_by" placeholder="FC Name" ${!permissions.canEditOrientation ? 'disabled' : ''}></div>
                 </div>
                 <div><h4>Quizzes</h4><div class="progress-grid">${createQuizProgressHTML(residentQuizzes, pilot.completed_quizzes)}</div></div>
                 <div>
                     <h4>In Fleet Sign-Offs</h4>
                     <div class="progress-grid">
-                        <div class="progress-item"><label>Bastion Badge</label><input type="checkbox" ${pilot.signoff_bastion ? 'checked' : ''} data-field="signoff_bastion" ${!permissions.canEdit ? 'disabled' : ''}></div>
+                        <div class="progress-item"><label>Bastion Badge</label><input type="checkbox" ${pilot.signoff_bastion ? 'checked' : ''} data-field="signoff_bastion" ${!canDoInFleetSignoffs ? 'disabled' : ''}></div>
                         <div class="progress-item ${pilot.signoff_trusted_logi ? 'completed' : ''}"><label>Trusted Logi</label></div>
                         ${createComplexSignoffHTML(pilot, 'signoff_scouting', 'Scouting')}
                         ${createComplexSignoffHTML(pilot, 'signoff_new_pilot_orientation', 'New Pilot Orientation')}
@@ -361,8 +389,8 @@
                 <div>
                     <h4>Exam</h4>
                     <div class="progress-grid">
-                        <div class="progress-item"><label>Multiple Choice</label><input type="checkbox" ${pilot.exam_multiple_choice ? 'checked' : ''} data-field="exam_multiple_choice" ${!permissions.canEdit ? 'disabled' : ''}></div>
-                        <div class="progress-item"><label>CT Exam</label><input type="checkbox" ${pilot.exam_ct ? 'checked' : ''} data-field="exam_ct" ${!permissions.canEdit ? 'disabled' : ''}></div>
+                        <div class="progress-item"><label>Multiple Choice</label><input type="checkbox" ${pilot.exam_multiple_choice ? 'checked' : ''} data-field="exam_multiple_choice" ${!canEditExams ? 'disabled' : ''}></div>
+                        <div class="progress-item"><label>CT Exam</label><input type="checkbox" ${pilot.exam_ct ? 'checked' : ''} data-field="exam_ct" ${!canEditExams ? 'disabled' : ''}></div>
                     </div>
                 </div>
                 <div class="comments-section">
@@ -387,12 +415,40 @@
                 </div>
             </div>`;
     }
+
+    function createTfcModuleHTML(pilot, field, label) {
+        const signoffName = pilot[field];
+        const hasPermission = (field.startsWith('practice_') || field.startsWith('competency_')) ? canEditExams : canEditTfcModules;
+        const signedOffByMe = signoffName === commanderName;
+
+        if (signoffName) {
+            // It's signed off
+            return `
+                <div class="progress-item completed">
+                    <label>${label}</label>
+                    <div class="signoff-by">
+                        <span>by ${signoffName}</span>
+                        ${ (signedOffByMe && hasPermission) ? `<a href="#" class="remove-tfc-signoff-btn" data-pilot-id="${pilot.pilot_id}" data-pilot-name="${pilot.pilot_name}" data-field="${field}" data-label="${label}" title="Remove your sign-off">&times;</a>` : '' }
+                    </div>
+                </div>
+            `;
+        } else {
+            // It's not signed off
+            return `
+                <div class="form-group">
+                    <label>${label}</label>
+                    <button class="tfc-signoff-btn btn-secondary btn-sm" data-pilot-id="${pilot.pilot_id}" data-pilot-name="${pilot.pilot_name}" data-field="${field}" data-label="${label}" ${!hasPermission ? 'disabled' : ''}>
+                        Sign-off
+                    </button>
+                </div>
+            `;
+        }
+    }
     
     function createTfcCardHTML(pilot) {
         const comments = pilot.comments || [];
         const lastComment = comments.length > 0 ? comments[0] : null;
         const olderComments = comments.slice(1);
-        const canEditTfc = permissions.canPromoteToTfc;
         const adminActionsHTML = permissions.canDelete
             ? `<div class="pilot-card-admin-actions">
                    <button class="btn-danger delete-pilot-btn" data-pilot-name="${pilot.pilot_name}" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc" title="Remove from Tracker">${deleteSVG}</button>
@@ -416,25 +472,25 @@
                 <div>
                     <h4>Modules</h4>
                     <div class="tfc-grid">
-                        <div class="form-group"><label>T1 - Tagging</label><input type="text" value="${pilot.t1_tagging || ''}" data-field="t1_tagging" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
-                        <div class="form-group"><label>T1 - Voicing</label><input type="text" value="${pilot.t1_voicing || ''}" data-field="t1_voicing" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
-                        <div class="form-group"><label>T1 - Waitlist & Comp</label><input type="text" value="${pilot.t1_waitlist || ''}" data-field="t1_waitlist" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
-                        <div class="form-group"><label>T2 - Situational Awareness</label><input type="text" value="${pilot.t2_situational_awareness || ''}" data-field="t2_situational_awareness" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
-                        <div class="form-group"><label>T2 - Evacuations</label><input type="text" value="${pilot.t2_evacuations || ''}" data-field="t2_evacuations" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
+                        ${createTfcModuleHTML(pilot, 't1_tagging', 'T1 - Tagging')}
+                        ${createTfcModuleHTML(pilot, 't1_voicing', 'T1 - Voicing')}
+                        ${createTfcModuleHTML(pilot, 't1_waitlist', 'T1 - Waitlist & Comp')}
+                        ${createTfcModuleHTML(pilot, 't2_situational_awareness', 'T2 - Situational Awareness')}
+                        ${createTfcModuleHTML(pilot, 't2_evacuations', 'T2 - Evacuations')}
                     </div>
                 </div>
                  <div>
                     <h4>Practice & Competency</h4>
                     <div class="tfc-grid">
-                         <div class="form-group"><label>Fleet Speed</label><input type="text" value="${pilot.practice_fleet_speed || ''}" data-field="practice_fleet_speed" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
-                         <div class="form-group"><label>System Awareness</label><input type="text" value="${pilot.practice_system_awareness || ''}" data-field="practice_system_awareness" placeholder="CT Name" ${!canEditTfc ? 'disabled' : ''}></div>
-                         <div class="form-group"><label>Final Sign-off</label><input type="text" value="${pilot.competency_final || ''}" data-field="competency_final" placeholder="Council Name" ${!canEditTfc ? 'disabled' : ''}></div>
+                        ${createTfcModuleHTML(pilot, 'practice_fleet_speed', 'Fleet Speed')}
+                        ${createTfcModuleHTML(pilot, 'practice_system_awareness', 'System Awareness')}
+                        ${createTfcModuleHTML(pilot, 'competency_final', 'Final Sign-off')}
                     </div>
                 </div>
                 <div class="comments-section">
                     ${lastComment ? `
                         <div class="latest-comment-wrapper">
-                             <div class="comment-bar" style="background-color: ${getCommentAccentColor(lastComment.type)};"></div>
+                            <div class="comment-bar" style="background-color: ${getCommentAccentColor(lastComment.type)};"></div>
                             <div class="latest-comment">
                                 <span class="comment-author">${lastComment.commander}:</span> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
                             </div>
@@ -520,6 +576,14 @@
             e.preventDefault();
             const field = target.closest('.complex-signoff-item').dataset.field;
             openSignoffsModal(pilotId, field);
+        } else if (target.classList.contains('tfc-signoff-btn')) {
+            e.preventDefault();
+            const { pilotId, field, label, pilotName } = target.dataset;
+            openTfcSignoffModal(pilotId, field, label, pilotName);
+        } else if (target.classList.contains('remove-tfc-signoff-btn')) {
+            e.preventDefault();
+            const { pilotId, field, pilotName, label } = target.dataset;
+            openRemoveTfcSignoffConfirmation(pilotId, field, pilotName, label);
         } else if (target.closest('.delete-pilot-btn')) {
             e.preventDefault();
             openDeletePilotModal(pilotName, pilotId);
@@ -580,7 +644,7 @@
 
         const btn = document.getElementById('addCommentBtn');
         btn.disabled = true;
-        const result = await apiCall(`/training/api/add-comment/${token}`, 'POST', { pilotId, comment, type: pilotType });
+        const result = await apiCall(`/training/api/add-comment/${token}`, 'POST', { pilotId, comment, pilotType, commentType: 'general' });
         if (result && result.success) {
             showToast(result.message, 'success');
             closeModal('commentsModal');
@@ -607,6 +671,8 @@
         const modal = document.getElementById('removeSignoffModal');
         const confirmBtn = document.getElementById('removeSignoffConfirmBtn');
         
+        removeSignoffModalTitle.textContent = 'Confirm Sign-off Removal';
+        removeSignoffModalText.innerHTML = `Are you sure you want to remove your sign-off for this skill? This cannot be undone.`;
         confirmBtn.onclick = () => handleRemoveSignoff(pilotId, field);
         
         openModal('removeSignoffModal');
@@ -680,7 +746,7 @@
         addForm.style.display = 'none';
         removeAction.style.display = 'none';
 
-        if (permissions.canEdit) {
+        if (canDoInFleetSignoffs) {
             const hasSignedOff = signoffs.some(s => s.discordId === commanderDiscordId);
             if (hasSignedOff) {
                 removeAction.style.display = 'block';
@@ -692,11 +758,74 @@
         openModal('signoffsModal');
     }
     
+    // --- TFC SIGNOFF MODAL ---
+    const tfcSignoffModal = document.getElementById('tfcSignoffModal');
+    const confirmTfcSignoffBtn = document.getElementById('confirmTfcSignoffBtn');
+    const tfcSignoffModalTitle = document.getElementById('tfcSignoffModalTitle');
+    const tfcSignoffComment = document.getElementById('tfcSignoffComment');
+
+    function openTfcSignoffModal(pilotId, field, label, pilotName) {
+        tfcSignoffModal.dataset.pilotId = pilotId;
+        tfcSignoffModal.dataset.field = field;
+        tfcSignoffModal.dataset.label = label;
+        tfcSignoffModalTitle.textContent = `Sign-off "${label}" for ${pilotName}`;
+        tfcSignoffComment.value = '';
+        openModal('tfcSignoffModal');
+    }
+
+    async function handleConfirmTfcSignoff() {
+        const { pilotId, field, label } = tfcSignoffModal.dataset;
+        const comment = tfcSignoffComment.value.trim();
+        
+        confirmTfcSignoffBtn.disabled = true;
+
+        const signoffResult = await apiCall(`/training/api/update-tfc/${token}`, 'POST', { pilotId, field, value: commanderName });
+        
+        if (signoffResult && signoffResult.success) {
+            // Only add a comment if text was entered.
+            if (comment) {
+                // The comment passed to the API now has the correct type.
+                await apiCall(`/training/api/add-comment/${token}`, 'POST', { pilotId, comment: comment, pilotType: 'tfc', commentType: 'signoff' });
+            }
+            showToast(signoffResult.message, 'success');
+            closeModal('tfcSignoffModal');
+        }
+        
+        confirmTfcSignoffBtn.disabled = false;
+    }
+
+    // --- TFC SIGNOFF REMOVAL ---
+    const removeSignoffModal = document.getElementById('removeSignoffModal');
+    const removeSignoffConfirmBtn = document.getElementById('removeSignoffConfirmBtn');
+    const removeSignoffModalTitle = document.getElementById('removeSignoffModalTitle');
+    const removeSignoffModalText = document.getElementById('removeSignoffModalText');
+
+    function openRemoveTfcSignoffConfirmation(pilotId, field, pilotName, label) {
+        removeSignoffModalTitle.textContent = 'Confirm Sign-off Removal';
+        removeSignoffModalText.innerHTML = `Are you sure you want to remove the sign-off for <strong>${label}</strong> from <strong>${pilotName}</strong>? This cannot be undone.`;
+
+        removeSignoffConfirmBtn.onclick = () => handleRemoveTfcSignoff(pilotId, field);
+        
+        openModal('removeSignoffModal');
+    }
+
+    async function handleRemoveTfcSignoff(pilotId, field) {
+        removeSignoffConfirmBtn.disabled = true;
+        const result = await apiCall(`/training/api/update-tfc/${token}`, 'POST', { pilotId, field, value: '' });
+
+        if (result && result.success) {
+            showToast(`Sign-off removed successfully.`, 'success');
+            closeModal('removeSignoffModal');
+        }
+        
+        removeSignoffConfirmBtn.disabled = false;
+    }
+
     function openDeletePilotModal(pilotName, pilotId) {
         const modal = document.getElementById('deletePilotModal');
         document.getElementById('deletePilotModalText').innerHTML = `Are you sure you want to permanently remove <strong>${pilotName}</strong> from the training tracker? This action cannot be undone.`;
         const confirmBtn = document.getElementById('deletePilotConfirmBtn');
-        confirmBtn.onclick = () => handleDeletePilot(pilotId); // Set the action for the confirm button
+        confirmBtn.onclick = () => handleDeletePilot(pilotId); 
         openModal('deletePilotModal');
     }
 
@@ -801,6 +930,7 @@
             const { pilotId, field } = modal.dataset;
             openRemoveSignoffModal(pilotId, field);
         });
+        document.getElementById('confirmTfcSignoffBtn')?.addEventListener('click', handleConfirmTfcSignoff);
 
         // --- WebSocket Logic ---
         const socket = io();
@@ -819,4 +949,5 @@
 
 </body>
 </html>
+
 
