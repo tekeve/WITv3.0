@@ -31,6 +31,19 @@ exports.showQuizForm = (client) => [
     async (req, res) => {
         const { user } = req.tokenData;
         try {
+            // Get the user's training status
+            const [trainingStatusRow] = await db.query('SELECT status FROM commander_training WHERE discord_id = ?', [user.id]);
+
+            // If the user isn't in the training program, they shouldn't see any quizzes.
+            if (!trainingStatusRow) {
+                return res.render('quizForm', {
+                    token: req.params.token,
+                    userTag: user.tag,
+                    quizzes: [], // No quizzes available
+                });
+            }
+            const userStatus = trainingStatusRow.status;
+
             // Get all quizzes
             const allQuizzes = await db.query('SELECT quiz_id, name, category FROM quizzes');
 
@@ -38,8 +51,13 @@ exports.showQuizForm = (client) => [
             const completedQuizzesResult = await db.query('SELECT quiz_id FROM quiz_completions WHERE discord_id = ?', [user.id]);
             const completedQuizIds = new Set(completedQuizzesResult.map(q => q.quiz_id));
 
-            // Filter out quizzes the user has already passed
-            const availableQuizzes = allQuizzes.filter(quiz => !completedQuizIds.has(quiz.quiz_id));
+            // Filter quizzes: must not be completed AND must match the user's training status category.
+            const availableQuizzes = allQuizzes.filter(quiz => {
+                const notCompleted = !completedQuizIds.has(quiz.quiz_id);
+                // The quiz category must match the user's status in the commander_training table.
+                const correctCategory = quiz.category === userStatus;
+                return notCompleted && correctCategory;
+            });
 
             res.render('quizForm', {
                 token: req.params.token,

@@ -192,16 +192,15 @@
                 <label for="newSignoffComment">Add Your Sign-off (Comment Optional)</label>
                 <textarea id="newSignoffComment" rows="3" placeholder="Enter an optional comment..."></textarea>
             </div>
-            <button id="addSignoffBtn" class="btn-primary">Add Sign-off</button>
-        </div>
-        <div id="removeSignoffAction" style="display: none; margin-top: 1.5rem;">
-            <button id="removeSignoffBtn" class="btn-danger">Remove My Sign-off</button>
         </div>
         <div class="modal-actions">
+            <button id="removeSignoffBtn" class="btn-danger" style="display: none; margin-right: auto;">Remove My Sign-off</button>
             <button class="btn-secondary" onclick="closeModal('signoffsModal')">Close</button>
+            <button id="addSignoffBtn" class="btn-primary" style="display: none;">Add Sign-off</button>
         </div>
     </div>
 </div>
+
 
 <!-- TFC Signoff Modal -->
 <div id="tfcSignoffModal" class="modal-overlay">
@@ -335,7 +334,7 @@
             }
         }
         return `
-            <div class="complex-signoff-item" data-field="${field}" data-pilot-type="resident">
+            <div class="complex-signoff-item progress-item" data-field="${field}" data-pilot-type="resident">
                 <label>${label}</label>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <div class="signoff-dots">${dotsHTML}</div>
@@ -742,16 +741,21 @@
         `).join('') : '<p style="color: var(--text-secondary);">No sign-offs yet.</p>';
         
         const addForm = document.getElementById('addSignoffForm');
-        const removeAction = document.getElementById('removeSignoffAction');
+        const addBtn = document.getElementById('addSignoffBtn');
+        const removeBtn = document.getElementById('removeSignoffBtn');
+        
+        // Reset visibility
         addForm.style.display = 'none';
-        removeAction.style.display = 'none';
+        addBtn.style.display = 'none';
+        removeBtn.style.display = 'none';
 
         if (canDoInFleetSignoffs) {
             const hasSignedOff = signoffs.some(s => s.discordId === commanderDiscordId);
             if (hasSignedOff) {
-                removeAction.style.display = 'block';
+                removeBtn.style.display = 'inline-flex';
             } else if (signoffs.length < 3) {
                 addForm.style.display = 'block';
+                addBtn.style.display = 'inline-flex';
                 document.getElementById('newSignoffComment').value = '';
             }
         }
@@ -781,7 +785,7 @@
 
         const signoffResult = await apiCall(`/training/api/update-tfc/${token}`, 'POST', { pilotId, field, value: commanderName });
         
-        if (signoffResult && signoffResult.success) {
+        if (signoffResult && result.success) {
             // Only add a comment if text was entered.
             if (comment) {
                 // The comment passed to the API now has the correct type.
@@ -949,5 +953,3 @@
 
 </body>
 </html>
-
-
