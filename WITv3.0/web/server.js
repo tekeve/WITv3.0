@@ -18,6 +18,7 @@ const reactionRoleRoutes = require('./routes/reactionRoleRoutes');
 const trainingRoutes = require('./routes/trainingRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const quizManagerRoutes = require('./routes/quizManagerRoutes');
+const iskRoutes = require('./routes/iskRoutes');
 
 /**
  * Initializes and starts the Express web server.
@@ -61,6 +62,7 @@ function startServer(client) {
     app.use('/training', trainingRoutes(client)); // Mount the training router at the /training path
     app.use('/', quizRoutes(client));
     app.use('/', quizManagerRoutes(client));
+    app.use('/', iskRoutes(client));
 
     app.get('/', (req, res) => {
         res.send('Web server is running.');
@@ -72,4 +74,3 @@ function startServer(client) {
 }
 
 module.exports = { startServer };
-

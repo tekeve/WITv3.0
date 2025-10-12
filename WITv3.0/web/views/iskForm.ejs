@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISK/Hour Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #1e293b; color: #e2e8f0; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; margin: 0; padding: 20px; }
+        .container { width: 100%; max-width: 1200px; padding: 2.5rem; border-radius: 0.75rem; background-color: #334155; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); border: 1px solid #475569; }
+        h1 { font-size: 1.75rem; font-weight: 700; text-align: center; margin-bottom: 0.5rem; color: #f8fafc; }
+        .form-subtitle { text-align: center; color: #94a3b8; margin-bottom: 2.5rem; }
+        .form-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+        @media (min-width: 768px) { .form-grid { grid-template-columns: repeat(3, 1fr); } }
+        .form-group { margin-bottom: 1.25rem; }
+        .full-width { grid-column: 1 / -1; }
+        label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 500; color: #cbd5e1; }
+        input[type="text"], input[type="number"], textarea { width: 100%; padding: 0.65rem 0.85rem; border-radius: 0.375rem; background-color: #1e293b; border: 1px solid #475569; color: #e2e8f0; font-size: 1rem; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; }
+        textarea { resize: vertical; min-height: 200px; font-family: monospace, sans-serif; font-size: 0.875rem; }
+        input:focus, textarea:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2); }
+        .tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid #475569; margin-bottom: 1rem; }
+        .tab-link { background-color: transparent; border: none; color: #94a3b8; padding: 0.75rem 1.25rem; cursor: pointer; font-size: 0.9rem; border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s; }
+        .tab-link.active { color: #f8fafc; border-bottom-color: #38bdf8; font-weight: 600; }
+        .tab-link:hover { color: #f8fafc; }
+        .pagination-controls { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 2rem; }
+        .page-btn { background-color: #475569; color: #cbd5e1; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; font-weight: 600; transition: background-color 0.2s; }
+        .page-btn:hover:not(:disabled) { background-color: #525f75; }
+        .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        #page-indicator { color: #cbd5e1; font-size: 0.9rem; }
+        .results-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+        @media (min-width: 1024px) { .results-grid { grid-template-columns: repeat(3, 1fr); } }
+        .results-panel { background-color: #1e293b; border-radius: 0.5rem; padding: 1.5rem; border: 1px solid #475569;}
+        .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #475569; padding-bottom: 0.75rem; margin-bottom: 1rem; }
+        .panel-header h2 { font-size: 1.25rem; margin: 0; }
+        .copy-btn { background-color: #475569; color: #cbd5e1; border: none; padding: 0.4rem 0.8rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; transition: background-color 0.2s; }
+        .copy-btn:hover { background-color: #525f75; }
+        .copy-btn svg { width: 16px; height: 16px; }
+        .result-item { display: flex; justify-content: space-between; align-items: center; font-size: 1rem; padding: 0.75rem 0; border-bottom: 1px solid #475569; }
+        .result-item:last-child { border-bottom: none; }
+        .result-item-label { color: #94a3b8; }
+        .result-item-value { color: #f8fafc; font-weight: 600; }
+        .chart-container { display: grid; grid-template-columns: 1fr; gap: 2rem; margin-top: 2rem; grid-column: 1 / -1; }
+        @media (min-width: 1024px) { .chart-container { grid-template-columns: repeat(2, 1fr); } }
+        .chart-panel { background-color: #1e293b; border-radius: 0.5rem; padding: 1.5rem; border: 1px solid #475569; }
+        #results-container { display: none; }
+        small { font-size: 0.8rem; color: #94a3b8; margin-top: 0.25rem; display: block; }
+        #pilot-count-detected { font-size: 0.8rem; color: #38bdf8; margin-left: 8px;}
+        
+        .character-income-panel { grid-column: 1 / -1; margin-top: 2rem; }
+        .character-income-content { display: grid; grid-template-columns: 1fr 1.5fr; gap: 2rem; align-items: center; }
+        @media (max-width: 768px) { .character-income-content { grid-template-columns: 1fr; } }
+        .income-list { max-height: 280px; overflow-y: auto; padding-right: 1rem;}
+        .income-list .result-item { padding: 0.6rem 0; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ISK/Hour Tracker</h1>
+        <p class="form-subtitle">Paste your EVE Online wallet journal entries to calculate ISK/hour.</p>
+        <form id="isk-form">
+            <div class="form-group full-width">
+                <label for="journal-data">Wallet Journal Data</label>
+                <textarea id="journal-data" name="journal-data" placeholder="2025.10.10 07:16   Corporate Reward Payout   31,500,000 ISK ..."></textarea>
+                 <small>Only lines containing "Corporate Reward Payout" will be processed.</small>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="pilot-count">Manual Alt Count <span id="pilot-count-detected"></span></label>
+                    <input type="number" id="pilot-count" name="pilot-count" min="1" placeholder="Auto">
+                    <small>Overrides auto-detection if set.</small>
+                </div>
+                 <div class="form-group">
+                    <label for="max-gap">Max Gap (minutes)</label>
+                    <input type="number" id="max-gap" name="max-gap" value="10" min="1">
+                    <small>Time between payouts to be a new fleet.</small>
+                </div>
+                <div class="form-group">
+                    <label for="manual-duration">Manual Duration (minutes)</label>
+                    <input type="number" id="manual-duration" name="manual-duration" min="0" placeholder="Optional">
+                    <small>Overrides calculated fleet duration.</small>
+                </div>
+            </div>
+        </form>
+
+        <div id="results-container">
+            <div id="fleet-tabs" class="tabs"></div>
+            <div id="fleet-pagination" class="pagination-controls"></div>
+            <div class="results-grid">
+                <div class="results-panel">
+                     <div class="panel-header">
+                        <h2>Performance Metrics</h2>
+                        <button id="copy-button" class="copy-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy
+                        </button>
+                     </div>
+                     <div class="result-item"><span class="result-item-label" id="pilot-speed-label">ISK/Hour (per Alt)</span><span class="result-item-value" id="pilot-speed">0 ISK/hr</span></div>
+                     <div class="result-item"><span class="result-item-label" id="fleet-speed-label">ISK/Hour (Total)</span><span class="result-item-value" id="fleet-speed">0 ISK/hr</span></div>
+                     <div class="result-item"><span class="result-item-label">Total Income</span><span class="result-item-value" id="total-income">0 ISK</span></div>
+                     <div class="result-item"><span class="result-item-label">Fleet Income</span><span class="result-item-value" id="fleet-income">0 ISK</span></div>
+                     <div class="result-item"><span class="result-item-label">Total Time</span><span class="result-item-value" id="total-time">0h 0m</span></div>
+                     <div class="result-item"><span class="result-item-label">Best Site Time</span><span class="result-item-value" id="best-site-time">0m 0s</span></div>
+                     <div class="result-item"><span class="result-item-label">2nd Best Site</span><span class="result-item-value" id="second-best-site-time">0m 0s</span></div>
+                     <div class="result-item"><span class="result-item-label">Average Site Time</span><span class="result-item-value" id="avg-site-time">0m 0s</span></div>
+                     <div class="result-item"><span class="result-item-label">2nd Worst Site</span><span class="result-item-value" id="second-worst-site-time">0m 0s</span></div>
+                     <div class="result-item"><span class="result-item-label">Worst Site Time</span><span class="result-item-value" id="worst-site-time">0m 0s</span></div>
+                </div>
+                <div class="results-panel">
+                    <div class="panel-header">
+                        <h2>Payout Analysis</h2>
+                    </div>
+                    <div class="result-item"><span class="result-item-label">Average Alts</span><span class="result-item-value" id="avg-pilots">0.0</span></div>
+                    <div class="result-item"><span class="result-item-label">Sites Run</span><span class="result-item-value" id="measured-sites">0</span></div>
+                    <div class="result-item"><span class="result-item-label">Payouts Tracked</span><span class="result-item-value" id="payout-count">0</span></div>
+                    <div class="result-item"><span class="result-item-label">Log Start</span><span class="result-item-value" id="log-start">N/A</span></div>
+                    <div class="result-item"><span class="result-item-label">Payout Max</span><span class="result-item-value" id="payout-max">0 ISK</span></div>
+                    <div class="result-item"><span class="result-item-label">Payout Min</span><span class="result-item-value" id="payout-min">0 ISK</span></div>
+                </div>
+                <div class="results-panel">
+                    <div class="panel-header">
+                        <h2>Site Completion Breakdown</h2>
+                    </div>
+                    <div class="result-item"><span class="result-item-label">Vanguards Run</span><span class="result-item-value" id="vanguard-sites">0</span></div>
+                    <div class="result-item"><span class="result-item-label">Assaults Run</span><span class="result-item-value" id="assault-sites">0</span></div>
+                    <div class="result-item"><span class="result-item-label">Headquarters Run</span><span class="result-item-value" id="hq-sites">0</span></div>
+                    <div class="result-item"><span class="result-item-label">Motherships Run</span><span class="result-item-value" id="mothership-sites">0</span></div>
+                    <div class="result-item"><span class="result-item-label">Unknown Sites</span><span class="result-item-value" id="unknown-sites">0</span></div>
+                </div>
+
+                <div class="chart-container">
+                     <div id="iskRateChartContainer" class="chart-panel">
+                        <canvas id="iskRateChart"></canvas>
+                     </div>
+                     <div id="siteTimeChartContainer" class="chart-panel">
+                        <canvas id="siteTimeChart"></canvas>
+                     </div>
+                </div>
+                <div id="character-income-panel" class="results-panel character-income-panel">
+                    <div class="panel-header">
+                        <h2>Income per Character</h2>
+                    </div>
+                    <div class="character-income-content">
+                        <div class="chart-wrapper">
+                            <canvas id="characterIncomeChart"></canvas>
+                        </div>
+                        <div id="character-income-list" class="income-list"></div>
+                    </div>
+                </div>
+             </div>
+        </div>
+    </div>
+    <script>
+        const PAYOUT_DATA = {
+            "Vanguard": { "H": { 10: 10395000, 11: 9615375, 12: 8713775, 13: 7900200 }, "LN": { 15: 15000000, 16: 13875000, 17: 12674000 } },
+            "Assault": { "H": { 20: 18200000, 21: 16835000, 22: 15379000 }, "LN": { 30: 26000000 } },
+            "Headquarter": { "H": { 40: 31500000, 41: 29137400, 42: 26617400 }, "LN": { 60: 45000000, 61: 41625000 } },
+            "Mothership": { "H": { 80: 63000000 }, "LN": { 120: 90000000 } }
+        };
+
+        // --- Global State ---
+        let allFleetsData = [];
+        let activeFleetIndex = 0;
+        let currentPage = 0;
+        const FLEETS_PER_PAGE = 7; // 7 individual + 1 summary tab
+
+        // --- Chart Instances ---
+        let iskRateChartInstance;
+        let siteTimeChartInstance;
+        let characterIncomeChartInstance;
+
+        // --- Element References ---
+        const journalDataEl = document.getElementById('journal-data');
+        const pilotCountEl = document.getElementById('pilot-count');
+        const manualDurationEl = document.getElementById('manual-duration');
+        const maxGapEl = document.getElementById('max-gap');
+        const copyButton = document.getElementById('copy-button');
+        const resultsContainerEl = document.getElementById('results-container');
+        const fleetTabsEl = document.getElementById('fleet-tabs');
+        const fleetPaginationEl = document.getElementById('fleet-pagination');
+        
+        // --- Result Elements ---
+        const pilotCountDetectedEl = document.getElementById('pilot-count-detected');
+        const payoutCountEl = document.getElementById('payout-count');
+        const avgPilotsEl = document.getElementById('avg-pilots');
+        const measuredSitesEl = document.getElementById('measured-sites');
+        const logStartEl = document.getElementById('log-start');
+        const payoutMaxEl = document.getElementById('payout-max');
+        const payoutMinEl = document.getElementById('payout-min');
+        const pilotSpeedEl = document.getElementById('pilot-speed');
+        const fleetSpeedEl = document.getElementById('fleet-speed');
+        const pilotSpeedLabelEl = document.getElementById('pilot-speed-label');
+        const fleetSpeedLabelEl = document.getElementById('fleet-speed-label');
+        const totalIncomeEl = document.getElementById('total-income');
+        const fleetIncomeEl = document.getElementById('fleet-income');
+        const totalTimeEl = document.getElementById('total-time');
+        const bestSiteTimeEl = document.getElementById('best-site-time');
+        const secondBestSiteTimeEl = document.getElementById('second-best-site-time');
+        const avgSiteTimeEl = document.getElementById('avg-site-time');
+        const secondWorstSiteTimeEl = document.getElementById('second-worst-site-time');
+        const worstSiteTimeEl = document.getElementById('worst-site-time');
+        
+        // --- Site Count Elements ---
+        const vanguardSitesEl = document.getElementById('vanguard-sites');
+        const assaultSitesEl = document.getElementById('assault-sites');
+        const hqSitesEl = document.getElementById('hq-sites');
+        const mothershipSitesEl = document.getElementById('mothership-sites');
+        const unknownSitesEl = document.getElementById('unknown-sites');
+
+        // --- Character Income Elements ---
+        const characterIncomePanelEl = document.getElementById('character-income-panel');
+        const characterIncomeListEl = document.getElementById('character-income-list');
+        const iskRateChartContainer = document.getElementById('iskRateChartContainer');
+
+
+        const elementsToWatch = [journalDataEl, pilotCountEl, manualDurationEl, maxGapEl];
+        elementsToWatch.forEach(el => el.addEventListener('input', calculateAndRender));
+        copyButton.addEventListener('click', copyResults);
+
+        function copyResults() {
+            const activeFleet = allFleetsData[activeFleetIndex];
+            if (!activeFleet) return;
+
+            const { perAltIskRate, totalIskRate, totalUserIncome, totalFleetIncome, sitesRun, avgUserAlts, durationMinutes, minPayout, maxPayout } = activeFleet.metrics;
+            
+            const time = `${Math.floor(durationMinutes / 60)}h ${Math.round(durationMinutes % 60)}m`;
+            const isPerMinute = durationMinutes > 0 && durationMinutes < 60;
+            const rateLabel = isPerMinute ? 'ISK/m' : 'ISK/h';
+
+            const perAltIskText = perAltIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+            const totalIskRateText = totalIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+
+            if (totalIskRate === 0) {
+                copyButton.textContent = 'No data';
+                setTimeout(() => { copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`; }, 2000);
+                return;
+            };
+
+            const copyText = `.\n${rateLabel} (per Alt): ${perAltIskText}\n${rateLabel} (Total): ${totalIskRateText}\nTotal Income: ${totalUserIncome.toLocaleString('en-US')} ISK\nFleet Income: ${totalFleetIncome.toLocaleString('en-US')} ISK\nTotal Sites: ${sitesRun}\nAverage Alts: ${avgUserAlts.toFixed(1)}\nTotal Time: ${time}\nMin/Max Payout: ${minPayout.toLocaleString('en-US')} ISK / ${maxPayout.toLocaleString('en-US')} ISK`;
+            
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = copyText;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            copyButton.textContent = 'Copied!';
+            setTimeout(() => { copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`; }, 2000);
+        }
+
+        function formatTime(ms) {
+            if (ms <= 0) return '0m 0s';
+            const totalSeconds = Math.round(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes}m ${seconds}s`;
+        }
+        
+        function findPayoutDetails(payoutAmount) {
+            const tolerance = 100;
+            for (const siteType in PAYOUT_DATA) {
+                for (const secType in PAYOUT_DATA[siteType]) {
+                    for (const pilotCount in PAYOUT_DATA[siteType][secType]) {
+                        const expectedPayout = PAYOUT_DATA[siteType][secType][pilotCount];
+                        if (Math.abs(expectedPayout - payoutAmount) <= tolerance) {
+                            return { siteType: siteType, pilotCount: parseInt(pilotCount, 10) };
+                        }
+                    }
+                }
+            }
+            return { siteType: 'Unknown', pilotCount: 0 };
+        }
+
+        function processFleet(fleet) {
+            const manualAltCount = parseInt(pilotCountEl.value, 10) || 0;
+            const manualDuration = parseInt(manualDurationEl.value, 10) || 0;
+
+            const groupedTicks = [];
+            if (fleet.length > 0) {
+                groupedTicks.push([fleet[0]]);
+                for (let i = 1; i < fleet.length; i++) {
+                    const currentPayout = fleet[i];
+                    const lastGroup = groupedTicks[groupedTicks.length - 1];
+                    const lastPayoutInGroup = lastGroup[lastGroup.length - 1];
+                    if ((currentPayout.time - lastPayoutInGroup.time) <= 60000) { lastGroup.push(currentPayout); } 
+                    else { groupedTicks.push([currentPayout]); }
+                }
+            }
+
+            if (groupedTicks.length < 2) return null;
+
+            const totalUserIncome = fleet.reduce((sum, p) => sum + p.amount, 0);
+            let totalFleetIncome = groupedTicks.reduce((sum, group) => sum + group[0].amount, 0);
+
+            let avgUserAlts = 0;
+            if (manualAltCount > 0) { avgUserAlts = manualAltCount; } 
+            else {
+                const altCountsPerTick = groupedTicks.map(group => group.length);
+                if (altCountsPerTick.length > 0) { avgUserAlts = altCountsPerTick.reduce((sum, count) => sum + count, 0) / altCountsPerTick.length; }
+            }
+            
+            const incomeByCharacter = {};
+            fleet.forEach(payout => {
+                const charName = payout.characterName || 'Unknown Character';
+                if (!incomeByCharacter[charName]) {
+                    incomeByCharacter[charName] = 0;
+                }
+                incomeByCharacter[charName] += payout.amount;
+            });
+
+            const representativeTimestamps = groupedTicks.map(group => group[0].time);
+            const firstPayoutTime = representativeTimestamps[0];
+            let durationMinutes = manualDuration > 0 ? manualDuration : (representativeTimestamps[representativeTimestamps.length - 1] - firstPayoutTime) / (1000 * 60);
+            
+            const siteDataChronological = [];
+            for (let i = 1; i < representativeTimestamps.length; i++) {
+                siteDataChronological.push({ time: representativeTimestamps[i] - representativeTimestamps[i-1], payout: groupedTicks[i][0].amount });
+            }
+
+            const siteCounts = { Vanguard: 0, Assault: 0, Headquarter: 0, Mothership: 0, Unknown: 0 };
+            groupedTicks.forEach(group => {
+                const siteType = findPayoutDetails(group[0].amount).siteType;
+                if (siteCounts.hasOwnProperty(siteType)) { siteCounts[siteType]++; }
+            });
+
+            const siteTimesSorted = siteDataChronological.map(d => d.time).sort((a, b) => a - b);
+            const avgSiteTimeMs = siteTimesSorted.length > 0 ? siteTimesSorted.reduce((a, b) => a + b, 0) / siteTimesSorted.length : 0;
+            const payoutAmounts = fleet.map(p => p.amount);
+            
+            let totalIskRate = 0, perAltIskRate = 0;
+            if (durationMinutes > 0) {
+                if (durationMinutes < 60) {
+                    totalIskRate = totalUserIncome / durationMinutes;
+                    perAltIskRate = avgUserAlts > 0 ? totalIskRate / avgUserAlts : 0;
+                } else {
+                    totalIskRate = totalUserIncome / (durationMinutes / 60);
+                    perAltIskRate = avgUserAlts > 0 ? totalIskRate / avgUserAlts : 0;
+                }
+            }
+
+            return {
+                metrics: {
+                    totalUserIncome, totalFleetIncome, durationMinutes, avgUserAlts,
+                    sitesRun: groupedTicks.length, payoutCount: fleet.length,
+                    logStart: new Date(firstPayoutTime), maxPayout: Math.max(...payoutAmounts), minPayout: Math.min(...payoutAmounts),
+                    bestTime: siteTimesSorted[0] || 0, secondBestTime: siteTimesSorted[1] || 0,
+                    avgTime: avgSiteTimeMs, secondWorstTime: siteTimesSorted[siteTimesSorted.length - 2] || 0,
+                    worstTime: siteTimesSorted[siteTimesSorted.length - 1] || 0,
+                    totalIskRate: Math.round(totalIskRate), perAltIskRate: Math.round(perAltIskRate),
+                    siteCounts,
+                    characterIncome: incomeByCharacter
+                },
+                chartData: {
+                    groupedTicks, firstPayoutTime, avgUserAlts, siteDataChronological
+                }
+            };
+        }
+        
+        function generateAllFleetsSummary(fleets) {
+            if (fleets.length === 0) return null;
+
+            const summary = {
+                metrics: {
+                    totalUserIncome: 0, totalFleetIncome: 0, durationMinutes: 0, 
+                    sitesRun: 0, payoutCount: 0,
+                    logStart: fleets[0].metrics.logStart, 
+                    maxPayout: 0, minPayout: Infinity,
+                    siteCounts: { Vanguard: 0, Assault: 0, Headquarter: 0, Mothership: 0, Unknown: 0 },
+                    characterIncome: {},
+                },
+                chartData: {
+                    siteDataChronological: []
+                }
+            };
+            
+            let totalWeightedAlts = 0;
+            const allSiteTimes = [];
+
+            fleets.forEach(fleet => {
+                summary.metrics.totalUserIncome += fleet.metrics.totalUserIncome;
+                summary.metrics.totalFleetIncome += fleet.metrics.totalFleetIncome;
+                summary.metrics.durationMinutes += fleet.metrics.durationMinutes;
+                summary.metrics.sitesRun += fleet.metrics.sitesRun;
+                summary.metrics.payoutCount += fleet.metrics.payoutCount;
+                summary.metrics.maxPayout = Math.max(summary.metrics.maxPayout, fleet.metrics.maxPayout);
+                summary.metrics.minPayout = Math.min(summary.metrics.minPayout, fleet.metrics.minPayout);
+                
+                totalWeightedAlts += fleet.metrics.avgUserAlts * fleet.metrics.durationMinutes;
+
+                for (const siteType in fleet.metrics.siteCounts) {
+                    summary.metrics.siteCounts[siteType] += fleet.metrics.siteCounts[siteType];
+                }
+                for (const charName in fleet.metrics.characterIncome) {
+                    summary.metrics.characterIncome[charName] = (summary.metrics.characterIncome[charName] || 0) + fleet.metrics.characterIncome[charName];
+                }
+                
+                allSiteTimes.push(...fleet.chartData.siteDataChronological.map(d => d.time));
+                summary.chartData.siteDataChronological.push(...fleet.chartData.siteDataChronological);
+            });
+            
+            summary.metrics.avgUserAlts = summary.metrics.durationMinutes > 0 ? totalWeightedAlts / summary.metrics.durationMinutes : 0;
+            
+            const duration = summary.metrics.durationMinutes;
+            if (duration > 0) {
+                 if (duration < 60) {
+                    summary.metrics.totalIskRate = Math.round(summary.metrics.totalUserIncome / duration);
+                    summary.metrics.perAltIskRate = summary.metrics.avgUserAlts > 0 ? Math.round(summary.metrics.totalIskRate / summary.metrics.avgUserAlts) : 0;
+                } else {
+                    summary.metrics.totalIskRate = Math.round(summary.metrics.totalUserIncome / (duration / 60));
+                    summary.metrics.perAltIskRate = summary.metrics.avgUserAlts > 0 ? Math.round(summary.metrics.totalIskRate / summary.metrics.avgUserAlts) : 0;
+                }
+            } else {
+                summary.metrics.totalIskRate = 0;
+                summary.metrics.perAltIskRate = 0;
+            }
+
+            allSiteTimes.sort((a, b) => a - b);
+            summary.metrics.bestTime = allSiteTimes[0] || 0;
+            summary.metrics.secondBestTime = allSiteTimes[1] || 0;
+            summary.metrics.avgTime = allSiteTimes.length > 0 ? allSiteTimes.reduce((a, b) => a + b, 0) / allSiteTimes.length : 0;
+            summary.metrics.secondWorstTime = allSiteTimes[allSiteTimes.length - 2] || 0;
+            summary.metrics.worstTime = allSiteTimes[allSiteTimes.length - 1] || 0;
+            
+            return summary;
+        }
+
+        function calculateAndRender() {
+            const lines = journalDataEl.value.split('\n');
+            const maxGapMinutes = parseInt(maxGapEl.value, 10) || 10;
+            const payoutRegex = /^(\d{4}\.\d{2}\.\d{2}\s\d{2}:\d{2})\s+Corporate Reward Payout\s+([\d,]+)\sISK.*?(?:CONCORD rewarded (.+?) for services performed\.?)?$/;
+
+            const allPayouts = lines.map(line => {
+                const match = line.match(payoutRegex);
+                if (match) {
+                    const dateTimeString = match[1].replace(/\./g, '-') + ':00Z';
+                    return { 
+                        time: new Date(dateTimeString).getTime(), 
+                        amount: parseInt(match[2].replace(/,/g, ''), 10),
+                        characterName: match[3] ? match[3].trim() : 'Unknown Character'
+                    };
+                }
+                return null;
+            }).filter(p => p !== null && !isNaN(p.time) && !isNaN(p.amount));
+
+            if (allPayouts.length === 0) { resetAndHideResults(); return; }
+            
+            allPayouts.sort((a,b) => a.time - b.time);
+
+            const fleets = [];
+            if (allPayouts.length > 0) {
+                fleets.push([allPayouts[0]]);
+                for (let i = 1; i < allPayouts.length; i++) {
+                    const timeDiffMinutes = (allPayouts[i].time - allPayouts[i - 1].time) / (1000 * 60);
+                    if (timeDiffMinutes > maxGapMinutes) { fleets.push([]); }
+                    fleets[fleets.length - 1].push(allPayouts[i]);
+                }
+            }
+            
+            const individualFleets = fleets.map(fleet => processFleet(fleet)).filter(Boolean);
+            if (individualFleets.length === 0) { resetAndHideResults(); return; }
+
+            const summaryFleet = generateAllFleetsSummary(individualFleets);
+            allFleetsData = [summaryFleet, ...individualFleets];
+
+            resultsContainerEl.style.display = 'block';
+            
+            activeFleetIndex = 0; // Default to summary
+            currentPage = 0;
+
+            renderTabsAndPagination();
+            displayFleetData(activeFleetIndex);
+        }
+
+        function renderTabsAndPagination() {
+            fleetTabsEl.innerHTML = '';
+            
+            // Add summary tab
+            const summaryButton = document.createElement('button');
+            summaryButton.classList.add('tab-link');
+            summaryButton.textContent = `All Fleets (${allFleetsData[0].metrics.sitesRun} sites)`;
+            summaryButton.dataset.index = 0;
+            summaryButton.onclick = () => displayFleetData(0);
+            fleetTabsEl.appendChild(summaryButton);
+
+            const individualFleets = allFleetsData.slice(1);
+            const totalPages = Math.ceil(individualFleets.length / FLEETS_PER_PAGE);
+            
+            if(totalPages <= 1 && individualFleets.length <= FLEETS_PER_PAGE) {
+                fleetPaginationEl.innerHTML = '';
+            } else {
+                fleetPaginationEl.innerHTML = `
+                    <button id="prev-page-btn" class="page-btn">&laquo; Prev</button>
+                    <span id="page-indicator">Page ${currentPage + 1} of ${totalPages}</span>
+                    <button id="next-page-btn" class="page-btn">Next &raquo;</button>
+                `;
+                document.getElementById('prev-page-btn').onclick = () => { if(currentPage > 0) { currentPage--; renderTabsAndPagination(); } };
+                document.getElementById('next-page-btn').onclick = () => { if(currentPage < totalPages - 1) { currentPage++; renderTabsAndPagination(); } };
+                document.getElementById('prev-page-btn').disabled = currentPage === 0;
+                document.getElementById('next-page-btn').disabled = currentPage >= totalPages - 1;
+            }
+
+            const startIndex = currentPage * FLEETS_PER_PAGE;
+            const endIndex = startIndex + FLEETS_PER_PAGE;
+            const fleetsForPage = individualFleets.slice(startIndex, endIndex);
+
+            fleetsForPage.forEach((fleetData, i) => {
+                const globalIndex = startIndex + i + 1; // +1 to account for summary
+                const button = document.createElement('button');
+                button.classList.add('tab-link');
+                const startDate = fleetData.metrics.logStart;
+                const utcHours = startDate.getUTCHours().toString().padStart(2, '0');
+                const utcMinutes = startDate.getUTCMinutes().toString().padStart(2, '0');
+                button.textContent = `Fleet @ ${utcHours}:${utcMinutes} (${fleetData.metrics.sitesRun} sites)`;
+                button.dataset.index = globalIndex;
+                button.onclick = () => displayFleetData(globalIndex);
+                fleetTabsEl.appendChild(button);
+            });
+
+            // Re-apply active class after re-rendering
+            Array.from(fleetTabsEl.children).forEach(tab => {
+                tab.classList.toggle('active', parseInt(tab.dataset.index) === activeFleetIndex);
+            });
+        }
+
+        function displayFleetData(index) {
+            activeFleetIndex = index;
+            const fleetData = allFleetsData[index];
+            if (!fleetData) return;
+
+            Array.from(fleetTabsEl.children).forEach(tab => {
+                tab.classList.toggle('active', parseInt(tab.dataset.index) === index);
+            });
+
+            const { metrics, chartData } = fleetData;
+            
+            // Hide ISK Rate chart for summary, show for individual
+            iskRateChartContainer.style.display = index === 0 ? 'none' : 'block';
+
+            updatePerformanceMetrics(metrics);
+            updateAnalysisMetrics(metrics);
+            updateSiteBreakdownMetrics(metrics.siteCounts);
+            updateCharacterIncomeBreakdown(metrics.characterIncome);
+            if (index !== 0) updateIskRateChart(chartData);
+            updateSiteTimeChart(chartData);
+        }
+
+        function updatePerformanceMetrics(m) {
+            const isPerMinute = m.durationMinutes > 0 && m.durationMinutes < 60;
+            pilotSpeedEl.textContent = m.perAltIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+            fleetSpeedEl.textContent = m.totalIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+            pilotSpeedLabelEl.textContent = isPerMinute ? 'ISK/Minute (per Alt)' : 'ISK/Hour (per Alt)';
+            fleetSpeedLabelEl.textContent = isPerMinute ? 'ISK/Minute (Total)' : 'ISK/Hour (Total)';
+            
+            totalIncomeEl.textContent = m.totalUserIncome.toLocaleString('en-US') + ' ISK';
+            fleetIncomeEl.textContent = m.totalFleetIncome.toLocaleString('en-US') + ' ISK';
+            totalTimeEl.textContent = `${Math.floor(m.durationMinutes / 60)}h ${Math.round(m.durationMinutes % 60)}m`;
+            bestSiteTimeEl.textContent = formatTime(m.bestTime);
+            secondBestSiteTimeEl.textContent = formatTime(m.secondBestTime);
+            avgSiteTimeEl.textContent = formatTime(m.avgTime);
+            secondWorstSiteTimeEl.textContent = formatTime(m.secondWorstTime);
+            worstSiteTimeEl.textContent = formatTime(m.worstTime);
+        }
+
+        function updateAnalysisMetrics(m) {
+            avgPilotsEl.textContent = m.avgUserAlts.toFixed(1);
+            pilotCountDetectedEl.textContent = parseInt(pilotCountEl.value, 10) > 0 ? `(manual override)` : `(avg detected: ${m.avgUserAlts.toFixed(1)})`;
+            measuredSitesEl.textContent = m.sitesRun;
+            payoutCountEl.textContent = m.payoutCount;
+
+            if (m.logStart) {
+                const utcHours = m.logStart.getUTCHours().toString().padStart(2, '0');
+                const utcMinutes = m.logStart.getUTCMinutes().toString().padStart(2, '0');
+                logStartEl.textContent = `${utcHours}:${utcMinutes}`;
+            } else {
+                 logStartEl.textContent = 'N/A';
+            }
+
+            payoutMaxEl.textContent = m.maxPayout.toLocaleString('en-US') + ' ISK';
+            payoutMinEl.textContent = m.minPayout === Infinity ? '0 ISK' : m.minPayout.toLocaleString('en-US') + ' ISK';
+        }
+
+        function updateSiteBreakdownMetrics(siteCounts) {
+            vanguardSitesEl.textContent = siteCounts.Vanguard;
+            assaultSitesEl.textContent = siteCounts.Assault;
+            hqSitesEl.textContent = siteCounts.Headquarter;
+            mothershipSitesEl.textContent = siteCounts.Mothership;
+            unknownSitesEl.textContent = siteCounts.Unknown;
+        }
+
+        function updateCharacterIncomeBreakdown(characterIncome) {
+            if (characterIncome && Object.keys(characterIncome).length > 0) {
+                characterIncomePanelEl.style.display = 'block';
+            } else {
+                characterIncomePanelEl.style.display = 'none';
+                return;
+            }
+
+            const sortedCharacters = Object.entries(characterIncome).sort(([, a], [, b]) => b - a);
+
+            characterIncomeListEl.innerHTML = '';
+            sortedCharacters.forEach(([name, amount]) => {
+                const item = document.createElement('div');
+                item.classList.add('result-item');
+                item.innerHTML = `<span class="result-item-label">${name}</span><span class="result-item-value">${amount.toLocaleString('en-US')} ISK</span>`;
+                characterIncomeListEl.appendChild(item);
+            });
+            
+            updateCharacterIncomeChart(sortedCharacters);
+        }
+
+        function updateCharacterIncomeChart(sortedCharacters) {
+            if (characterIncomeChartInstance) characterIncomeChartInstance.destroy();
+            const ctx = document.getElementById('characterIncomeChart').getContext('2d');
+
+            const labels = sortedCharacters.map(([name]) => name);
+            const data = sortedCharacters.map(([, amount]) => amount);
+            
+            characterIncomeChartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Income',
+                        data: data,
+                        backgroundColor: [ '#38bdf8', '#f97316', '#10b981', '#ec4899', '#8b5cf6', '#f59e0b', '#ef4444', '#6366f1' ],
+                        borderColor: '#334155',
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#cbd5e1'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateIskRateChart({ groupedTicks, firstPayoutTime, avgUserAlts }) {
+            if (iskRateChartInstance) iskRateChartInstance.destroy();
+            const ctx = document.getElementById('iskRateChart').getContext('2d');
+            
+            const totalDataPoints = [], perAltDataPoints = [], altCountDataPoints = [];
+            let cumulativeIsk = 0;
+
+            groupedTicks.forEach(group => {
+                const tickTime = group[0].time;
+                const elapsedMinutes = (tickTime - firstPayoutTime) / (1000 * 60);
+                cumulativeIsk += group.reduce((sum, p) => sum + p.amount, 0);
+                altCountDataPoints.push({x: elapsedMinutes, y: group.length});
+                if (elapsedMinutes > 0) {
+                    const currentTotalIskPerHour = (cumulativeIsk / elapsedMinutes) * 60;
+                    const currentPerAltIskPerHour = avgUserAlts > 0 ? currentTotalIskPerHour / avgUserAlts : 0;
+                    totalDataPoints.push({ x: elapsedMinutes, y: currentTotalIskPerHour });
+                    perAltDataPoints.push({ x: elapsedMinutes, y: currentPerAltIskPerHour });
+                }
+            });
+
+            iskRateChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: totalDataPoints.map(p => p.x.toFixed(0) + ' min'),
+                    datasets: [ 
+                        { type: 'line', label: 'Total ISK/Hour', data: totalDataPoints.map(p => p.y), borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.2)', fill: true, tension: 0.1, yAxisID: 'y' }, 
+                        { type: 'line', label: 'Per Alt ISK/Hour', data: perAltDataPoints.map(p => p.y), borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.2)', fill: true, tension: 0.1, yAxisID: 'y' },
+                        { type: 'bar', label: 'Number of Alts', data: altCountDataPoints.map(p=>p.y), backgroundColor: 'rgba(71, 85, 105, 0.5)', borderColor: '#64748b', yAxisID: 'y1' }
+                    ]
+                },
+                options: { responsive: true, plugins: { title: { display: true, text: 'ISK/Hour & Alts Over Time', color: '#e2e8f0', font: { size: 16 } }, legend: { labels: { color: '#cbd5e1' } } }, 
+                    scales: { 
+                        x: { title: { display: true, text: 'Time (Minutes)', color: '#94a3b8' }, ticks: { color: '#cbd5e1' }, grid: { color: '#475569' } }, 
+                        y: { type: 'linear', position: 'left', title: { display: true, text: 'ISK/Hour', color: '#94a3b8' }, ticks: { color: '#cbd5e1', callback: value => value.toLocaleString() }, grid: { color: '#475569' } },
+                        y1: { type: 'linear', position: 'right', title: { display: true, text: 'Number of Alts', color: '#94a3b8' }, ticks: { color: '#cbd5e1', stepSize: 1 }, grid: { drawOnChartArea: false } }
+                    } 
+                }
+            });
+        }
+
+        function updateSiteTimeChart({ siteDataChronological }) {
+            if (siteTimeChartInstance) siteTimeChartInstance.destroy();
+            const ctx = document.getElementById('siteTimeChart').getContext('2d');
+            
+            siteTimeChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: siteDataChronological.map((_, i) => `Site ${i + 1}`),
+                    datasets: [ { label: 'Completion Time (Seconds)', data: siteDataChronological.map(d => Math.round(d.time / 1000)), backgroundColor: '#38bdf8', borderColor: '#0284c7', yAxisID: 'y', order: 2 }, { label: 'Payout per Alt (ISK)', data: siteDataChronological.map(d => d.payout), backgroundColor: '#f97316', borderColor: '#c2410c', type: 'line', yAxisID: 'y1', tension: 0.1, order: 1 } ]
+                },
+                options: { responsive: true, plugins: { title: { display: true, text: 'Site Performance (Time & Payout)', color: '#e2e8f0', font: { size: 16 } }, legend: { labels: { color: '#cbd5e1' } } },
+                    scales: {
+                        x: { ticks: { color: '#cbd5e1' }, grid: { display: false } },
+                        y: { type: 'linear', position: 'left', title: { display: true, text: 'Time (Seconds)', color: '#94a3b8' }, ticks: { color: '#cbd5e1' }, grid: { color: '#475569' } },
+                        y1: { type: 'linear', position: 'right', title: { display: true, text: 'Payout per Alt (ISK)', color: '#94a3b8' }, ticks: { color: '#cbd5e1', callback: value => { if (value >= 1e9) return (value / 1e9).toFixed(2) + 'b'; if (value >= 1e6) return (value / 1e6).toFixed(1) + 'm'; if (value >= 1e3) return (value / 1e3).toFixed(0) + 'k'; return value; } }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+
+        function resetAndHideResults() {
+            if (iskRateChartInstance) iskRateChartInstance.destroy();
+            if (siteTimeChartInstance) siteTimeChartInstance.destroy();
+            if (characterIncomeChartInstance) characterIncomeChartInstance.destroy();
+            resultsContainerEl.style.display = 'none';
+            pilotCountDetectedEl.textContent = '';
+        }
+
+        // Initial call to set the page state correctly
+        resetAndHideResults();
+    </script>
+</body>
+</html>
+
