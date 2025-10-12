@@ -45,6 +45,7 @@
         .chart-container { display: grid; grid-template-columns: 1fr; gap: 2rem; margin-top: 2rem; grid-column: 1 / -1; }
         @media (min-width: 1024px) { .chart-container { grid-template-columns: repeat(2, 1fr); } }
         .chart-panel { background-color: #1e293b; border-radius: 0.5rem; padding: 1.5rem; border: 1px solid #475569; }
+        .chart-panel canvas { cursor: zoom-in; }
         #results-container { display: none; }
         small { font-size: 0.8rem; color: #94a3b8; margin-top: 0.25rem; display: block; }
         #pilot-count-detected { font-size: 0.8rem; color: #38bdf8; margin-left: 8px;}
@@ -54,7 +55,11 @@
         @media (max-width: 768px) { .character-income-content { grid-template-columns: 1fr; } }
         .income-list { max-height: 280px; overflow-y: auto; padding-right: 1rem;}
         .income-list .result-item { padding: 0.6rem 0; }
-
+        
+        /* Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { position: relative; width: 90%; height: 90%; max-width: 1400px; padding: 2rem; background-color: #1e293b; border-radius: 0.5rem; }
+        .modal-overlay.visible { display: flex; }
     </style>
 </head>
 <body>
@@ -153,6 +158,13 @@
              </div>
         </div>
     </div>
+
+    <div id="chart-modal" class="modal-overlay">
+        <div class="modal-content">
+            <canvas id="modal-chart"></canvas>
+        </div>
+    </div>
+
     <script>
         const PAYOUT_DATA = {
             "Vanguard": { "H": { 10: 10395000, 11: 9615375, 12: 8713775, 13: 7900200 }, "LN": { 15: 15000000, 16: 13875000, 17: 12674000 } },
@@ -171,6 +183,7 @@
         let iskRateChartInstance;
         let siteTimeChartInstance;
         let characterIncomeChartInstance;
+        let modalChartInstance;
 
         // --- Element References ---
         const journalDataEl = document.getElementById('journal-data');
@@ -181,6 +194,7 @@
         const resultsContainerEl = document.getElementById('results-container');
         const fleetTabsEl = document.getElementById('fleet-tabs');
         const fleetPaginationEl = document.getElementById('fleet-pagination');
+        const chartModalEl = document.getElementById('chart-modal');
         
         // --- Result Elements ---
         const pilotCountDetectedEl = document.getElementById('pilot-count-detected');
@@ -219,6 +233,39 @@
         const elementsToWatch = [journalDataEl, pilotCountEl, manualDurationEl, maxGapEl];
         elementsToWatch.forEach(el => el.addEventListener('input', calculateAndRender));
         copyButton.addEventListener('click', copyResults);
+
+        // --- Modal Logic ---
+        document.getElementById('iskRateChart').onclick = () => openModal(iskRateChartInstance);
+        document.getElementById('siteTimeChart').onclick = () => openModal(siteTimeChartInstance);
+        document.getElementById('characterIncomeChart').onclick = () => openModal(characterIncomeChartInstance);
+        chartModalEl.onclick = (e) => {
+            if (e.target === chartModalEl) {
+                closeModal();
+            }
+        };
+
+        function openModal(chartInstance) {
+            if (!chartInstance) return;
+            chartModalEl.classList.add('visible');
+            const ctx = document.getElementById('modal-chart').getContext('2d');
+            if (modalChartInstance) {
+                modalChartInstance.destroy();
+            }
+            modalChartInstance = new Chart(ctx, {
+                type: chartInstance.config.type,
+                data: chartInstance.config.data,
+                options: { ...chartInstance.config.options, maintainAspectRatio: false }
+            });
+        }
+
+        function closeModal() {
+            chartModalEl.classList.remove('visible');
+            if (modalChartInstance) {
+                modalChartInstance.destroy();
+                modalChartInstance = null;
+            }
+        }
+
 
         function copyResults() {
             const activeFleet = allFleetsData[activeFleetIndex];
