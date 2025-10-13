@@ -1,15 +1,12 @@
 -- --------------------------------------------------------
 -- Host:                         localhost
--- Server version:               11.8.3-MariaDB - mariadb.org binary distribution
--- Server OS:                    Win64
--- HeidiSQL Version:             12.11.0.7065
+-- Server version:               MySQL 8.x / MariaDB 10.x
 -- --------------------------------------------------------
 -- This script handles both initial setup and database migrations.
 -- It is safe to run on new or existing databases.
 -- --------------------------------------------------------
 
--- Dumping database structure for wit-db
-CREATE DATABASE IF NOT EXISTS `wit-db` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+CREATE DATABASE IF NOT EXISTS `wit-db` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci */;
 USE `wit-db`;
 
 -- Create tables in dependency order
@@ -39,7 +36,7 @@ CREATE TABLE IF NOT EXISTS `action_log_settings` (
   `ignored_channels` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
   `ignored_roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `bot_status` (
   `id` int(11) NOT NULL DEFAULT 1,
@@ -48,7 +45,7 @@ CREATE TABLE IF NOT EXISTS `bot_status` (
   `url` varchar(255) DEFAULT NULL,
   `expiryTimestamp` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `commander_training` (
   `pilot_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -67,27 +64,27 @@ CREATE TABLE IF NOT EXISTS `commander_training` (
   `comments` text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
   PRIMARY KEY (`pilot_id`),
   UNIQUE KEY `discord_id` (`discord_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `config` (
   `key_name` varchar(255) NOT NULL,
   `value` longtext DEFAULT NULL,
   PRIMARY KEY (`key_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `google_docs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `alias` varchar(50) NOT NULL,
   `doc_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `google_sheets` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `alias` varchar(50) NOT NULL,
   `sheet_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `incursion_state` (
   `id` int(11) NOT NULL DEFAULT 1,
@@ -101,7 +98,7 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
   `lastIncursionStats` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`lastIncursionStats`)),
   `route_data` text DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `incursion_systems` (
   `Constellation_id` int(11) NOT NULL,
@@ -116,7 +113,7 @@ CREATE TABLE IF NOT EXISTS `incursion_systems` (
   `region` varchar(255) DEFAULT NULL,
   `region_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`Constellation_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `isk_logs` (
   `log_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -131,7 +128,7 @@ CREATE TABLE IF NOT EXISTS `isk_logs` (
   `journal_data` text DEFAULT NULL,
   PRIMARY KEY (`log_id`),
   KEY `discord_id_idx` (`discord_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `logi_signoffs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -144,7 +141,7 @@ CREATE TABLE IF NOT EXISTS `logi_signoffs` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `pilot_name` (`pilot_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `mail_queue` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -154,7 +151,7 @@ CREATE TABLE IF NOT EXISTS `mail_queue` (
   `body` text NOT NULL,
   `failed_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `quizzes` (
   `quiz_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -163,7 +160,7 @@ CREATE TABLE IF NOT EXISTS `quizzes` (
   `category` enum('resident','training_fc') NOT NULL DEFAULT 'resident',
   PRIMARY KEY (`quiz_id`),
   UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `quiz_questions` (
   `question_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -174,7 +171,7 @@ CREATE TABLE IF NOT EXISTS `quiz_questions` (
   PRIMARY KEY (`question_id`),
   KEY `quiz_id` (`quiz_id`),
   CONSTRAINT `fk_quiz_questions_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `quiz_answers` (
   `answer_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -185,7 +182,7 @@ CREATE TABLE IF NOT EXISTS `quiz_answers` (
   PRIMARY KEY (`answer_id`),
   KEY `question_id` (`question_id`),
   CONSTRAINT `fk_quiz_answers_question` FOREIGN KEY (`question_id`) REFERENCES `quiz_questions` (`question_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `quiz_attempts` (
   `attempt_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -198,7 +195,7 @@ CREATE TABLE IF NOT EXISTS `quiz_attempts` (
   KEY `discord_id` (`discord_id`),
   KEY `quiz_id` (`quiz_id`),
   CONSTRAINT `fk_quiz_attempts_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `quiz_completions` (
   `completion_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -209,7 +206,7 @@ CREATE TABLE IF NOT EXISTS `quiz_completions` (
   UNIQUE KEY `user_quiz` (`discord_id`,`quiz_id`),
   KEY `quiz_id` (`quiz_id`),
   CONSTRAINT `fk_completion_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `reaction_roles` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -220,7 +217,7 @@ CREATE TABLE IF NOT EXISTS `reaction_roles` (
   `emoji` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `message_emoji_role` (`message_id`,`emoji`(100),`role_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `reminders` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -232,7 +229,7 @@ CREATE TABLE IF NOT EXISTS `reminders` (
   PRIMARY KEY (`id`),
   KEY `discord_id` (`discord_id`),
   KEY `remind_at` (`remind_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `resident_applications` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -250,7 +247,7 @@ CREATE TABLE IF NOT EXISTS `resident_applications` (
   `discord_id` varchar(50) NOT NULL,
   `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `role_hierarchy` (
   `roleName` varchar(50) NOT NULL,
@@ -259,7 +256,7 @@ CREATE TABLE IF NOT EXISTS `role_hierarchy` (
   `demote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`demote`)),
   `history` longtext DEFAULT NULL,
   PRIMARY KEY (`roleName`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `saved_embeds` (
   `embed_name` varchar(100) NOT NULL,
@@ -290,7 +287,7 @@ CREATE TABLE IF NOT EXISTS `srp_history` (
   `loss_description` text NOT NULL,
   `loot_status` text NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `training_fc_tracker` (
   `pilot_id` int(11) NOT NULL,
@@ -307,7 +304,7 @@ CREATE TABLE IF NOT EXISTS `training_fc_tracker` (
   `special_notes` text DEFAULT NULL,
   PRIMARY KEY (`pilot_id`),
   CONSTRAINT `fk_tfc_pilot` FOREIGN KEY (`pilot_id`) REFERENCES `commander_training` (`pilot_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `trusted_pilots` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -320,7 +317,7 @@ CREATE TABLE IF NOT EXISTS `trusted_pilots` (
   `history` longtext DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `pilot_name` (`pilot_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `users` (
   `character_id` int(11) NOT NULL,
@@ -335,37 +332,34 @@ CREATE TABLE IF NOT EXISTS `users` (
   PRIMARY KEY (`character_id`),
   KEY `discord_id` (`discord_id`),
   CONSTRAINT `roles` CHECK (json_valid(`roles`))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
 -- --------------------------------------------------------
 -- MIGRATION SCRIPT
 -- This section will add/remove columns to bring an old schema up to date.
+-- This uses a stored procedure to be compatible with the script runner.
 -- --------------------------------------------------------
 
 DELIMITER $$
-CREATE PROCEDURE DropColumnIfExists(IN dbName VARCHAR(255), IN tableName VARCHAR(255), IN colName VARCHAR(255))
+CREATE PROCEDURE `MigrateSchema`()
 BEGIN
-    IF EXISTS (
-        SELECT * FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = dbName
-        AND TABLE_NAME = tableName
-        AND COLUMN_NAME = colName
-    ) THEN
-        SET @sql = CONCAT('ALTER TABLE `', tableName, '` DROP COLUMN `', colName, '`;');
-        PREPARE stmt FROM @sql;
-        EXECUTE stmt;
-        DEALLOCATE PREPARE stmt;
+    -- Drop old quiz columns from commander_training table
+    IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema = DATABASE() AND table_name = 'commander_training' AND column_name = 'quiz_scouting') THEN
+        ALTER TABLE `commander_training` DROP COLUMN `quiz_scouting`;
+    END IF;
+    IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema = DATABASE() AND table_name = 'commander_training' AND column_name = 'quiz_fitting') THEN
+        ALTER TABLE `commander_training` DROP COLUMN `quiz_fitting`;
+    END IF;
+    IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema = DATABASE() AND table_name = 'commander_training' AND column_name = 'quiz_fleet_roles') THEN
+        ALTER TABLE `commander_training` DROP COLUMN `quiz_fleet_roles`;
+    END IF;
+    IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema = DATABASE() AND table_name = 'commander_training' AND column_name = 'quiz_site_mechanics') THEN
+        ALTER TABLE `commander_training` DROP COLUMN `quiz_site_mechanics`;
     END IF;
 END$$
 DELIMITER ;
 
--- Remove deprecated quiz columns from commander_training as this is now handled by the quiz_completions table
-CALL DropColumnIfExists('wit-db', 'commander_training', 'quiz_scouting');
-CALL DropColumnIfExists('wit-db', 'commander_training', 'quiz_fitting');
-CALL DropColumnIfExists('wit-db', 'commander_training', 'quiz_fleet_roles');
-CALL DropColumnIfExists('wit-db', 'commander_training', 'quiz_site_mechanics');
-
--- Clean up the stored procedure
-DROP PROCEDURE IF EXISTS DropColumnIfExists;
+CALL `MigrateSchema`();
+DROP PROCEDURE `MigrateSchema`;
 

@@ -69,7 +69,6 @@ async function runSetup() {
         throw error;
     }
 }
-
 module.exports = {
     query,
     runSetup,
