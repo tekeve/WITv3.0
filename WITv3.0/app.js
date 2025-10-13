@@ -99,6 +99,7 @@ async function initializeApp() {
     client.activeReactionRoleTokens = new Map();
     client.activeTrainingTokens = new Map();
     client.activeQuizTokens = new Map(); // Added for the new quiz system
+    client.activeIskTokens = new Map();
     client.esiStateMap = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null;

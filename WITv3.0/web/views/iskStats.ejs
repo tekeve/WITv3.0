@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISK/Hour Statistics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569;
+            --text-primary: #e2e8f0; --text-secondary: #94a3b8; --accent-blue: #38bdf8;
+            --accent-green: #4ade80; --accent-red: #f87171; --border-color: #4a5568;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 2rem; }
+        .container { max-width: 1400px; margin: auto; }
+        h1, h2 { color: #f8fafc; text-align: center; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        .subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 3rem; }
+        
+        .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 3rem; }
+        .stat-card { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; border: 1px solid var(--border-color); text-align: center; }
+        .stat-card-label { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-card-value { font-size: 2.25rem; font-weight: 700; color: #f8fafc; }
+
+        .leaderboard-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .leaderboard-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 1024px) {
+            .leaderboard-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .panel { 
+            background-color: var(--bg-secondary); 
+            border-radius: 0.75rem; 
+            padding: 1.5rem; 
+            border: 1px solid var(--border-color); 
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; }
+        .panel h2 { text-align: left; font-size: 1.25rem; margin-top: 0; margin-bottom: 0; border: none; padding: 0; }
+
+        .leaderboard { list-style: none; padding: 0; margin: 0; }
+        .leaderboard li { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); }
+        .leaderboard li:last-child { border-bottom: none; }
+        .leaderboard .rank { font-size: 1rem; font-weight: 600; color: var(--text-secondary); width: 30px; }
+        .leaderboard .name { font-weight: 500; flex-grow: 1; }
+        .leaderboard .value { font-weight: 600; font-size: 1.1rem; color: var(--accent-blue); }
+        .leaderboard .sub-value { font-size: 0.8rem; color: var(--text-secondary); margin-left: 0.5rem; }
+        
+        .full-width { grid-column: 1 / -1; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; }
+        td { font-size: 0.9rem; }
+        tbody tr:hover { background-color: var(--bg-tertiary); }
+        td.actions-cell { text-align: right; }
+
+        /* Pagination Styles */
+        .pagination { display: flex; align-items: center; gap: 0.5rem; }
+        .pagination-info { font-size: 0.875rem; color: var(--text-secondary); }
+        .pagination-buttons { display: flex; gap: 0.5rem; }
+        .pagination-buttons button { padding: 0.4rem 0.8rem; font-size: 0.8rem; background-color: var(--bg-tertiary); color: var(--text-primary); border: none; cursor: pointer; border-radius: 0.25rem; }
+        .pagination-buttons button:hover:not(:disabled) { background-color: #55667d; }
+        .pagination-buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal { background-color: var(--bg-secondary); padding: 2rem; border-radius: 0.75rem; width: 90%; max-width: 500px; text-align: center; }
+        .modal h3 { margin: 0 0 1rem 0; font-size: 1.25rem; }
+        .modal p { color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.5; }
+        .modal-actions { display: flex; justify-content: center; gap: 1rem; margin-top: 1.5rem; }
+        button, .btn { padding: 0.6rem 1.2rem; border: none; border-radius: 0.375rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; transition: background-color 0.2s; }
+        .btn-danger { background-color: var(--accent-red); color: #fff; } .btn-danger:hover { background-color: #c53030; }
+        .btn-secondary { background-color: var(--bg-tertiary); color: var(--text-primary); } .btn-secondary:hover { background-color: #55667d; }
+
+        /* Toast Styles */
+        .toast { position: fixed; top: 1.5rem; right: 1.5rem; padding: 1rem 1.5rem; border-radius: 0.5rem; z-index: 1001; opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background-color: var(--accent-green); color: black; }
+        .toast.error { background-color: var(--accent-red); color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ISK/Hour Fleet Statistics</h1>
+        <p class="subtitle">An overview of all fleet logs submitted by commanders.</p>
+
+        <div class="stat-cards" id="stat-cards-container">
+            <% const overall = stats.overallStats; %>
+            <div class="stat-card">
+                <div class="stat-card-label">Total ISK Earned</div>
+                <div class="stat-card-value"><%= formatIsk(overall.totalIsk) %></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Overall Average ISK/Hour</div>
+                <div class="stat-card-value"><%= formatIsk(overall.averageIskPerHour) %></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Total Fleets Logged</div>
+                <div class="stat-card-value"><%= (overall.totalFleets || 0).toLocaleString('en-US') %></div>
+            </div>
+             <div class="stat-card">
+                <div class="stat-card-label">Total Sites Run</div>
+                <div class="stat-card-value"><%= (overall.totalSitesRun || 0).toLocaleString('en-US') %></div>
+            </div>
+        </div>
+        
+        <div class="leaderboard-container">
+            <div class="leaderboard-row">
+                <div class="panel" id="single-isk-panel">
+                    <h2>Top Single-Account (by Avg ISK/Hour)</h2>
+                    <ol class="leaderboard">
+                        <% if (stats.topCommandersByIskPerHourSingleBox && stats.topCommandersByIskPerHourSingleBox.length > 0) { %>
+                            <% stats.topCommandersByIskPerHourSingleBox.forEach((commander, index) => { %>
+                                <li>
+                                    <span class="rank"><%= index + 1 %>.</span>
+                                    <span class="name"><%= commander.commander_name %></span>
+                                    <div>
+                                        <span class="value"><%= formatIsk(commander.avgIskPerHour) %>/hr</span>
+                                        <span class="sub-value">(<%= commander.fleetCount %> fleets)</span>
+                                    </div>
+                                </li>
+                            <% }); %>
+                        <% } else { %>
+                            <li>No single-account data available.</li>
+                        <% } %>
+                    </ol>
+                </div>
+                <div class="panel" id="multi-isk-panel">
+                    <h2>Top Multi-box Commanders (by Avg ISK/Hour)</h2>
+                     <ol class="leaderboard">
+                        <% if (stats.topMultiBoxByIskPerHour && stats.topMultiBoxByIskPerHour.length > 0) { %>
+                            <% stats.topMultiBoxByIskPerHour.forEach((commander, index) => { %>
+                                <li>
+                                    <span class="rank"><%= index + 1 %>.</span>
+                                    <span class="name"><%= commander.commander_name %></span>
+                                    <div>
+                                        <span class="value"><%= formatIsk(commander.avgFleetIskPerHour) %>/hr</span>
+                                        <span class="sub-value">(~<%= Number(commander.avgPilots).toFixed(1) %> pilots, <%= commander.fleetCount %> fleets)</span>
+                                    </div>
+                                </li>
+                            <% }); %>
+                        <% } else { %>
+                            <li>No multi-box data available.</li>
+                        <% } %>
+                    </ol>
+                </div>
+            </div>
+            <div class="leaderboard-row">
+                 <div class="panel" id="single-total-panel">
+                    <h2>Top Single-Account Commanders (by Total ISK)</h2>
+                    <ol class="leaderboard">
+                         <% if (stats.topCommandersByTotalIskSingleBox && stats.topCommandersByTotalIskSingleBox.length > 0) { %>
+                            <% stats.topCommandersByTotalIskSingleBox.forEach((commander, index) => { %>
+                                <li>
+                                    <span class="rank"><%= index + 1 %>.</span>
+                                    <span class="name"><%= commander.commander_name %></span>
+                                     <div>
+                                        <span class="value"><%= formatIsk(commander.totalIsk) %></span>
+                                        <span class="sub-value">(<%= commander.fleetCount %> fleets)</span>
+                                    </div>
+                                </li>
+                            <% }); %>
+                         <% } else { %>
+                            <li>No single-account data available.</li>
+                        <% } %>
+                    </ol>
+                </div>
+                <div class="panel" id="multi-total-panel">
+                    <h2>Top Multi-box Commanders (by Total ISK)</h2>
+                     <ol class="leaderboard">
+                         <% if (stats.topCommandersByTotalIskMultiBox && stats.topCommandersByTotalIskMultiBox.length > 0) { %>
+                            <% stats.topCommandersByTotalIskMultiBox.forEach((commander, index) => { %>
+                                <li>
+                                    <span class="rank"><%= index + 1 %>.</span>
+                                    <span class="name"><%= commander.commander_name %></span>
+                                     <div>
+                                        <span class="value"><%= formatIsk(commander.totalIsk) %></span>
+                                        <span class="sub-value">(~<%= Number(commander.avgPilots).toFixed(1) %> pilots, <%= commander.fleetCount %> fleets)</span>
+                                    </div>
+                                </li>
+                            <% }); %>
+                         <% } else { %>
+                            <li>No multi-box data available.</li>
+                        <% } %>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel full-width">
+            <h2>ISK/Hour Over Time (Top 5 by Total ISK)</h2>
+            <div id="chart-container" style="position: relative; height:40vh">
+                <canvas id="iskOverTimeChart"></canvas>
+            </div>
+        </div>
+        <div class="panel full-width">
+            <div class="panel-header">
+                <h2>Fleet Logs</h2>
+                 <div class="pagination" id="fleet-pagination">
+                    <!-- Pagination will be built by JS -->
+                </div>
+            </div>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Commander</th>
+                            <th>Date</th>
+                            <th>Duration</th>
+                            <th>Total ISK</th>
+                            <th>ISK/Hour</th>
+                            <th>Avg. Pilots</th>
+                            <th>Sites</th>
+                            <th class="actions-cell">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fleet-logs-tbody">
+                        <!-- Fleet data will be built by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="delete-confirm-modal">
+        <div class="modal">
+            <h3>Confirm Deletion</h3>
+            <p id="delete-modal-text"></p>
+            <div class="modal-actions">
+                <button id="delete-modal-cancel-btn" class="btn btn-secondary">Cancel</button>
+                <button id="delete-modal-confirm-btn" class="btn-danger">Confirm Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast"></div>
+
+    <script>
+        const initialStats = <%- JSON.stringify(stats) %>;
+        const initialFleetData = <%- JSON.stringify(fleetData) %>;
+        const token = "<%= token %>";
+        const currentUserId = "<%= currentUserId %>";
+        const isLeadership = <%- isLeadership %>;
+        let iskOverTimeChart;
+
+        function formatIsk(value) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+            const num = Number(value);
+            if (num >= 1e9) return `${(num / 1e9).toFixed(2)}b`;
+            if (num >= 1e6) return `${(num / 1e6).toFixed(2)}m`;
+            if (num >= 1e3) return `${(num / 1e3).toFixed(1)}k`;
+            return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        }
+        
+        function showToast(message, type = 'info') {
+            const existingToast = document.querySelector('.toast');
+            if(existingToast) existingToast.remove();
+
+            const toast = document.createElement('div');
+            toast.className = `toast show ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            // Trigger reflow to enable animation
+            toast.offsetHeight;
+            
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // --- MODAL ---
+        const deleteModal = {
+            overlay: document.getElementById('delete-confirm-modal'),
+            text: document.getElementById('delete-modal-text'),
+            confirmBtn: document.getElementById('delete-modal-confirm-btn'),
+            cancelBtn: document.getElementById('delete-modal-cancel-btn'),
+            confirmAction: null,
+            
+            show(logId, commanderName, fleetTimestamp) {
+                this.text.innerHTML = `Are you sure you want to delete the log for <strong>${commanderName}</strong> from <strong>${new Date(fleetTimestamp).toLocaleString()}</strong>? This action cannot be undone.`;
+                this.confirmAction = () => deleteLogEntry(logId);
+                this.overlay.style.display = 'flex';
+            },
+            hide() {
+                this.overlay.style.display = 'none';
+                this.confirmAction = null;
+            }
+        };
+        deleteModal.confirmBtn.addEventListener('click', () => {
+            if(deleteModal.confirmAction) deleteModal.confirmAction();
+        });
+        deleteModal.cancelBtn.addEventListener('click', () => deleteModal.hide());
+        deleteModal.overlay.addEventListener('click', (e) => {
+            if (e.target === deleteModal.overlay) deleteModal.hide();
+        });
+
+        // --- API & DATA HANDLING ---
+        async function fetchApi(endpoint, options = {}) {
+            try {
+                const response = await fetch(endpoint, options);
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || `HTTP error! Status: ${response.status}`);
+                }
+                return data;
+            } catch (error) {
+                showToast(error.message, 'error');
+                console.error('API Call Failed:', error);
+                return { success: false, message: error.message };
+            }
+        }
+        
+        async function deleteLogEntry(logId) {
+            deleteModal.confirmBtn.disabled = true;
+            deleteModal.confirmBtn.textContent = 'Deleting...';
+
+            const result = await fetchApi(`/isk/delete/${token}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logId })
+            });
+
+            if (result && result.success) {
+                showToast(result.message, 'success');
+                await refreshAllStats();
+            }
+
+            deleteModal.hide();
+            deleteModal.confirmBtn.disabled = false;
+            deleteModal.confirmBtn.textContent = 'Confirm Delete';
+        }
+
+        async function refreshAllStats() {
+            const [statsResult, fleetsResult] = await Promise.all([
+                fetchApi(`/isk/api/stats/${token}`),
+                fetchApi(`/isk/api/fleets/${token}?page=${window.currentPage || 1}`)
+            ]);
+            
+            if (statsResult.success) {
+                renderStatCards(statsResult.data.overallStats);
+                renderLeaderboards(statsResult.data);
+                renderIskOverTimeChart(statsResult.data.iskOverTime);
+            }
+            if(fleetsResult.success){
+                renderFleetLogs(fleetsResult.data);
+                renderPagination(fleetsResult.data);
+            }
+        }
+
+        async function goToPage(page) {
+            window.currentPage = page;
+            const fleetsResult = await fetchApi(`/isk/api/fleets/${token}?page=${page}`);
+            if (fleetsResult.success) {
+                renderFleetLogs(fleetsResult.data);
+                renderPagination(fleetsResult.data);
+            }
+        }
+
+        // --- RENDERING ---
+        function renderFleetLogs(fleetData) {
+            const tbody = document.getElementById('fleet-logs-tbody');
+            tbody.innerHTML = ''; // Clear existing
+            
+            if (fleetData.fleets && fleetData.fleets.length > 0) {
+                fleetData.fleets.forEach(fleet => {
+                    const canDelete = isLeadership || fleet.discord_id === currentUserId;
+                    const deleteButtonHtml = canDelete ? `<button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="deleteModal.show(${fleet.log_id}, '${fleet.commander_name.replace(/'/g, "\\'")}', '${fleet.fleet_timestamp}')">Delete</button>` : '';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${fleet.commander_name}</td>
+                        <td>${new Date(fleet.fleet_timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric'})}</td>
+                        <td>${fleet.duration_minutes}m</td>
+                        <td>${formatIsk(fleet.total_isk)}</td>
+                        <td>${formatIsk(fleet.isk_per_hour)}</td>
+                        <td>${fleet.pilot_count ? Number(fleet.pilot_count).toFixed(1) : 'N/A'}</td>
+                        <td>${fleet.sites_run}</td>
+                        <td class="actions-cell">${deleteButtonHtml}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-secondary);">No fleet logs found.</td></tr>`;
+            }
+        }
+
+        function renderPagination(fleetData) {
+            const container = document.getElementById('fleet-pagination');
+            container.innerHTML = '';
+            if (!fleetData || fleetData.totalPages <= 1) return;
+
+            const { currentPage, totalPages } = fleetData;
+
+            const pageInfo = document.createElement('span');
+            pageInfo.className = 'pagination-info';
+            pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+
+            const buttonsContainer = document.createElement('div');
+            buttonsContainer.className = 'pagination-buttons';
+
+            const prevBtn = document.createElement('button');
+            prevBtn.innerHTML = '&laquo; Prev';
+            prevBtn.disabled = currentPage <= 1;
+            prevBtn.onclick = () => goToPage(currentPage - 1);
+
+            const nextBtn = document.createElement('button');
+            nextBtn.innerHTML = 'Next &raquo;';
+            nextBtn.disabled = currentPage >= totalPages;
+            nextBtn.onclick = () => goToPage(currentPage + 1);
+
+            buttonsContainer.append(prevBtn, nextBtn);
+            container.append(buttonsContainer, pageInfo);
+        }
+        
+        function renderStatCards(overall) {
+            const container = document.getElementById('stat-cards-container');
+            container.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-card-label">Total ISK Earned</div>
+                    <div class="stat-card-value">${formatIsk(overall.totalIsk)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Overall Average ISK/Hour</div>
+                    <div class="stat-card-value">${formatIsk(overall.averageIskPerHour)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Total Fleets Logged</div>
+                    <div class="stat-card-value">${(overall.totalFleets || 0).toLocaleString('en-US')}</div>
+                </div>
+                 <div class="stat-card">
+                    <div class="stat-card-label">Total Sites Run</div>
+                    <div class="stat-card-value">${(overall.totalSitesRun || 0).toLocaleString('en-US')}</div>
+                </div>
+            `;
+        }
+        
+        function renderLeaderboards(statsData) {
+            // Single-Account ISK/hr
+            const singleIskList = document.querySelector('#single-isk-panel .leaderboard');
+            singleIskList.innerHTML = statsData.topCommandersByIskPerHourSingleBox && statsData.topCommandersByIskPerHourSingleBox.length > 0 ?
+                statsData.topCommandersByIskPerHourSingleBox.map((c, i) => `<li><span class="rank">${i + 1}.</span><span class="name">${c.commander_name}</span><div><span class="value">${formatIsk(c.avgIskPerHour)}/hr</span><span class="sub-value">(${c.fleetCount} fleets)</span></div></li>`).join('') :
+                '<li>No single-account data available.</li>';
+
+            // Single-Account Total ISK
+            const singleTotalList = document.querySelector('#single-total-panel .leaderboard');
+            singleTotalList.innerHTML = statsData.topCommandersByTotalIskSingleBox && statsData.topCommandersByTotalIskSingleBox.length > 0 ?
+                statsData.topCommandersByTotalIskSingleBox.map((c, i) => `<li><span class="rank">${i + 1}.</span><span class="name">${c.commander_name}</span><div><span class="value">${formatIsk(c.totalIsk)}</span><span class="sub-value">(${c.fleetCount} fleets)</span></div></li>`).join('') :
+                '<li>No single-account data available.</li>';
+
+            // Multi-box ISK/hr
+            const multiIskList = document.querySelector('#multi-isk-panel .leaderboard');
+            multiIskList.innerHTML = statsData.topMultiBoxByIskPerHour && statsData.topMultiBoxByIskPerHour.length > 0 ?
+                statsData.topMultiBoxByIskPerHour.map((c, i) => `<li><span class="rank">${i + 1}.</span><span class="name">${c.commander_name}</span><div><span class="value">${formatIsk(c.avgFleetIskPerHour)}/hr</span><span class="sub-value">(~${Number(c.avgPilots).toFixed(1)} pilots, ${c.fleetCount} fleets)</span></div></li>`).join('') :
+                '<li>No multi-box data available.</li>';
+
+            // Multi-box Total ISK
+            const multiTotalList = document.querySelector('#multi-total-panel .leaderboard');
+             multiTotalList.innerHTML = statsData.topCommandersByTotalIskMultiBox && statsData.topCommandersByTotalIskMultiBox.length > 0 ?
+                statsData.topCommandersByTotalIskMultiBox.map((c, i) => `<li><span class="rank">${i + 1}.</span><span class="name">${c.commander_name}</span><div><span class="value">${formatIsk(c.totalIsk)}</span><span class="sub-value">(~${Number(c.avgPilots).toFixed(1)} pilots, ${c.fleetCount} fleets)</span></div></li>`).join('') :
+                '<li>No multi-box data available.</li>';
+        }
+
+        function renderIskOverTimeChart(iskOverTimeData) {
+            const chartContainer = document.getElementById('chart-container');
+            if (iskOverTimeChart) {
+                iskOverTimeChart.destroy();
+            }
+            if (!iskOverTimeData || iskOverTimeData.length === 0) {
+                chartContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">Not enough data for the ISK/hour over time graph.</p>';
+                return;
+            } else {
+                 chartContainer.innerHTML = '<canvas id="iskOverTimeChart"></canvas>';
+            }
+
+            const ctx = document.getElementById('iskOverTimeChart').getContext('2d');
+            const commanderNames = [...new Set(iskOverTimeData.map(d => d.commander_name))];
+            const colors = ['#38bdf8', '#f97316', '#10b981', '#ec4899', '#8b5cf6'];
+
+            const datasets = commanderNames.map((name, index) => {
+                const commanderData = iskOverTimeData.filter(d => d.commander_name === name);
+                return {
+                    label: name,
+                    data: commanderData.map(d => ({ x: new Date(d.date).valueOf(), y: d.avgPilotIskPerHour })),
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: `${colors[index % colors.length]}33`, // Add alpha for fill
+                    fill: false,
+                    tension: 0.1,
+                    pointRadius: 4,
+                };
+            });
+
+            iskOverTimeChart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#cbd5e1' } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${formatIsk(context.parsed.y)}/hr`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'day', tooltipFormat: 'MMM d, yyyy', displayFormats: { day: 'MMM d' } },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#475569' }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            ticks: { color: '#94a3b8', callback: value => formatIsk(value) },
+                            grid: { color: '#475569' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', function() {
+            window.currentPage = initialFleetData.currentPage;
+            renderIskOverTimeChart(initialStats.iskOverTime);
+            renderFleetLogs(initialFleetData);
+            renderPagination(initialFleetData);
+        });
+    </script>
+</body>
+</html>
+
