@@ -215,8 +215,8 @@ async function getPaginatedFleets(page = 1, limit = 15) {
                 total_isk, isk_per_hour, pilot_count, sites_run
             FROM isk_logs
             ORDER BY fleet_timestamp DESC
-            LIMIT ? OFFSET ?;
-        `, [limit, offset]);
+            LIMIT ?, ?;
+        `, [offset, limit]);
 
         return {
             success: true,
