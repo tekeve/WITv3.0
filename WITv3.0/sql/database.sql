@@ -177,6 +177,18 @@ CREATE TABLE IF NOT EXISTS `quizzes` (
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.quiz_questions
+CREATE TABLE IF NOT EXISTS `quiz_questions` (
+  `question_id` int(11) NOT NULL AUTO_INCREMENT,
+  `quiz_id` int(11) NOT NULL,
+  `question_text` text NOT NULL,
+  `question_type` varchar(20) NOT NULL DEFAULT 'single',
+  `order_index` int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`question_id`),
+  KEY `quiz_id` (`quiz_id`),
+  CONSTRAINT `fk_quiz_questions_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4;
+
 -- Dumping structure for table wit-db.quiz_answers
 CREATE TABLE IF NOT EXISTS `quiz_answers` (
   `answer_id` int(11) NOT NULL AUTO_INCREMENT,
@@ -214,18 +226,6 @@ CREATE TABLE IF NOT EXISTS `quiz_completions` (
   KEY `quiz_id` (`quiz_id`),
   CONSTRAINT `fk_completion_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4;
-
--- Dumping structure for table wit-db.quiz_questions
-CREATE TABLE IF NOT EXISTS `quiz_questions` (
-  `question_id` int(11) NOT NULL AUTO_INCREMENT,
-  `quiz_id` int(11) NOT NULL,
-  `question_text` text NOT NULL,
-  `question_type` varchar(20) NOT NULL DEFAULT 'single',
-  `order_index` int(11) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`question_id`),
-  KEY `quiz_id` (`quiz_id`),
-  CONSTRAINT `fk_quiz_questions_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4;
 
 -- Dumping structure for table wit-db.reaction_roles
 CREATE TABLE IF NOT EXISTS `reaction_roles` (
