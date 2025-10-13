@@ -620,9 +620,9 @@
 
         const btn = document.getElementById('promote-tfc-btn');
         btn.disabled = true;
-        const { pilot_id: pilotId } = selectedTfcForPromotion;
+        const { discord_id: discordId, character_name: pilotName } = selectedTfcForPromotion;
         
-        const result = await apiCall(`/training/api/promote-to-tfc/${token}`, 'POST', { pilotId });
+        const result = await apiCall(`/training/api/promote-to-tfc/${token}`, 'POST', { discordId, pilotName });
         if (result && result.success) {
             showToast(result.message, 'success');
             // Clear selection and search
@@ -953,3 +953,4 @@
 
 </body>
 </html>
+

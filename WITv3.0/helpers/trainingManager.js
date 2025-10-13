@@ -1,6 +1,7 @@
 const db = require('@helpers/database');
 const logger = require('@helpers/logger');
 const charManager = require('@helpers/characterManager');
+const configManager = require('@helpers/configManager');
 
 const residentSimpleFields = new Set([
     'last_active', 'resident_orientation_by',
@@ -134,27 +135,42 @@ async function addResident(pilotName, discordId) {
     }
 }
 
-async function promoteToTfc(pilotId) {
+async function promoteToTfc(discordId, pilotName) {
     const connection = await db.pool.getConnection();
     try {
         await connection.beginTransaction();
 
-        const [pilot] = await connection.query('SELECT status FROM commander_training WHERE pilot_id = ?', [pilotId]);
-        if (!pilot) {
-            throw new Error('Pilot not found.');
-        }
-        if (pilot.status === 'training_fc') {
-            return { success: false, message: 'Pilot is already a Training FC.' };
+        // Check if pilot is already in the commander_training table
+        const [existingPilot] = await connection.query('SELECT pilot_id, status FROM commander_training WHERE discord_id = ?', [discordId]);
+
+        let pilotId;
+
+        if (existingPilot) {
+            // Pilot is already in the training program
+            pilotId = existingPilot.pilot_id;
+            if (existingPilot.status === 'training_fc') {
+                await connection.rollback();
+                return { success: false, message: 'Pilot is already a Training FC.' };
+            }
+            // Update their status
+            await connection.query("UPDATE commander_training SET status = 'training_fc', last_active = NOW() WHERE pilot_id = ?", [pilotId]);
+        } else {
+            // Pilot is not in the training program, so add them
+            const [insertResult] = await connection.query(
+                'INSERT INTO commander_training (pilot_name, discord_id, start_date, last_active, status) VALUES (?, ?, NOW(), NOW(), ?)',
+                [pilotName, discordId, 'training_fc']
+            );
+            pilotId = insertResult.insertId;
         }
 
-        await connection.query("UPDATE commander_training SET status = 'training_fc', last_active = NOW() WHERE pilot_id = ?", [pilotId]);
+        // Ensure a corresponding entry exists in the tfc tracker
         await connection.query("INSERT INTO training_fc_tracker (pilot_id) VALUES (?) ON DUPLICATE KEY UPDATE pilot_id = pilot_id", [pilotId]);
 
         await connection.commit();
-        return { success: true, message: 'Pilot has been promoted to Training FC.' };
+        return { success: true, message: `${pilotName} has been promoted to Training FC.` };
     } catch (error) {
         await connection.rollback();
-        logger.error(`Error promoting pilot ${pilotId} to TFC:`, error);
+        logger.error(`Error promoting user ${discordId} to TFC:`, error);
         return { success: false, message: 'A database error occurred during promotion.' };
     } finally {
         connection.release();
@@ -311,21 +327,38 @@ async function updateTrustedLogiStatus(pilotName, isTrusted) {
 
 async function searchEligibleResidents(searchTerm) {
     try {
+        const config = configManager.get();
+        const commanderRoles = config.commanderRoles || [];
+        const residentRoles = config.residentRoles || [];
+        const requiredRoleIds = [...commanderRoles, ...residentRoles];
+
+        if (requiredRoleIds.length === 0) {
+            logger.warn('searchEligibleResidents: No commander or resident roles are configured. Returning no users.');
+            return [];
+        }
+
+        const roleChecks = requiredRoleIds.map(() => 'JSON_CONTAINS(u.roles, ?)').join(' OR ');
+
         let sql;
         let params;
         const baseSql = `
             SELECT u.discord_id, u.character_name
             FROM users u
             LEFT JOIN commander_training ct ON u.discord_id = ct.discord_id
-            WHERE u.is_main = 1 AND ct.pilot_id IS NULL
+            WHERE u.is_main = 1 
+              AND ct.pilot_id IS NULL
+              AND (${roleChecks})
         `;
+
+        // JSON_CONTAINS requires the search value to be a JSON string, so we wrap the role IDs in quotes.
+        const roleParams = requiredRoleIds.map(id => `"${id}"`);
 
         if (searchTerm && searchTerm.trim().length > 0) {
             sql = `${baseSql} AND (u.character_name LIKE ? OR u.discord_id LIKE ?) ORDER BY u.character_name ASC LIMIT 25;`;
-            params = [`%${searchTerm.trim()}%`, `%${searchTerm.trim()}%`];
+            params = [...roleParams, `%${searchTerm.trim()}%`, `%${searchTerm.trim()}%`];
         } else {
             sql = `${baseSql} ORDER BY u.character_name ASC LIMIT 25;`;
-            params = [];
+            params = roleParams;
         }
 
         const results = await db.query(sql, params);
@@ -338,19 +371,38 @@ async function searchEligibleResidents(searchTerm) {
 
 async function searchEligibleTfcCandidates(searchTerm) {
     try {
+        const config = configManager.get();
+        const commanderRoles = config.commanderRoles || [];
+        const residentRoles = config.residentRoles || [];
+        const lineCommanderRoles = config.lineCommanderRoles || [];
+        const requiredRoleIds = [...commanderRoles, ...residentRoles, ...lineCommanderRoles];
+
+        if (requiredRoleIds.length === 0) {
+            logger.warn('searchEligibleTfcCandidates: No commander, resident, or line commander roles are configured. Returning no users.');
+            return [];
+        }
+
+        const roleChecks = requiredRoleIds.map(() => 'JSON_CONTAINS(u.roles, ?)').join(' OR ');
+
         let sql;
         let params;
         const baseSql = `
-            SELECT pilot_id, pilot_name
-            FROM commander_training
-            WHERE status IN ('resident', 'line_commander')
+            SELECT u.discord_id, u.character_name, ct.pilot_id
+            FROM users u
+            LEFT JOIN commander_training ct ON u.discord_id = ct.discord_id
+            WHERE u.is_main = 1 
+              AND (ct.status IS NULL OR ct.status != 'training_fc')
+              AND (${roleChecks})
         `;
+
+        const roleParams = requiredRoleIds.map(id => `"${id}"`);
+
         if (searchTerm && searchTerm.trim().length > 0) {
-            sql = `${baseSql} AND pilot_name LIKE ? ORDER BY pilot_name ASC LIMIT 25;`;
-            params = [`%${searchTerm.trim()}%`];
+            sql = `${baseSql} AND (u.character_name LIKE ?) ORDER BY u.character_name ASC LIMIT 25;`;
+            params = [...roleParams, `%${searchTerm.trim()}%`];
         } else {
-            sql = `${baseSql} ORDER BY pilot_name ASC LIMIT 25;`;
-            params = [];
+            sql = `${baseSql} ORDER BY u.character_name ASC LIMIT 25;`;
+            params = roleParams;
         }
 
         const results = await db.query(sql, params);
@@ -415,3 +467,4 @@ module.exports = {
     searchEligibleTfcCandidates,
     removePilotFromTraining
 };
+

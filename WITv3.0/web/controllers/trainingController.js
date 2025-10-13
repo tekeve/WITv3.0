@@ -154,15 +154,15 @@ exports.addResident = (client) => [
 exports.promoteToTfc = (client) => [
     validateTokenAndPermissions(client, ['council', 'admin', 'certified_trainer']), // Special permission check is handled in the middleware now
     async (req, res) => {
-        const { pilotId } = req.body;
+        const { discordId, pilotName } = req.body;
         const io = req.app.get('io');
 
-        if (!pilotId) {
-            return res.status(400).json({ success: false, message: 'Pilot ID is required.' });
+        if (!discordId || !pilotName) {
+            return res.status(400).json({ success: false, message: 'Discord ID and Pilot Name are required.' });
         }
 
         try {
-            const result = await trainingManager.promoteToTfc(pilotId);
+            const result = await trainingManager.promoteToTfc(discordId, pilotName);
             if (result.success && io) {
                 io.emit('training-update');
             }
@@ -385,3 +385,4 @@ exports.removePilot = (client) => [
         }
     }
 ];
+
