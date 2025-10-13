@@ -57,14 +57,18 @@ async function runMigrations() {
     const columnsToDrop = ['quiz_scouting', 'quiz_fitting', 'quiz_fleet_roles', 'quiz_site_mechanics'];
 
     try {
+        // Correctly format the IN clause for multiple values
+        const placeholders = columnsToDrop.map(() => '?').join(',');
         const sql = `
             SELECT column_name 
             FROM INFORMATION_SCHEMA.COLUMNS 
             WHERE table_schema = ? 
               AND table_name = 'commander_training' 
-              AND column_name IN (?)
+              AND column_name IN (${placeholders})
         `;
-        const [existingColumns] = await pool.query(sql, [dbName, [columnsToDrop]]);
+
+        // Pass parameters as a flat array
+        const [existingColumns] = await pool.query(sql, [dbName, ...columnsToDrop]);
 
         const foundColumns = existingColumns.map(c => c.column_name);
 
@@ -99,9 +103,15 @@ async function runSetup() {
         const sqlFilePath = path.join(process.cwd(), './sql/database.sql');
         const sqlScript = fs.readFileSync(sqlFilePath, 'utf8');
 
-        // Step 1: Execute the table creation script.
-        // The script now contains only CREATE statements, which is safe for multipleStatements.
-        await pool.query(sqlScript);
+        // Split the script into statements and execute them one by one.
+        // This is safer than enabling multipleStatements for the whole connection.
+        const statements = sqlScript.split(';').filter(statement => statement.trim() !== '');
+
+        for (const statement of statements) {
+            if (statement) {
+                await pool.query(statement);
+            }
+        }
         logger.success('Database tables created/verified successfully!');
 
         // Step 2: Run programmatic migrations.
