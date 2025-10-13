@@ -56,22 +56,21 @@ async function runSetup() {
     try {
         const sqlFilePath = path.join(process.cwd(), './sql/database.sql');
         const sqlScript = fs.readFileSync(sqlFilePath, 'utf8');
-        const statements = sqlScript.split(';').filter(statement => statement.trim() !== '');
 
-        for (const statement of statements) {
-            if (statement) {
-                await pool.query(statement);
-            }
-        }
-        logger.success('Database tables created/verified successfully!');
+        // Execute the entire script as a single block to support multi-statement procedures
+        await pool.query(sqlScript);
+
+        logger.success('Database tables created/verified/migrated successfully!');
     } catch (error) {
         logger.error('Failed to run database setup script:', error);
         throw error;
     }
 }
+
 module.exports = {
     query,
     runSetup,
     ensureDatabaseExistsAndConnected,
     pool
 };
+
