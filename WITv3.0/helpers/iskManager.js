@@ -204,7 +204,9 @@ async function getStats() {
  */
 async function getPaginatedFleets(page = 1, limit = 15) {
     try {
-        const offset = (page - 1) * limit;
+        const numLimit = Number(limit);
+        const numPage = Number(page);
+        const offset = (numPage - 1) * numLimit;
 
         const countResult = await db.query('SELECT COUNT(*) as total FROM isk_logs;');
         const totalFleets = countResult[0] ? countResult[0].total : 0;
@@ -215,17 +217,17 @@ async function getPaginatedFleets(page = 1, limit = 15) {
                 total_isk, isk_per_hour, pilot_count, sites_run
             FROM isk_logs
             ORDER BY fleet_timestamp DESC
-            LIMIT ?, ?;
-        `, [offset, limit]);
+            LIMIT ${offset}, ${numLimit};
+        `);
 
         return {
             success: true,
             data: {
                 fleets,
                 totalFleets,
-                totalPages: Math.ceil(totalFleets / limit),
-                currentPage: parseInt(page, 10)
-            }
+                totalPages: Math.ceil(totalFleets / numLimit),
+                currentPage: numPage,
+            },
         };
     } catch (error) {
         logger.error('Failed to get paginated fleet data from database:', error);
@@ -240,4 +242,3 @@ module.exports = {
     getStats,
     getPaginatedFleets,
 };
-
