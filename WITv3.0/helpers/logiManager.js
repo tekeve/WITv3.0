@@ -3,6 +3,7 @@ const db = require('@helpers/database');
 const logger = require('@helpers/logger');
 const configManager = require('@helpers/configManager');
 const charManager = require('@helpers/characterManager');
+const trainingManager = require('@helpers/trainingManager'); // Import trainingManager
 
 const SIGNOFFS_REQUIRED = 2;
 const DEMERITS_FOR_REMOVAL = 2;
@@ -34,7 +35,6 @@ async function getSignoffData(options = {}) {
         const totalInProgress = inProgressCountResult.count;
         const totalTrusted = trustedCountResult.count;
 
-        // Use template literals for LIMIT and OFFSET to avoid placeholder issues with some mysql drivers
         const inProgress = await db.query(`SELECT id, pilot_name, history, created_at FROM logi_signoffs WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY created_at DESC LIMIT ${limitNum} OFFSET ${offsetInProgress}`, [searchInProgressWildcard, searchInProgressWildcard]);
         const trusted = await db.query(`SELECT pilot_name, added_at, history FROM trusted_pilots WHERE pilot_name LIKE ? OR history LIKE ? ORDER BY added_at DESC LIMIT ${limitNum} OFFSET ${offsetTrusted}`, [searchTrustedWildcard, searchTrustedWildcard]);
 
@@ -116,20 +116,19 @@ async function notifyCouncilOfPass(pilotName, history, client, options = { ping:
  * @param {string} commanderName - The name of the commander giving the signoff.
  * @param {string} comment - The comment for the signoff.
  * @param {import('discord.js').Client} client - The Discord client.
- * @returns {Promise<{success: boolean, message: string}>}
+ * @returns {Promise<{success: boolean, message: string, promoted: boolean}>}
  */
 async function addSignoff(pilotName, commanderName, comment, client) {
     try {
         const [isTrusted] = await db.query('SELECT 1 FROM trusted_pilots WHERE pilot_name = ?', [pilotName]);
         if (isTrusted) {
-            return { success: false, message: `**${pilotName}** is already a trusted pilot.` };
+            return { success: false, message: `**${pilotName}** is already a trusted pilot.`, promoted: false };
         }
 
         const [pilot] = await db.query('SELECT * FROM logi_signoffs WHERE pilot_name = ?', [pilotName]);
 
         let currentHistory = pilot && pilot.history ? JSON.parse(pilot.history) : [];
 
-        // Reset demerit count upon first new signoff after being demoted
         const demeritsInHistory = currentHistory.filter(h => h.type === 'demerit').length;
         if (demeritsInHistory >= DEMERITS_FOR_REMOVAL) {
             currentHistory.push({ type: 'comment', commander: 'System', comment: 'Pilot sign-off process restarted.', date: new Date().toISOString() });
@@ -140,7 +139,7 @@ async function addSignoff(pilotName, commanderName, comment, client) {
         ).filter(h => h.type === 'signoff');
 
         if (signoffsSinceLastDemerit.some(s => s.commander === commanderName)) {
-            return { success: false, message: `You have already signed off **${pilotName}** since their last demerit.` };
+            return { success: false, message: `You have already signed off **${pilotName}** since their last demerit.`, promoted: false };
         }
 
         const newEvent = { type: 'signoff', commander: commanderName, comment, date: new Date().toISOString() };
@@ -159,14 +158,15 @@ async function addSignoff(pilotName, commanderName, comment, client) {
         if (newSignoffCount >= SIGNOFFS_REQUIRED) {
             await db.query('DELETE FROM logi_signoffs WHERE pilot_name = ?', [pilotName]);
             await db.query('INSERT INTO trusted_pilots (pilot_name, history) VALUES (?, ?)', [pilotName, JSON.stringify(currentHistory)]);
+            await trainingManager.updateTrustedLogiStatus(pilotName, true); // Direct update
             await notifyCouncilOfPass(pilotName, currentHistory, client);
-            return { success: true, message: `**${pilotName}** has been successfully signed off and is now a trusted pilot!` };
+            return { success: true, message: `**${pilotName}** has been successfully signed off and is now a trusted pilot!`, promoted: true };
         } else {
-            return { success: true, message: `Sign-off added for **${pilotName}**. They now have ${newSignoffCount}/${SIGNOFFS_REQUIRED} sign-offs.` };
+            return { success: true, message: `Sign-off added for **${pilotName}**. They now have ${newSignoffCount}/${SIGNOFFS_REQUIRED} sign-offs.`, promoted: false };
         }
     } catch (error) {
         logger.error(`Error adding signoff for ${pilotName}:`, error);
-        return { success: false, message: 'A database error occurred.' };
+        return { success: false, message: 'A database error occurred.', promoted: false };
     }
 }
 
@@ -182,12 +182,11 @@ async function addDemerit(pilotName, commanderName, comment, client) {
     try {
         const [pilot] = await db.query('SELECT history FROM trusted_pilots WHERE pilot_name = ?', [pilotName]);
         if (!pilot) {
-            return { success: false, message: 'Could not find that trusted pilot.' };
+            return { success: false, message: 'Could not find that trusted pilot.', demoted: false };
         }
 
         let currentHistory = pilot.history ? JSON.parse(pilot.history) : [];
 
-        // Reset signoff count upon first new demerit after being trusted
         const signoffsInHistory = currentHistory.filter(h => h.type === 'signoff').length;
         if (signoffsInHistory >= SIGNOFFS_REQUIRED) {
             currentHistory.push({ type: 'comment', commander: 'System', comment: 'Pilot demerit process started.', date: new Date().toISOString() });
@@ -198,7 +197,7 @@ async function addDemerit(pilotName, commanderName, comment, client) {
         ).filter(h => h.type === 'demerit');
 
         if (demeritsSinceLastSignoff.some(d => d.commander === commanderName)) {
-            return { success: false, message: `You have already given a demerit to **${pilotName}** since they were last trusted.` };
+            return { success: false, message: `You have already given a demerit to **${pilotName}** since they were last trusted.`, demoted: false };
         }
 
         const newEvent = { type: 'demerit', commander: commanderName, comment, date: new Date().toISOString() };
@@ -211,6 +210,7 @@ async function addDemerit(pilotName, commanderName, comment, client) {
         if (newDemeritCount >= DEMERITS_FOR_REMOVAL) {
             await db.query('DELETE FROM trusted_pilots WHERE pilot_name = ?', [pilotName]);
             await db.query('INSERT INTO logi_signoffs (pilot_name, history) VALUES (?, ?)', [pilotName, JSON.stringify(currentHistory)]);
+            await trainingManager.updateTrustedLogiStatus(pilotName, false); // Direct update
             await notifyCouncilOfDistrust(pilotName, currentHistory, client);
             return { success: true, message: `**${pilotName}** received a second demerit and has been moved back to the in-progress list.`, demoted: true };
         } else {
@@ -219,7 +219,7 @@ async function addDemerit(pilotName, commanderName, comment, client) {
         }
     } catch (error) {
         logger.error(`Error adding demerit for ${pilotName}:`, error);
-        return { success: false, message: 'A database error occurred.' };
+        return { success: false, message: 'A database error occurred.', demoted: false };
     }
 }
 
@@ -259,6 +259,9 @@ async function deletePilot(pilotName, listType) {
         const result = await db.query(`DELETE FROM ${tableName} WHERE pilot_name = ?`, [pilotName]);
 
         if (result.affectedRows > 0) {
+            if (tableName === 'trusted_pilots') {
+                await trainingManager.updateTrustedLogiStatus(pilotName, false); // Direct update
+            }
             logger.info(`Admin deleted pilot ${pilotName} from ${tableName}.`);
             return { success: true, message: `Successfully deleted ${pilotName}.` };
         } else {
@@ -328,14 +331,14 @@ async function validateCharacter(characterName) {
  * @param {string} commanderName - The name of the admin performing the action.
  * @param {string} comment - The comment for the action.
  * @param {import('discord.js').Client} client - The Discord client.
- * @returns {Promise<{success: boolean, message: string}>}
+ * @returns {Promise<{success: boolean, message: string, promoted: boolean}>}
  */
 async function addPilotDirectlyToTrusted(pilotName, commanderName, comment, client) {
     try {
         // Check if pilot is already trusted
         const [isTrusted] = await db.query('SELECT 1 FROM trusted_pilots WHERE pilot_name = ?', [pilotName]);
         if (isTrusted) {
-            return { success: false, message: `**${pilotName}** is already a trusted pilot.` };
+            return { success: false, message: `**${pilotName}** is already a trusted pilot.`, promoted: false };
         }
 
         // Check if they are in progress and remove them if so, to avoid duplication.
@@ -352,13 +355,16 @@ async function addPilotDirectlyToTrusted(pilotName, commanderName, comment, clie
         // Add to trusted pilots table
         await db.query('INSERT INTO trusted_pilots (pilot_name, history) VALUES (?, ?)', [pilotName, JSON.stringify(history)]);
 
+        // Direct update to training manager
+        await trainingManager.updateTrustedLogiStatus(pilotName, true);
+
         // Notify council without a ping
         await notifyCouncilOfPass(pilotName, history, client, { ping: false });
 
-        return { success: true, message: `**${pilotName}** has been added directly to the trusted pilot list via admin override.` };
+        return { success: true, message: `**${pilotName}** has been added directly to the trusted pilot list via admin override.`, promoted: true };
     } catch (error) {
         logger.error(`Error in addPilotDirectlyToTrusted for ${pilotName}:`, error);
-        return { success: false, message: 'A database error occurred during the admin override process.' };
+        return { success: false, message: 'A database error occurred during the admin override process.', promoted: false };
     }
 }
 
@@ -371,4 +377,3 @@ module.exports = {
     validateCharacter,
     addPilotDirectlyToTrusted
 };
-

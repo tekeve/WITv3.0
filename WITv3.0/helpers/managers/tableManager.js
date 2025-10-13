@@ -5,11 +5,15 @@ const logger = require('@helpers/logger');
 const editableTables = [
     'action_log_settings',
     'bot_status',
+    'commander_training', // Added new table
     'config',
     'google_docs',
     'google_sheets',
     'incursion_state',
     'incursion_systems',
+    'quizzes', // Added for quiz management
+    'quiz_questions', // Added for quiz management
+    'quiz_answers', // Added for quiz management
     'reminders',
     'resident_applications',
     'role_hierarchy',
@@ -22,11 +26,15 @@ const editableTables = [
 const tableKeyMap = {
     action_log_settings: 'id',
     bot_status: 'id',
+    commander_training: 'pilot_id', // Added key for new table
     config: 'key_name',
     google_docs: 'alias',
     google_sheets: 'alias',
     incursion_state: 'id',
     incursion_systems: 'Constellation_id',
+    quizzes: 'quiz_id', // Added key for new table
+    quiz_questions: 'question_id', // Added key for new table
+    quiz_answers: 'answer_id', // Added key for new table
     reminders: 'id',
     resident_applications: 'id',
     role_hierarchy: 'roleName',
@@ -71,8 +79,8 @@ module.exports = {
         try {
             const sql = `SELECT \`${keyColumn}\` FROM \`${tableName}\` WHERE \`${keyColumn}\` LIKE ? LIMIT 25`;
             const rows = await db.query(sql, [`%${filter}%`]);
-            const validRows = rows.filter(row => row[keyColumn] && typeof row[keyColumn] === 'string');
-            return validRows.map(row => ({ name: row[keyColumn], value: row[keyColumn] }));
+            const validRows = rows.filter(row => row[keyColumn] && (typeof row[keyColumn] === 'string' || typeof row[keyColumn] === 'number'));
+            return validRows.map(row => ({ name: String(row[keyColumn]), value: String(row[keyColumn]) }));
         } catch (error) {
             logger.error(`Failed to get keys from table ${tableName}:`, error);
             return [];
@@ -152,4 +160,3 @@ module.exports = {
         }
     },
 };
-

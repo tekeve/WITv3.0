@@ -85,6 +85,9 @@ exports.handleSignoff = (client, io) => async (req, res) => {
 
         if (result.success) {
             io.emit('logi-update'); // Notify all clients of the change
+            if (result.promoted) {
+                io.emit('training-update'); // Notify training tracker of the status change
+            }
         }
         res.json(result);
     } catch (error) {
@@ -113,6 +116,9 @@ exports.handleDemerit = (client, io) => async (req, res) => {
         const result = await logiManager.addDemerit(pilotName, commanderName, comment, client);
         if (result.success) {
             io.emit('logi-update'); // Notify all clients
+            if (result.demoted) {
+                io.emit('training-update'); // Notify training tracker of the status change
+            }
         }
         res.json(result);
     } catch (error) {
@@ -173,6 +179,7 @@ exports.handleDeletePilot = (client, io) => async (req, res) => {
         const result = await logiManager.deletePilot(pilotName, listType);
         if (result.success) {
             io.emit('logi-update'); // Notify all clients
+            io.emit('training-update'); // Also notify training in case the pilot was removed
         }
         res.json(result);
     } catch (error) {
@@ -242,3 +249,4 @@ exports.getPaginatedData = (client) => async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to fetch updated data.' });
     }
 };
+

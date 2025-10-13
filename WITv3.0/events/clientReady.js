@@ -2,8 +2,9 @@ const { Events } = require('discord.js');
 const logger = require('@helpers/logger');
 const statusManager = require('@helpers/statusManager');
 const githubWatcher = require('@helpers/githubWatcher');
-const reminderManager = require('@helpers/reminderManager'); // Import the new manager
+const reminderManager = require('@helpers/reminderManager');
 const scheduler = require('@helpers/scheduler');
+const trainingSyncManager = require('@helpers/trainingSyncManager'); // Import the training sync manager
 
 module.exports = {
 	name: Events.ClientReady,
@@ -20,8 +21,17 @@ module.exports = {
 		// Initial call to update incursions, which will then schedule the next call itself.
 		client.updateIncursions();
 
-		// Initialize scheduled tasks, including the new token refresh task
+		// Initialize scheduled tasks, including the commander list and token refresh tasks.
 		scheduler.initialize(client);
+
+		// Initialize the new training data sync manager.
+		// This needs the `io` instance from the webserver, which we attached to the client.
+		if (client.io) {
+			trainingSyncManager.initialize(client);
+		} else {
+			logger.warn('[TrainingSync] Could not initialize because the web server\'s `io` instance was not found on the client.');
+		}
+
 
 		// Initialize and start GitHub watcher with a standard interval
 		await githubWatcher.initializeLastSha();

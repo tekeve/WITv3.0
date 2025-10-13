@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commander Training Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569;
+            --bg-card: #2d3748; --text-primary: #e2e8f0; --text-secondary: #94a3b8;
+            --accent-blue: #38bdf8; --accent-green: #4ade80; --accent-red: #f87171;
+            --accent-yellow: #facc15; --border-color: #4a5568;
+            --bg-card-resident: #4a4a38; /* Pale Yellow */
+            --bg-card-tfc: #384a5c;      /* Pale Blue */
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 1.5rem; }
+        .container { max-width: 98%; margin: auto; }
+        h1, h2 { text-align: center; color: #f8fafc; }
+        h1 { margin-bottom: 0.5rem; }
+        h2 { margin-top: 2.5rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; }
+        .subtitle { text-align: center; margin-bottom: 2rem; color: var(--text-secondary); }
+        .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; border: 1px solid var(--border-color); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1); }
+        
+        .top-panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; max-width: 1400px; margin: auto; margin-bottom: 2rem; }
+        
+        .pilots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; justify-content: center; }
+        .pilot-card { background-color: var(--bg-card); border-radius: 0.5rem; padding: 1.25rem; display: flex; flex-direction: column; gap: 1.5rem; border: 1px solid var(--border-color); }
+        
+        .pilot-card.resident { background-color: var(--bg-card-resident); }
+        .pilot-card.tfc { background-color: var(--bg-card-tfc); }
+
+        .pilot-card h3 { margin: 0; font-size: 1.25rem; color: var(--accent-blue); padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); }
+        .pilot-card h4 { margin: 0 0 0.75rem 0; font-size: 0.875rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .info-grid, .progress-grid, .tfc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .tfc-grid .form-group, .tfc-grid .progress-item { grid-column: span 2; }
+
+
+        .form-group { margin-bottom: 0; }
+        label { display: block; margin-bottom: 0.35rem; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); }
+        input[type="text"], input[type="date"], select { width: 100%; padding: 0.5rem; border-radius: 0.375rem; background-color: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.875rem; box-sizing: border-box; }
+        input:disabled, textarea:disabled { background-color: #3d4c5f; cursor: not-allowed; }
+        
+        .progress-item { display: flex; align-items: center; justify-content: space-between; background-color: var(--bg-secondary); padding: 0.6rem 0.8rem; border-radius: 0.375rem; }
+        .progress-item label { margin: 0; color: var(--text-primary); font-size: 0.875rem; }
+        .progress-item.completed { background-color: var(--accent-green); }
+        .progress-item.completed label { color: var(--bg-primary); font-weight: 600; }
+        .progress-item .signoff-by { display: flex; align-items: center; gap: 0.5rem; }
+        .progress-item .signoff-by span { color: var(--bg-primary); font-size: 0.8rem; }
+        .progress-item .signoff-by a { color: var(--bg-secondary); text-decoration: none; font-size: 0.75rem; font-weight: bold; }
+        .progress-item .signoff-by a:hover { color: var(--accent-red); }
+
+        input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: var(--accent-green); }
+        input[type="checkbox"]:not(:disabled) { cursor: pointer; }
+        .signoff-dots { display: flex; gap: 4px; }
+        .signoff-dot { width: 12px; height: 12px; border-radius: 50%; background-color: var(--bg-tertiary); }
+        .signoff-dot.filled { background-color: var(--accent-green); }
+        .signoff-dot.mine { background-color: var(--accent-blue); }
+        
+        .comments-section { margin-top: 1rem; }
+        .comment-history { display: none; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color); }
+        .latest-comment-wrapper { display: flex; align-items: flex-start; gap: 0.5rem; }
+        .comment-bar { flex-shrink: 0; width: 3px; border-radius: 3px; align-self: stretch; }
+        .latest-comment { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; white-space: pre-wrap; word-break: break-word; flex-grow: 1; }
+        .latest-comment strong { color: var(--text-primary); }
+        .comment-author { font-weight: bold; color: var(--text-primary); }
+
+        .older-comment { padding-left: 1rem; border-left: 3px solid var(--bg-tertiary); margin-bottom: 0.75rem; }
+        
+        .pilot-card-footer { display: flex; justify-content: space-between; align-items: center; }
+        .comments-actions { display: flex; gap: 1rem; }
+        .comments-actions a { color: var(--accent-blue); cursor: pointer; text-decoration: none; font-size: 0.875rem; }
+        .complex-signoff-item .view-signoffs-btn { color: var(--accent-blue); cursor: pointer; text-decoration: none; font-size: 0.875rem; }
+        
+        .action-grid { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal { background: var(--bg-secondary); padding: 2rem; border-radius: 0.5rem; max-width: 600px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
+        .modal h2 { margin: 0 0 1rem 0; text-align: left; border: none; font-size: 1.25rem; color: #f8fafc;}
+        .modal-content { overflow-y: auto; margin-right: -1rem; padding-right: 1rem;}
+        .modal-actions { margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 1rem; }
+        button { padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; font-weight: 600; }
+        button:disabled { cursor: not-allowed; opacity: 0.7; }
+        .btn-primary { background-color: var(--accent-blue); color: white; }
+        .btn-secondary { background-color: var(--bg-tertiary); color: var(--text-primary); }
+        .btn-danger { background-color: var(--accent-red); color: white; }
+        .delete-pilot-btn { padding: 0.5rem; line-height: 1; }
+        .delete-pilot-btn svg { width: 16px; height: 16px; pointer-events: none; }
+        .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+        
+        .comment, .signoff-entry { border-bottom: 1px solid var(--border-color); padding: 0.75rem 0; }
+        .comment:last-child, .signoff-entry:last-child { border-bottom: none; }
+        .comment-header, .signoff-header { font-size: 0.8rem; color: var(--text-secondary); }
+        .comment-header strong, .signoff-header strong { color: var(--text-primary); }
+        .comment-body, .signoff-body { margin-top: 0.25rem; white-space: pre-wrap; font-size: 0.875rem;}
+        textarea { width: 100%; padding: 0.75rem; border-radius: 0.375rem; background-color: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 1rem; box-sizing: border-box; resize: vertical; }
+        
+        .toast { position: fixed; top: 1.5rem; right: 1.5rem; padding: 1rem 1.5rem; border-radius: 0.5rem; z-index: 1001; opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background-color: var(--accent-green); color: black; }
+        .toast.error { background-color: var(--accent-red); color: white; }
+        .toast.info { background-color: var(--accent-blue); color: white; }
+
+        .search-results {
+            position: absolute;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-radius: 0 0 0.375rem 0.375rem;
+            z-index: 10;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .search-result-item {
+            padding: 0.75rem;
+            cursor: pointer;
+        }
+        .search-result-item:hover {
+            background-color: var(--bg-tertiary);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Commander Training Tracker</h1>
+    <p class="subtitle">Welcome, <%= commanderName %></p>
+    
+    <div class="top-panels">
+        <% if (permissions.canAddResidents) { %>
+        <div class="panel add-resident-panel">
+            <h2>Add New Resident from Applications</h2>
+            <div class="action-grid">
+                <div class="form-group" style="position: relative;">
+                    <label for="resident-search">Search by Pilot Name or Discord ID</label>
+                    <input type="text" id="resident-search" placeholder="Click to see eligible pilots..." autocomplete="off">
+                    <div id="resident-search-results" class="search-results" style="display: none;"></div>
+                </div>
+                <button id="add-resident-btn" class="btn-primary" style="padding: 0.75rem;" disabled>Add</button>
+            </div>
+        </div>
+        <% } %>
+
+        <% if (permissions.canPromoteToTfc) { %>
+        <div class="panel promote-tfc-panel">
+            <h2>Promote to Training FC</h2>
+            <div class="action-grid">
+                <div class="form-group" style="position: relative;">
+                    <label for="tfc-promote-search">Search by Pilot Name</label>
+                    <input type="text" id="tfc-promote-search" placeholder="Click to see eligible commanders..." autocomplete="off">
+                     <div id="tfc-promote-search-results" class="search-results" style="display: none;"></div>
+                </div>
+                <button id="promote-tfc-btn" class="btn-primary" style="padding: 0.75rem;" disabled>Promote</button>
+            </div>
+        </div>
+        <% } %>
+    </div>
+
+
+    <div id="all-pilots-section">
+        <h2>Commander Training Progress</h2>
+        <div class="pilots-grid" id="all-pilots-container"></div>
+    </div>
+</div>
+
+<!-- Comments Modal -->
+<div id="commentsModal" class="modal-overlay">
+    <div class="modal">
+        <h2 id="commentsModalTitle">Comments</h2>
+        <div class="modal-content" id="commentsModalContent"></div>
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label for="newComment">Add New Comment</label>
+            <textarea id="newComment" rows="3" placeholder="Enter your comment..."></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModal('commentsModal')">Close</button>
+            <button id="addCommentBtn" class="btn-primary">Add Comment</button>
+        </div>
+    </div>
+</div>
+
+<!-- Signoffs Modal -->
+<div id="signoffsModal" class="modal-overlay">
+    <div class="modal">
+        <h2 id="signoffsModalTitle">Sign-offs</h2>
+        <div class="modal-content" id="signoffsModalContent"></div>
+        <div id="addSignoffForm" style="display: none; margin-top: 1.5rem;">
+            <div class="form-group">
+                <label for="newSignoffComment">Add Your Sign-off (Comment Optional)</label>
+                <textarea id="newSignoffComment" rows="3" placeholder="Enter an optional comment..."></textarea>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button id="removeSignoffBtn" class="btn-danger" style="display: none; margin-right: auto;">Remove My Sign-off</button>
+            <button class="btn-secondary" onclick="closeModal('signoffsModal')">Close</button>
+            <button id="addSignoffBtn" class="btn-primary" style="display: none;">Add Sign-off</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- TFC Signoff Modal -->
+<div id="tfcSignoffModal" class="modal-overlay">
+    <div class="modal">
+        <h2 id="tfcSignoffModalTitle">Sign-off Module</h2>
+        <div class="form-group">
+            <label for="tfcSignoffComment">Add Optional Comment</label>
+            <textarea id="tfcSignoffComment" rows="3" placeholder="This comment will be added to the pilot's general comments..."></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModal('tfcSignoffModal')">Cancel</button>
+            <button id="confirmTfcSignoffBtn" class="btn-primary">Confirm Sign-off</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Pilot Modal -->
+<div id="deletePilotModal" class="modal-overlay">
+    <div class="modal">
+        <h2 id="deletePilotModalTitle">Confirm Removal</h2>
+        <p id="deletePilotModalText"></p>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModal('deletePilotModal')">Cancel</button>
+            <button id="deletePilotConfirmBtn" class="btn-danger">Confirm Removal</button>
+        </div>
+    </div>
+</div>
+
+<!-- Remove Signoff Modal -->
+<div id="removeSignoffModal" class="modal-overlay">
+    <div class="modal">
+        <h2 id="removeSignoffModalTitle">Confirm Sign-off Removal</h2>
+        <p id="removeSignoffModalText">Are you sure you want to remove your sign-off for this skill? This cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModal('removeSignoffModal')">Cancel</button>
+            <button id="removeSignoffConfirmBtn" class="btn-danger">Confirm Removal</button>
+        </div>
+    </div>
+</div>
+
+
+<div id="toast" class="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const token = "<%= token %>";
+    const commanderName = "<%= commanderName %>";
+    const commanderDiscordId = "<%= commanderDiscordId %>";
+    const permissions = <%- JSON.stringify(permissions) %>;
+    const canDoInFleetSignoffs = <%- JSON.stringify(permissions.canDoInFleetSignoffs) %>;
+    const canEditTfcModules = <%- JSON.stringify(permissions.canEditTfcModules) %>;
+    const canEditExams = <%- JSON.stringify(permissions.canEditExams) %>;
+    const residentQuizzes = <%- JSON.stringify(residentQuizzes) %>;
+    const tfcQuizzes = <%- JSON.stringify(tfcQuizzes) %>;
+    let trackerData = { residents: [], tfcs: [] };
+    const deleteSVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/></svg>`;
+    let selectedUserForAddition = null;
+    let selectedTfcForPromotion = null;
+
+
+    function formatDisplayDate(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        // Handles invalid date strings gracefully
+        if (isNaN(date)) return 'Invalid Date';
+        return date.toLocaleString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true
+        });
+    }
+
+    function showToast(message, type = 'info') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast show ${type}`;
+        setTimeout(() => { toast.className = 'toast'; }, 3000);
+    }
+
+    async function apiCall(endpoint, method = 'POST', body = null) {
+        try {
+            const options = {
+                method: method.toUpperCase(),
+                headers: { 'Content-Type': 'application/json' },
+            };
+            if (body) options.body = JSON.stringify(body);
+            const response = await fetch(endpoint, options);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'An API error occurred.');
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('API Call Failed:', error);
+            showToast(error.message, 'error');
+            return null;
+        }
+    }
+
+    function openModal(modalId) { document.getElementById(modalId).style.display = 'flex'; }
+    function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
+    
+    function getCommentAccentColor(type) {
+        switch (type) {
+            case 'scouting': return 'var(--accent-green)';
+            case 'orientation': return 'var(--accent-blue)';
+            case 'signoff': return 'var(--accent-green)';
+            case 'general':
+            default:
+                return 'var(--accent-yellow)';
+        }
+    }
+    
+    function createQuizProgressHTML(quizzes, completedQuizIds) {
+        if (!quizzes || quizzes.length === 0) return '<p class="no-quizzes">No quizzes available for this category.</p>';
+        return quizzes.map(quiz => `
+            <div class="progress-item ${completedQuizIds.includes(quiz.quiz_id) ? 'completed' : ''}">
+                <label>${quiz.name}</label>
+            </div>
+        `).join('');
+    }
+
+    function createComplexSignoffHTML(pilot, field, label) {
+        const signoffs = pilot[field] || [];
+        let dotsHTML = '';
+        for (let i = 0; i < 3; i++) {
+            if (signoffs[i]) {
+                const dotClass = signoffs[i].discordId === commanderDiscordId ? 'mine' : 'filled';
+                dotsHTML += `<div class="signoff-dot ${dotClass}" title="${signoffs[i].commander}"></div>`;
+            } else {
+                dotsHTML += `<div class="signoff-dot"></div>`;
+            }
+        }
+        return `
+            <div class="complex-signoff-item progress-item" data-field="${field}" data-pilot-type="resident">
+                <label>${label}</label>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div class="signoff-dots">${dotsHTML}</div>
+                    ${canDoInFleetSignoffs ? '<a href="#" class="view-signoffs-btn">View/Add</a>' : ''}
+                </div>
+            </div>`;
+    }
+
+    function createResidentCardHTML(pilot) {
+        const comments = pilot.comments || [];
+        const lastComment = comments.length > 0 ? comments[0] : null;
+        const olderComments = comments.slice(1);
+
+        const adminActionsHTML = permissions.canDelete
+            ? `<div class="pilot-card-admin-actions">
+                   <button class="btn-danger delete-pilot-btn" data-pilot-name="${pilot.pilot_name}" data-pilot-id="${pilot.pilot_id}" data-pilot-type="resident" title="Remove from Tracker">${deleteSVG}</button>
+               </div>`
+            : '';
+
+        let olderCommentsHTML = '';
+        if (olderComments.length > 0) {
+            olderCommentsHTML = olderComments.map(c => `
+                <div class="older-comment">
+                    <div class="comment-header">By <span class="comment-author">${c.commander}</span> on ${new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} (${c.type})</div>
+                    <div class="comment-body">${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '<i>No comment text.</i>'}</div>
+                </div>
+            `).join('');
+        }
+
+        return `
+            <div class="pilot-card resident" data-pilot-id="${pilot.pilot_id}" data-pilot-type="resident">
+                <h3>${pilot.pilot_name}</h3>
+                <div>
+                    <h4>General</h4>
+                    <div class="info-grid">
+                        <div class="form-group"><label>Start Date</label><input type="text" value="${formatDisplayDate(pilot.start_date)}" title="${pilot.start_date || ''}" disabled></div>
+                        <div class="form-group"><label>Last Active</label><input type="text" value="${formatDisplayDate(pilot.last_active)}" title="${pilot.last_active || ''}" disabled></div>
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;"><label>Resident Orientation</label><input type="text" value="${pilot.resident_orientation_by || ''}" data-field="resident_orientation_by" placeholder="FC Name" ${!permissions.canEditOrientation ? 'disabled' : ''}></div>
+                </div>
+                <div><h4>Quizzes</h4><div class="progress-grid">${createQuizProgressHTML(residentQuizzes, pilot.completed_quizzes)}</div></div>
+                <div>
+                    <h4>In Fleet Sign-Offs</h4>
+                    <div class="progress-grid">
+                        <div class="progress-item"><label>Bastion Badge</label><input type="checkbox" ${pilot.signoff_bastion ? 'checked' : ''} data-field="signoff_bastion" ${!canDoInFleetSignoffs ? 'disabled' : ''}></div>
+                        <div class="progress-item ${pilot.signoff_trusted_logi ? 'completed' : ''}"><label>Trusted Logi</label></div>
+                        ${createComplexSignoffHTML(pilot, 'signoff_scouting', 'Scouting')}
+                        ${createComplexSignoffHTML(pilot, 'signoff_new_pilot_orientation', 'New Pilot Orientation')}
+                    </div>
+                </div>
+                <div>
+                    <h4>Exam</h4>
+                    <div class="progress-grid">
+                        <div class="progress-item"><label>Multiple Choice</label><input type="checkbox" ${pilot.exam_multiple_choice ? 'checked' : ''} data-field="exam_multiple_choice" ${!canEditExams ? 'disabled' : ''}></div>
+                        <div class="progress-item"><label>CT Exam</label><input type="checkbox" ${pilot.exam_ct ? 'checked' : ''} data-field="exam_ct" ${!canEditExams ? 'disabled' : ''}></div>
+                    </div>
+                </div>
+                <div class="comments-section">
+                    ${lastComment ? `
+                        <div class="latest-comment-wrapper">
+                            <div class="comment-bar" style="background-color: ${getCommentAccentColor(lastComment.type)};"></div>
+                            <div class="latest-comment">
+                                <span class="comment-author">${lastComment.commander}:</span> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+                            </div>
+                        </div>
+                    ` : ''}
+                    <div class="comment-history">
+                        ${olderCommentsHTML}
+                    </div>
+                    <div class="pilot-card-footer">
+                        <div class="comments-actions">
+                            <a href="#" class="add-comment-btn">Add Comment</a>
+                            ${olderComments.length > 0 ? `<a href="#" class="view-older-comments-btn">View Older (${olderComments.length})</a>` : ''}
+                        </div>
+                         ${adminActionsHTML}
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function createTfcModuleHTML(pilot, field, label) {
+        const signoffName = pilot[field];
+        const hasPermission = (field.startsWith('practice_') || field.startsWith('competency_')) ? canEditExams : canEditTfcModules;
+        const signedOffByMe = signoffName === commanderName;
+
+        if (signoffName) {
+            // It's signed off
+            return `
+                <div class="progress-item completed">
+                    <label>${label}</label>
+                    <div class="signoff-by">
+                        <span>by ${signoffName}</span>
+                        ${ (signedOffByMe && hasPermission) ? `<a href="#" class="remove-tfc-signoff-btn" data-pilot-id="${pilot.pilot_id}" data-pilot-name="${pilot.pilot_name}" data-field="${field}" data-label="${label}" title="Remove your sign-off">&times;</a>` : '' }
+                    </div>
+                </div>
+            `;
+        } else {
+            // It's not signed off
+            return `
+                <div class="form-group">
+                    <label>${label}</label>
+                    <button class="tfc-signoff-btn btn-secondary btn-sm" data-pilot-id="${pilot.pilot_id}" data-pilot-name="${pilot.pilot_name}" data-field="${field}" data-label="${label}" ${!hasPermission ? 'disabled' : ''}>
+                        Sign-off
+                    </button>
+                </div>
+            `;
+        }
+    }
+    
+    function createTfcCardHTML(pilot) {
+        const comments = pilot.comments || [];
+        const lastComment = comments.length > 0 ? comments[0] : null;
+        const olderComments = comments.slice(1);
+        const adminActionsHTML = permissions.canDelete
+            ? `<div class="pilot-card-admin-actions">
+                   <button class="btn-danger delete-pilot-btn" data-pilot-name="${pilot.pilot_name}" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc" title="Remove from Tracker">${deleteSVG}</button>
+               </div>`
+            : '';
+            
+        let olderCommentsHTML = '';
+        if (olderComments.length > 0) {
+            olderCommentsHTML = olderComments.map(c => `
+                <div class="older-comment">
+                    <div class="comment-header">By <span class="comment-author">${c.commander}</span> on ${new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} (${c.type})</div>
+                    <div class="comment-body">${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '<i>No comment text.</i>'}</div>
+                </div>
+            `).join('');
+        }
+
+        return `
+            <div class="pilot-card tfc" data-pilot-id="${pilot.pilot_id}" data-pilot-type="tfc">
+                <h3>${pilot.pilot_name}</h3>
+                <div><h4>Quizzes</h4><div class="progress-grid">${createQuizProgressHTML(tfcQuizzes, pilot.completed_quizzes)}</div></div>
+                <div>
+                    <h4>Modules</h4>
+                    <div class="tfc-grid">
+                        ${createTfcModuleHTML(pilot, 't1_tagging', 'T1 - Tagging')}
+                        ${createTfcModuleHTML(pilot, 't1_voicing', 'T1 - Voicing')}
+                        ${createTfcModuleHTML(pilot, 't1_waitlist', 'T1 - Waitlist & Comp')}
+                        ${createTfcModuleHTML(pilot, 't2_situational_awareness', 'T2 - Situational Awareness')}
+                        ${createTfcModuleHTML(pilot, 't2_evacuations', 'T2 - Evacuations')}
+                    </div>
+                </div>
+                 <div>
+                    <h4>Practice & Competency</h4>
+                    <div class="tfc-grid">
+                        ${createTfcModuleHTML(pilot, 'practice_fleet_speed', 'Fleet Speed')}
+                        ${createTfcModuleHTML(pilot, 'practice_system_awareness', 'System Awareness')}
+                        ${createTfcModuleHTML(pilot, 'competency_final', 'Final Sign-off')}
+                    </div>
+                </div>
+                <div class="comments-section">
+                    ${lastComment ? `
+                        <div class="latest-comment-wrapper">
+                            <div class="comment-bar" style="background-color: ${getCommentAccentColor(lastComment.type)};"></div>
+                            <div class="latest-comment">
+                                <span class="comment-author">${lastComment.commander}:</span> ${lastComment.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+                            </div>
+                        </div>
+                    ` : ''}
+                     <div class="comment-history">
+                        ${olderCommentsHTML}
+                    </div>
+                     <div class="pilot-card-footer">
+                        <div class="comments-actions">
+                            <a href="#" class="add-comment-btn">Add Comment</a>
+                             ${olderComments.length > 0 ? `<a href="#" class="view-older-comments-btn">View Older (${olderComments.length})</a>` : ''}
+                        </div>
+                        ${adminActionsHTML}
+                    </div>
+                </div>
+            </div>`;
+    }
+
+
+    function renderAllData() {
+        const allPilotsContainer = document.getElementById('all-pilots-container');
+        
+        allPilotsContainer.innerHTML = ''; // Clear the container first
+
+        // Render TFCs first, then residents
+        const tfcHtml = trackerData.tfcs.map(createTfcCardHTML).join('');
+        const residentHtml = trackerData.residents.map(createResidentCardHTML).join('');
+
+        allPilotsContainer.innerHTML = tfcHtml + residentHtml;
+    }
+
+    async function fetchAndRenderData() {
+        const result = await apiCall(`/training/api/data/${token}`, 'GET');
+        if (result && result.success) {
+            trackerData = result.data;
+            renderAllData();
+        }
+    }
+
+    // --- EVENT HANDLERS ---
+    async function handleInputChange(event) {
+        const input = event.target;
+        const field = input.dataset.field;
+        if (!field) return;
+
+        const card = input.closest('.pilot-card');
+        const pilotId = card.dataset.pilotId;
+        const pilotType = card.dataset.pilotType;
+        const value = (input.type === 'checkbox') ? input.checked : input.value;
+        
+        const endpoint = pilotType === 'resident' ? `/training/api/update-resident/${token}` : `/training/api/update-tfc/${token}`;
+        const result = await apiCall(endpoint, 'POST', { pilotId, field, value });
+        
+        if (result && result.success) {
+            showToast(result.message, 'success');
+            // Data will be re-rendered via socket event
+        } else {
+            // Revert failed change
+            if (input.type === 'checkbox') input.checked = !input.checked;
+        }
+    }
+
+    function handleGridClick(e) {
+        const target = e.target;
+        const card = target.closest('.pilot-card');
+        if (!card) return;
+
+        const pilotId = card.dataset.pilotId;
+        const pilotType = card.dataset.pilotType;
+        const pilotName = card.querySelector('h3').textContent;
+
+        if (target.classList.contains('add-comment-btn')) {
+            e.preventDefault();
+            openCommentsModal(pilotId, pilotType);
+        } else if (target.classList.contains('view-older-comments-btn')) {
+            e.preventDefault();
+            const historyDiv = card.querySelector('.comment-history');
+            const isHidden = historyDiv.style.display === 'none' || !historyDiv.style.display;
+            historyDiv.style.display = isHidden ? 'block' : 'none';
+            target.textContent = isHidden ? 'Hide Older' : `View Older (${historyDiv.children.length})`;
+        } else if (target.classList.contains('view-signoffs-btn')) {
+            e.preventDefault();
+            const field = target.closest('.complex-signoff-item').dataset.field;
+            openSignoffsModal(pilotId, field);
+        } else if (target.classList.contains('tfc-signoff-btn')) {
+            e.preventDefault();
+            const { pilotId, field, label, pilotName } = target.dataset;
+            openTfcSignoffModal(pilotId, field, label, pilotName);
+        } else if (target.classList.contains('remove-tfc-signoff-btn')) {
+            e.preventDefault();
+            const { pilotId, field, pilotName, label } = target.dataset;
+            openRemoveTfcSignoffConfirmation(pilotId, field, pilotName, label);
+        } else if (target.closest('.delete-pilot-btn')) {
+            e.preventDefault();
+            openDeletePilotModal(pilotName, pilotId);
+        }
+    }
+    
+    async function handleAddResident() {
+        if (!selectedUserForAddition) {
+            showToast('Please select a pilot from the search results first.', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('add-resident-btn');
+        btn.disabled = true;
+        const { character_name: pilotName, discord_id: discordId } = selectedUserForAddition;
+
+        const result = await apiCall(`/training/api/add-resident/${token}`, 'POST', { pilotName, discordId });
+        if (result && result.success) {
+            showToast(result.message, 'success');
+            // Clear selection and search
+            document.getElementById('resident-search').value = '';
+            document.getElementById('resident-search-results').style.display = 'none';
+            selectedUserForAddition = null;
+            btn.disabled = true;
+        } else {
+            btn.disabled = false;
+        }
+    }
+    
+    async function handlePromoteToTfc() {
+        if (!selectedTfcForPromotion) {
+            showToast('Please select a pilot from the search results to promote.', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('promote-tfc-btn');
+        btn.disabled = true;
+        const { pilot_id: pilotId } = selectedTfcForPromotion;
+        
+        const result = await apiCall(`/training/api/promote-to-tfc/${token}`, 'POST', { pilotId });
+        if (result && result.success) {
+            showToast(result.message, 'success');
+            // Clear selection and search
+            document.getElementById('tfc-promote-search').value = '';
+            document.getElementById('tfc-promote-search-results').style.display = 'none';
+            selectedTfcForPromotion = null;
+            btn.disabled = true;
+        } else {
+            btn.disabled = false; // Re-enable on failure
+        }
+    }
+
+    async function handleAddComment() {
+        const modal = document.getElementById('commentsModal');
+        const { pilotId, pilotType } = modal.dataset;
+        const comment = document.getElementById('newComment').value.trim();
+        if (!comment) return;
+
+        const btn = document.getElementById('addCommentBtn');
+        btn.disabled = true;
+        const result = await apiCall(`/training/api/add-comment/${token}`, 'POST', { pilotId, comment, pilotType, commentType: 'general' });
+        if (result && result.success) {
+            showToast(result.message, 'success');
+            closeModal('commentsModal');
+        }
+        btn.disabled = false;
+    }
+
+    async function handleAddSignoff() {
+        const modal = document.getElementById('signoffsModal');
+        const { pilotId, field } = modal.dataset;
+        const comment = document.getElementById('newSignoffComment').value.trim();
+        
+        const btn = document.getElementById('addSignoffBtn');
+        btn.disabled = true;
+        const result = await apiCall(`/training/api/add-signoff/${token}`, 'POST', { pilotId, field, comment });
+        if (result && result.success) {
+            showToast(result.message, 'success');
+            closeModal('signoffsModal');
+        }
+        btn.disabled = false;
+    }
+    
+    function openRemoveSignoffModal(pilotId, field) {
+        const modal = document.getElementById('removeSignoffModal');
+        const confirmBtn = document.getElementById('removeSignoffConfirmBtn');
+        
+        removeSignoffModalTitle.textContent = 'Confirm Sign-off Removal';
+        removeSignoffModalText.innerHTML = `Are you sure you want to remove your sign-off for this skill? This cannot be undone.`;
+        confirmBtn.onclick = () => handleRemoveSignoff(pilotId, field);
+        
+        openModal('removeSignoffModal');
+    }
+
+    async function handleRemoveSignoff(pilotId, field) {
+        const confirmBtn = document.getElementById('removeSignoffConfirmBtn');
+        confirmBtn.disabled = true;
+
+        const result = await apiCall(`/training/api/remove-signoff/${token}`, 'POST', { pilotId, field });
+        
+        if (result && result.success) {
+            showToast(result.message, 'success');
+            closeModal('removeSignoffModal');
+            closeModal('signoffsModal');
+        }
+        
+        confirmBtn.disabled = false;
+    }
+
+    function openCommentsModal(pilotId, pilotType) {
+        const pilotList = pilotType === 'resident' ? trackerData.residents : trackerData.tfcs;
+        const pilot = pilotList.find(p => p.pilot_id == pilotId);
+        if (!pilot) return;
+
+        const modal = document.getElementById('commentsModal');
+        modal.dataset.pilotId = pilotId;
+        modal.dataset.pilotType = pilotType;
+        
+        document.getElementById('commentsModalTitle').textContent = `Comments for ${pilot.pilot_name}`;
+        const contentEl = document.getElementById('commentsModalContent');
+        const comments = pilot.comments || [];
+        
+        if (comments.length === 0) {
+            contentEl.innerHTML = '<p style="color: var(--text-secondary);">No comments yet.</p>';
+        } else {
+            contentEl.innerHTML = comments.map(c => `
+                <div class="comment">
+                    <div class="comment-header">By <span class="comment-author">${c.commander}</span> on ${new Date(c.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} (${c.type})</div>
+                    <div class="comment-body">${c.comment ? c.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;") : ''}</div>
+                </div>
+            `).join('');
+        }
+        document.getElementById('newComment').value = '';
+        openModal('commentsModal');
+    }
+
+    function openSignoffsModal(pilotId, field) {
+        const pilot = trackerData.residents.find(p => p.pilot_id == pilotId);
+        if (!pilot) return;
+
+        const modal = document.getElementById('signoffsModal');
+        modal.dataset.pilotId = pilotId;
+        modal.dataset.field = field;
+
+        const signoffs = pilot[field] || [];
+        const fieldName = field.replace('signoff_', '').replace(/_/g, ' ');
+        
+        document.getElementById('signoffsModalTitle').textContent = `Sign-offs for ${fieldName}`;
+        const contentEl = document.getElementById('signoffsModalContent');
+        
+        contentEl.innerHTML = signoffs.length > 0 ? signoffs.map(s => `
+            <div class="signoff-entry">
+                <div class="signoff-header">By <strong>${s.commander}</strong> on ${new Date(s.date).toLocaleDateString([], { dateStyle: 'long' })}</div>
+                ${s.comment ? `<div class="signoff-body">${s.comment.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>` : ''}
+            </div>
+        `).join('') : '<p style="color: var(--text-secondary);">No sign-offs yet.</p>';
+        
+        const addForm = document.getElementById('addSignoffForm');
+        const addBtn = document.getElementById('addSignoffBtn');
+        const removeBtn = document.getElementById('removeSignoffBtn');
+        
+        // Reset visibility
+        addForm.style.display = 'none';
+        addBtn.style.display = 'none';
+        removeBtn.style.display = 'none';
+
+        if (canDoInFleetSignoffs) {
+            const hasSignedOff = signoffs.some(s => s.discordId === commanderDiscordId);
+            if (hasSignedOff) {
+                removeBtn.style.display = 'inline-flex';
+            } else if (signoffs.length < 3) {
+                addForm.style.display = 'block';
+                addBtn.style.display = 'inline-flex';
+                document.getElementById('newSignoffComment').value = '';
+            }
+        }
+        openModal('signoffsModal');
+    }
+    
+    // --- TFC SIGNOFF MODAL ---
+    const tfcSignoffModal = document.getElementById('tfcSignoffModal');
+    const confirmTfcSignoffBtn = document.getElementById('confirmTfcSignoffBtn');
+    const tfcSignoffModalTitle = document.getElementById('tfcSignoffModalTitle');
+    const tfcSignoffComment = document.getElementById('tfcSignoffComment');
+
+    function openTfcSignoffModal(pilotId, field, label, pilotName) {
+        tfcSignoffModal.dataset.pilotId = pilotId;
+        tfcSignoffModal.dataset.field = field;
+        tfcSignoffModal.dataset.label = label;
+        tfcSignoffModalTitle.textContent = `Sign-off "${label}" for ${pilotName}`;
+        tfcSignoffComment.value = '';
+        openModal('tfcSignoffModal');
+    }
+
+    async function handleConfirmTfcSignoff() {
+        const { pilotId, field, label } = tfcSignoffModal.dataset;
+        const comment = tfcSignoffComment.value.trim();
+        
+        confirmTfcSignoffBtn.disabled = true;
+
+        const signoffResult = await apiCall(`/training/api/update-tfc/${token}`, 'POST', { pilotId, field, value: commanderName });
+        
+        if (signoffResult && result.success) {
+            // Only add a comment if text was entered.
+            if (comment) {
+                // The comment passed to the API now has the correct type.
+                await apiCall(`/training/api/add-comment/${token}`, 'POST', { pilotId, comment: comment, pilotType: 'tfc', commentType: 'signoff' });
+            }
+            showToast(signoffResult.message, 'success');
+            closeModal('tfcSignoffModal');
+        }
+        
+        confirmTfcSignoffBtn.disabled = false;
+    }
+
+    // --- TFC SIGNOFF REMOVAL ---
+    const removeSignoffModal = document.getElementById('removeSignoffModal');
+    const removeSignoffConfirmBtn = document.getElementById('removeSignoffConfirmBtn');
+    const removeSignoffModalTitle = document.getElementById('removeSignoffModalTitle');
+    const removeSignoffModalText = document.getElementById('removeSignoffModalText');
+
+    function openRemoveTfcSignoffConfirmation(pilotId, field, pilotName, label) {
+        removeSignoffModalTitle.textContent = 'Confirm Sign-off Removal';
+        removeSignoffModalText.innerHTML = `Are you sure you want to remove the sign-off for <strong>${label}</strong> from <strong>${pilotName}</strong>? This cannot be undone.`;
+
+        removeSignoffConfirmBtn.onclick = () => handleRemoveTfcSignoff(pilotId, field);
+        
+        openModal('removeSignoffModal');
+    }
+
+    async function handleRemoveTfcSignoff(pilotId, field) {
+        removeSignoffConfirmBtn.disabled = true;
+        const result = await apiCall(`/training/api/update-tfc/${token}`, 'POST', { pilotId, field, value: '' });
+
+        if (result && result.success) {
+            showToast(`Sign-off removed successfully.`, 'success');
+            closeModal('removeSignoffModal');
+        }
+        
+        removeSignoffConfirmBtn.disabled = false;
+    }
+
+    function openDeletePilotModal(pilotName, pilotId) {
+        const modal = document.getElementById('deletePilotModal');
+        document.getElementById('deletePilotModalText').innerHTML = `Are you sure you want to permanently remove <strong>${pilotName}</strong> from the training tracker? This action cannot be undone.`;
+        const confirmBtn = document.getElementById('deletePilotConfirmBtn');
+        confirmBtn.onclick = () => handleDeletePilot(pilotId); 
+        openModal('deletePilotModal');
+    }
+
+    async function handleDeletePilot(pilotId) {
+        const result = await apiCall(`/training/api/remove-pilot/${token}`, 'POST', { pilotId });
+        if (result && result.success) {
+            showToast(result.message, 'success');
+            closeModal('deletePilotModal');
+        }
+    }
+
+
+    // --- INITIALIZATION & LISTENERS ---
+    document.addEventListener('DOMContentLoaded', () => {
+        let searchDebounceTimeout;
+        const residentSearchInput = document.getElementById('resident-search');
+        const residentSearchResults = document.getElementById('resident-search-results');
+        const addResidentBtn = document.getElementById('add-resident-btn');
+
+        let tfcSearchDebounceTimeout;
+        const tfcSearchInput = document.getElementById('tfc-promote-search');
+        const tfcSearchResults = document.getElementById('tfc-promote-search-results');
+        const promoteTfcBtn = document.getElementById('promote-tfc-btn');
+
+        async function handleSearch(type) {
+            const inputEl = type === 'resident' ? residentSearchInput : tfcSearchInput;
+            const resultsEl = type === 'resident' ? residentSearchResults : tfcSearchResults;
+            const btnEl = type === 'resident' ? addResidentBtn : promoteTfcBtn;
+            
+            const searchTerm = inputEl.value.trim();
+            btnEl.disabled = true;
+            if(type === 'resident') selectedUserForAddition = null; else selectedTfcForPromotion = null;
+            resultsEl.innerHTML = '';
+
+            const endpoint = type === 'resident' ? `/training/api/search-residents/${token}` : `/training/api/search-tfc-candidates/${token}`;
+            const result = await apiCall(endpoint, 'POST', { searchTerm });
+
+            if (result && result.success && result.users.length > 0) {
+                resultsEl.style.display = 'block';
+                result.users.forEach(user => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    const displayName = user.character_name || user.pilot_name;
+                    item.textContent = type === 'resident' ? `${displayName} (${user.discord_id})` : displayName;
+                    item.addEventListener('click', () => {
+                        if (type === 'resident') {
+                           selectedUserForAddition = user;
+                        } else {
+                           selectedTfcForPromotion = user;
+                        }
+                        btnEl.disabled = false;
+                        inputEl.value = displayName;
+                        resultsEl.style.display = 'none';
+                    });
+                    resultsEl.appendChild(item);
+                });
+            } else {
+                resultsEl.style.display = 'none';
+            }
+        }
+        
+        document.addEventListener('click', function(event) {
+            if (residentSearchInput && !residentSearchInput.contains(event.target) && residentSearchResults && !residentSearchResults.contains(event.target)) {
+                residentSearchResults.style.display = 'none';
+            }
+            if (tfcSearchInput && !tfcSearchInput.contains(event.target) && tfcSearchResults && !tfcSearchResults.contains(event.target)) {
+                tfcSearchResults.style.display = 'none';
+            }
+        });
+
+        if (residentSearchInput) {
+            residentSearchInput.addEventListener('input', () => {
+                clearTimeout(searchDebounceTimeout);
+                searchDebounceTimeout = setTimeout(() => handleSearch('resident'), 300);
+            });
+            residentSearchInput.addEventListener('focus', () => handleSearch('resident'));
+        }
+        
+        if (tfcSearchInput) {
+            tfcSearchInput.addEventListener('input', () => {
+                clearTimeout(tfcSearchDebounceTimeout);
+                tfcSearchDebounceTimeout = setTimeout(() => handleSearch('tfc'), 300);
+            });
+            tfcSearchInput.addEventListener('focus', () => handleSearch('tfc'));
+        }
+        
+        const container = document.querySelector('.container');
+        container.addEventListener('change', handleInputChange);
+        container.addEventListener('click', handleGridClick);
+        
+        if (addResidentBtn) {
+            addResidentBtn.addEventListener('click', handleAddResident);
+        }
+        if (promoteTfcBtn) {
+            promoteTfcBtn.addEventListener('click', handlePromoteToTfc);
+        }
+
+        document.getElementById('addCommentBtn')?.addEventListener('click', handleAddComment);
+        document.getElementById('addSignoffBtn')?.addEventListener('click', handleAddSignoff);
+        document.getElementById('removeSignoffBtn')?.addEventListener('click', () => {
+            const modal = document.getElementById('signoffsModal');
+            const { pilotId, field } = modal.dataset;
+            openRemoveSignoffModal(pilotId, field);
+        });
+        document.getElementById('confirmTfcSignoffBtn')?.addEventListener('click', handleConfirmTfcSignoff);
+
+        // --- WebSocket Logic ---
+        const socket = io();
+        socket.on('connect', () => console.log('Connected to WebSocket server.'));
+        socket.on('training-update', () => {
+            console.log('Received training-update event. Fetching new data.');
+            showToast('Data updated by another user. Refreshing...', 'info');
+            fetchAndRenderData();
+        });
+        socket.on('disconnect', () => console.log('Disconnected from WebSocket server.'));
+
+        // Initial data load
+        fetchAndRenderData();
+    });
+</script>
+
+</body>
+</html>

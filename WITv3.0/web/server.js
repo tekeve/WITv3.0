@@ -14,7 +14,10 @@ const actionlogRoutes = require('./routes/actionlogRoutes');
 const residentAppRoutes = require('./routes/residentAppRoutes');
 const embedRoutes = require('./routes/embedRoutes');
 const logiRoutes = require('./routes/logiRoutes');
-const reactionRoleRoutes = require('./routes/reactionRoleRoutes'); // Import the new router
+const reactionRoleRoutes = require('./routes/reactionRoleRoutes');
+const trainingRoutes = require('./routes/trainingRoutes');
+const quizRoutes = require('./routes/quizRoutes');
+const quizManagerRoutes = require('./routes/quizManagerRoutes');
 
 /**
  * Initializes and starts the Express web server.
@@ -26,8 +29,12 @@ function startServer(client) {
     const io = new Server(server);
     const host = process.env.HOST_NAME;
 
+    // Make the io instance available to all routes
+    app.set('io', io);
+    // Also attach it to the client for background tasks
+    client.io = io;
+
     app.use(express.urlencoded({ extended: true }));
-    // Added express.json() to handle JSON payloads from the web editor.
     app.use(express.json());
 
     app.set('view engine', 'ejs');
@@ -41,7 +48,7 @@ function startServer(client) {
         });
     });
 
-    // Load and use all the routers, passing the 'io' instance to logiRoutes
+    // Load and use all the routers
     app.use('/', authRoutes(client));
     app.use('/', srpRoutes(client, client.activeSrpTokens));
     app.use('/', setupRoutes(client, client.activeSetupTokens));
@@ -49,8 +56,11 @@ function startServer(client) {
     app.use('/', actionlogRoutes(client));
     app.use('/', residentAppRoutes(client, client.activeResidentAppTokens));
     app.use('/', embedRoutes(client));
-    app.use('/', logiRoutes(client, io)); // Pass the 'io' instance here
-    app.use('/', reactionRoleRoutes(client)); // Add the new router
+    app.use('/', logiRoutes(client, io)); // logiRoutes still needs io passed directly for its own emits
+    app.use('/', reactionRoleRoutes(client));
+    app.use('/training', trainingRoutes(client)); // Mount the training router at the /training path
+    app.use('/', quizRoutes(client));
+    app.use('/', quizManagerRoutes(client));
 
     app.get('/', (req, res) => {
         res.send('Web server is running.');
@@ -62,3 +72,4 @@ function startServer(client) {
 }
 
 module.exports = { startServer };
+

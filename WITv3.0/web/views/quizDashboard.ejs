@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Dashboard</title>
+    <style>
+         :root { --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569; --text-primary: #e2e8f0; --text-secondary: #94a3b8; --accent-blue: #38bdf8; --accent-green: #4ade80; --accent-red: #f87171; --border-color: #4a5568; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 2rem; }
+        .container { max-width: 900px; margin: auto; }
+        .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 2rem; border: 1px solid var(--border-color); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem; }
+        h1 { color: #f8fafc; margin: 0; font-size: 1.75rem; }
+        .btn, button { padding: 0.6rem 1.2rem; border: none; border-radius: 0.375rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; transition: background-color 0.2s; }
+        .btn-primary { background-color: var(--accent-green); color: #fff; } .btn-primary:hover { background-color: #38a169; }
+        .btn-secondary { background-color: var(--accent-blue); color: #fff; } .btn-secondary:hover { background-color: #3182ce; }
+        .btn-danger { background-color: var(--accent-red); color: #fff; } .btn-danger:hover { background-color: #e53e3e; }
+         .btn-back { background-color: var(--bg-tertiary); color: var(--text-primary); } .btn-back:hover { background-color: #4a5568; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; }
+        td:first-child { color: var(--text-primary); font-weight: 500; }
+        .actions { display: flex; gap: 0.5rem; }
+        .no-quizzes { text-align: center; color: var(--text-secondary); padding: 2rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel">
+            <div class="header">
+                <h1>Quiz Manager</h1>
+                <a href="/quizmanager/<%= token %>/create" class="btn btn-primary">Create New Quiz</a>
+            </div>
+            <% if (quizzes.length > 0) { %>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Quiz Name</th>
+                            <th style="width: 150px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% quizzes.forEach(quiz => { %>
+                            <tr>
+                                <td><%= quiz.name %></td>
+                                <td class="actions">
+                                    <a href="/quizmanager/<%= token %>/edit/<%= quiz.quiz_id %>" class="btn btn-secondary">Edit</a>
+                                    <form action="/quizmanager/<%= token %>/delete" method="POST" onsubmit="return confirm('Are you sure you want to permanently delete the quiz named \'<%= quiz.name %>\'? This cannot be undone.');">
+                                        <input type="hidden" name="quizId" value="<%= quiz.quiz_id %>">
+                                        <button type="submit" class="btn btn-danger">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            <% } else { %>
+                <p class="no-quizzes">No quizzes found. Get started by creating one!</p>
+            <% } %>
+        </div>
+    </div>
+</body>
+</html>
