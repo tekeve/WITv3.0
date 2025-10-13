@@ -16,14 +16,16 @@ module.exports = (client) => {
     router.get('/isk/stats/:token', iskController.showIskStats(client));
 
     // API route to fetch paginated fleet data for the stats page
-    router.get('/isk/stats/:token/fleets', iskController.getFleetLogsPage(client));
+    router.get('/isk/api/fleets/:token', iskController.getFleetLogsPage(client));
+
+    // API route to fetch all stats data
+    router.get('/isk/api/stats/:token', iskController.getFullStats(client));
 
     // Route to handle log submission
     router.post('/isk/:token/submit', iskController.handleLogSubmission(client));
 
     // Route to handle log deletion
-    router.post('/isk/stats/:token/delete', iskController.handleLogDeletion(client));
+    router.post('/isk/delete/:token', iskController.handleLogDeletion(client));
 
     return router;
 };
-
