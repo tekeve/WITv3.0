@@ -333,33 +333,3 @@ CREATE TABLE IF NOT EXISTS `users` (
   KEY `discord_id` (`discord_id`),
   CONSTRAINT `roles` CHECK (json_valid(`roles`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-
--- --------------------------------------------------------
--- MIGRATION SCRIPT
--- This section will add/remove columns to bring an old schema up to date.
--- This uses a stored procedure to be compatible with the script runner.
--- --------------------------------------------------------
-
-DELIMITER $$
-CREATE PROCEDURE `MigrateSchema`()
-BEGIN
-    -- Drop old quiz columns from commander_training table
-    IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema = DATABASE() AND table_name = 'commander_training' AND column_name = 'quiz_scouting') THEN
-        ALTER TABLE `commander_training` DROP COLUMN `quiz_scouting`;
-    END IF;
-    IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema = DATABASE() AND table_name = 'commander_training' AND column_name = 'quiz_fitting') THEN
-        ALTER TABLE `commander_training` DROP COLUMN `quiz_fitting`;
-    END IF;
-    IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema = DATABASE() AND table_name = 'commander_training' AND column_name = 'quiz_fleet_roles') THEN
-        ALTER TABLE `commander_training` DROP COLUMN `quiz_fleet_roles`;
-    END IF;
-    IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema = DATABASE() AND table_name = 'commander_training' AND column_name = 'quiz_site_mechanics') THEN
-        ALTER TABLE `commander_training` DROP COLUMN `quiz_site_mechanics`;
-    END IF;
-END$$
-DELIMITER ;
-
-CALL `MigrateSchema`();
-DROP PROCEDURE `MigrateSchema`;
-
