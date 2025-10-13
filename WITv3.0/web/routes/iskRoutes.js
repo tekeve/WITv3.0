@@ -12,6 +12,9 @@ module.exports = (client) => {
     // Route to display the form
     router.get('/isk/:token', iskController.showIskForm(client));
 
+    // Route to display the statistics page
+    router.get('/isk/stats/:token', iskController.showIskStats(client));
+
     // Route to handle log submission
     router.post('/isk/:token/submit', iskController.handleLogSubmission(client));
 

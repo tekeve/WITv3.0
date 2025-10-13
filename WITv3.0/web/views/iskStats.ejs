@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISK/Hour Statistics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569;
+            --text-primary: #e2e8f0; --text-secondary: #94a3b8; --accent-blue: #38bdf8;
+            --accent-green: #4ade80; --accent-red: #f87171; --border-color: #4a5568;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 2rem; }
+        .container { max-width: 1400px; margin: auto; }
+        h1, h2 { color: #f8fafc; text-align: center; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        .subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 3rem; }
+        
+        .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 3rem; }
+        .stat-card { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; border: 1px solid var(--border-color); text-align: center; }
+        .stat-card-label { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat-card-value { font-size: 2.25rem; font-weight: 700; color: #f8fafc; }
+        
+        .main-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+        @media (min-width: 1024px) { .main-grid { grid-template-columns: repeat(2, 1fr); } }
+        
+        .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; border: 1px solid var(--border-color); }
+        .panel h2 { text-align: left; font-size: 1.25rem; margin-top: 0; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; }
+        
+        .leaderboard { list-style: none; padding: 0; margin: 0; }
+        .leaderboard li { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid var(--border-color); }
+        .leaderboard li:last-child { border-bottom: none; }
+        .leaderboard .rank { font-size: 1rem; font-weight: 600; color: var(--text-secondary); width: 30px; }
+        .leaderboard .name { font-weight: 500; flex-grow: 1; }
+        .leaderboard .value { font-weight: 600; font-size: 1.1rem; color: var(--accent-blue); }
+        .leaderboard .fleet-count { font-size: 0.8rem; color: var(--text-secondary); margin-left: 1rem; }
+        
+        .full-width { grid-column: 1 / -1; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; }
+        td { font-size: 0.9rem; }
+        tbody tr:hover { background-color: var(--bg-tertiary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ISK/Hour Fleet Statistics</h1>
+        <p class="subtitle">An overview of all fleet logs submitted by commanders.</p>
+
+        <% const overall = stats.overallStats; %>
+        <div class="stat-cards">
+            <div class="stat-card">
+                <div class="stat-card-label">Total ISK Earned</div>
+                <div class="stat-card-value"><%= formatIsk(overall.totalIsk) %></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Overall Average ISK/Hour</div>
+                <div class="stat-card-value"><%= formatIsk(overall.averageIskPerHour) %></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-label">Total Fleets Logged</div>
+                <div class="stat-card-value"><%= (overall.totalFleets || 0).toLocaleString('en-US') %></div>
+            </div>
+             <div class="stat-card">
+                <div class="stat-card-label">Total Sites Run</div>
+                <div class="stat-card-value"><%= (overall.totalSitesRun || 0).toLocaleString('en-US') %></div>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="panel">
+                <h2>Top Commanders (by Avg ISK/Hour)</h2>
+                <ol class="leaderboard">
+                    <% if (stats.topCommandersByIskPerHour && stats.topCommandersByIskPerHour.length > 0) { %>
+                        <% stats.topCommandersByIskPerHour.forEach((commander, index) => { %>
+                            <li>
+                                <span class="rank"><%= index + 1 %>.</span>
+                                <span class="name"><%= commander.commander_name %></span>
+                                <div>
+                                    <span class="value"><%= formatIsk(commander.avgIskPerHour) %>/hr</span>
+                                    <span class="fleet-count">(<%= commander.fleetCount %> fleets)</span>
+                                </div>
+                            </li>
+                        <% }); %>
+                    <% } else { %>
+                        <li>No data available.</li>
+                    <% } %>
+                </ol>
+            </div>
+            <div class="panel">
+                <h2>Top Commanders (by Total ISK)</h2>
+                <ol class="leaderboard">
+                     <% if (stats.topCommandersByTotalIsk && stats.topCommandersByTotalIsk.length > 0) { %>
+                        <% stats.topCommandersByTotalIsk.forEach((commander, index) => { %>
+                            <li>
+                                <span class="rank"><%= index + 1 %>.</span>
+                                <span class="name"><%= commander.commander_name %></span>
+                                 <div>
+                                    <span class="value"><%= formatIsk(commander.totalIsk) %></span>
+                                    <span class="fleet-count">(<%= commander.fleetCount %> fleets)</span>
+                                </div>
+                            </li>
+                        <% }); %>
+                     <% } else { %>
+                        <li>No data available.</li>
+                    <% } %>
+                </ol>
+            </div>
+            <div class="panel full-width">
+                <h2>ISK/Hour Over Time</h2>
+                <div style="position: relative; height:40vh">
+                    <canvas id="iskOverTimeChart"></canvas>
+                </div>
+            </div>
+            <div class="panel full-width">
+                <h2>Recent Fleets</h2>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Commander</th>
+                                <th>Date</th>
+                                <th>Duration</th>
+                                <th>Total ISK</th>
+                                <th>ISK/Hour</th>
+                                <th>Avg. Pilots</th>
+                                <th>Sites</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (stats.recentFleets && stats.recentFleets.length > 0) { %>
+                                <% stats.recentFleets.forEach(fleet => { %>
+                                    <tr>
+                                        <td><%= fleet.commander_name %></td>
+                                        <td><%= new Date(fleet.fleet_timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric'}) %></td>
+                                        <td><%= fleet.duration_minutes %>m</td>
+                                        <td><%= formatIsk(fleet.total_isk) %></td>
+                                        <td><%= formatIsk(fleet.isk_per_hour) %></td>
+                                        <td><%= fleet.pilot_count ? Number(fleet.pilot_count).toFixed(1) : 'N/A' %></td>
+                                        <td><%= fleet.sites_run %></td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="7" style="text-align: center; color: var(--text-secondary);">No recent fleets have been logged.</td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const iskOverTimeData = <%- JSON.stringify(stats.iskOverTime) %>;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (iskOverTimeData && iskOverTimeData.length > 0) {
+                const ctx = document.getElementById('iskOverTimeChart').getContext('2d');
+                
+                const chartData = {
+                    labels: iskOverTimeData.map(d => new Date(d.date)),
+                    datasets: [{
+                        label: 'Average ISK/Hour',
+                        data: iskOverTimeData.map(d => d.avgIskPerHour),
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#38bdf8'
+                    }]
+                };
+
+                const iskOverTimeChart = new Chart(ctx, {
+                    type: 'line',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(context.parsed.y).replace('$', '') + ' ISK/hr';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'day',
+                                    tooltipFormat: 'MMM d, yyyy',
+                                    displayFormats: { day: 'MMM d' }
+                                },
+                                ticks: { color: '#94a3b8' },
+                                grid: { color: '#475569' }
+                            },
+                            y: {
+                                beginAtZero: false,
+                                ticks: { 
+                                    color: '#94a3b8',
+                                    callback: function(value, index, values) {
+                                        if (value >= 1e9) return (value / 1e9) + 'b';
+                                        if (value >= 1e6) return (value / 1e6) + 'm';
+                                        return value.toLocaleString('en-US');
+                                    }
+                                },
+                                grid: { color: '#475569' }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
+
