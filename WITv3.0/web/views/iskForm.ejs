@@ -145,8 +145,8 @@
 
                  <% if (isCommander) { %>
                     <div class="form-group full-width" style="margin-top: 2rem; text-align: center;">
-                        <button id="submit-log-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white;">Submit Fleet Log</button>
-                        <small>As a commander, you can submit this fleet's data for long-term statistical tracking.</small>
+                        <button id="submit-log-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white;">Submit All Fleets</button>
+                        <small>As a commander, you can submit all detected fleets for long-term statistical tracking.</small>
                     </div>
                 <% } %>
 
@@ -179,6 +179,8 @@
         </div>
     </div>
 
+    <div id="toast-container"></div>
+
     <script>
         const token = "<%= token %>";
         const isCommander = <%- JSON.stringify(isCommander) %>;
@@ -196,6 +198,7 @@
         let activeFleetIndex = 0;
         let currentPage = 0;
         const FLEETS_PER_PAGE = 5; // 5 individual fleet tabs per page
+        let calculationTimeout;
 
         // --- Chart Instances ---
         let iskRateChartInstance;
@@ -250,7 +253,11 @@
 
 
         const elementsToWatch = [journalDataEl, pilotCountEl, manualDurationEl, maxGapEl];
-        elementsToWatch.forEach(el => el.addEventListener('input', calculateAndRender));
+        elementsToWatch.forEach(el => el.addEventListener('input', () => {
+             clearTimeout(calculationTimeout);
+             calculationTimeout = setTimeout(calculateAndRender, 300);
+        }));
+        
         copyButton.addEventListener('click', copyResults);
         if (submitLogBtn) {
             submitLogBtn.addEventListener('click', submitLog);
@@ -287,7 +294,6 @@
                 modalChartInstance = null;
             }
         }
-
 
         function copyResults() {
             const activeFleet = allFleetsData[activeFleetIndex];
@@ -344,36 +350,44 @@
             return { siteType: 'Unknown', pilotCount: 0 };
         }
 
-        function processFleet(fleet) {
+        function processFleet(payouts) {
+            if (payouts.length === 0) return null;
+
             const manualAltCount = parseInt(pilotCountEl.value, 10) || 0;
             const manualDuration = parseInt(manualDurationEl.value, 10) || 0;
 
             const groupedTicks = [];
-            if (fleet.length > 0) {
-                groupedTicks.push([fleet[0]]);
-                for (let i = 1; i < fleet.length; i++) {
-                    const currentPayout = fleet[i];
+            if (payouts.length > 0) {
+                groupedTicks.push([payouts[0]]);
+                for (let i = 1; i < payouts.length; i++) {
+                    const currentPayout = payouts[i];
                     const lastGroup = groupedTicks[groupedTicks.length - 1];
                     const lastPayoutInGroup = lastGroup[lastGroup.length - 1];
-                    if ((currentPayout.time - lastPayoutInGroup.time) <= 60000) { lastGroup.push(currentPayout); } 
-                    else { groupedTicks.push([currentPayout]); }
+                    if ((currentPayout.time - lastPayoutInGroup.time) <= 60000) {
+                        lastGroup.push(currentPayout);
+                    } else {
+                        groupedTicks.push([currentPayout]);
+                    }
                 }
             }
 
             if (groupedTicks.length < 2) return null;
 
-            const totalUserIncome = fleet.reduce((sum, p) => sum + p.amount, 0);
+            const totalUserIncome = payouts.reduce((sum, p) => sum + p.amount, 0);
             let totalFleetIncome = groupedTicks.reduce((sum, group) => sum + group[0].amount, 0);
 
             let avgUserAlts = 0;
-            if (manualAltCount > 0) { avgUserAlts = manualAltCount; } 
-            else {
+            if (manualAltCount > 0) {
+                avgUserAlts = manualAltCount;
+            } else {
                 const altCountsPerTick = groupedTicks.map(group => group.length);
-                if (altCountsPerTick.length > 0) { avgUserAlts = altCountsPerTick.reduce((sum, count) => sum + count, 0) / altCountsPerTick.length; }
+                if (altCountsPerTick.length > 0) {
+                    avgUserAlts = altCountsPerTick.reduce((sum, count) => sum + count, 0) / altCountsPerTick.length;
+                }
             }
             
             const incomeByCharacter = {};
-            fleet.forEach(payout => {
+            payouts.forEach(payout => {
                 const charName = payout.characterName || 'Unknown Character';
                 if (!incomeByCharacter[charName]) {
                     incomeByCharacter[charName] = 0;
@@ -398,7 +412,7 @@
 
             const siteTimesSorted = siteDataChronological.map(d => d.time).sort((a, b) => a - b);
             const avgSiteTimeMs = siteTimesSorted.length > 0 ? siteTimesSorted.reduce((a, b) => a + b, 0) / siteTimesSorted.length : 0;
-            const payoutAmounts = fleet.map(p => p.amount);
+            const payoutAmounts = payouts.map(p => p.amount);
             
             let totalIskRate = 0, perAltIskRate = 0;
             if (durationMinutes > 0) {
@@ -412,9 +426,10 @@
             }
 
             return {
+                payouts, // Include original payouts
                 metrics: {
                     totalUserIncome, totalFleetIncome, durationMinutes, avgUserAlts,
-                    sitesRun: groupedTicks.length, payoutCount: fleet.length,
+                    sitesRun: groupedTicks.length, payoutCount: payouts.length,
                     logStart: new Date(firstPayoutTime), maxPayout: Math.max(...payoutAmounts), minPayout: Math.min(...payoutAmounts),
                     bestTime: siteTimesSorted[0] || 0, secondBestTime: siteTimesSorted[1] || 0,
                     avgTime: avgSiteTimeMs, secondWorstTime: siteTimesSorted[siteTimesSorted.length - 2] || 0,
@@ -550,7 +565,7 @@
             // Add summary tab
             const summaryButton = document.createElement('button');
             summaryButton.classList.add('tab-link');
-            summaryButton.textContent = `All Fleets (${allFleetsData[0].metrics.sitesRun} sites)`;
+            summaryButton.textContent = `All Fleets (${allFleetsData.length -1})`;
             summaryButton.dataset.index = 0;
             summaryButton.onclick = () => displayFleetData(0);
             fleetTabsEl.appendChild(summaryButton);
@@ -564,8 +579,8 @@
                     <span id="page-indicator">Page ${currentPage + 1} of ${totalPages}</span>
                     <button id="next-page-btn" class="page-btn">Next &raquo;</button>
                 `;
-                document.getElementById('prev-page-btn').onclick = () => { if(currentPage > 0) { currentPage--; renderTabsAndPagination(); } };
-                document.getElementById('next-page-btn').onclick = () => { if(currentPage < totalPages - 1) { currentPage++; renderTabsAndPagination(); } };
+                document.getElementById('prev-page-btn').onclick = () => { if(currentPage > 0) { currentPage--; renderTabsAndPagination(); displayFleetData(0); } };
+                document.getElementById('next-page-btn').onclick = () => { if(currentPage < totalPages - 1) { currentPage++; renderTabsAndPagination(); displayFleetData(0); } };
                 document.getElementById('prev-page-btn').disabled = currentPage === 0;
                 document.getElementById('next-page-btn').disabled = currentPage >= totalPages - 1;
             } else {
@@ -608,6 +623,10 @@
             
             // Hide ISK Rate chart for summary, show for individual
             iskRateChartContainer.style.display = index === 0 ? 'none' : 'block';
+            if(submitLogBtn) {
+                 submitLogBtn.style.display = index === 0 ? 'block' : 'none';
+            }
+
 
             updatePerformanceMetrics(metrics);
             updateAnalysisMetrics(metrics);
@@ -783,13 +802,11 @@
         }
 
         function showToast(message, type = 'info') {
-            const existingToast = document.querySelector('.toast');
-            if(existingToast) existingToast.remove();
-
+            const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.textContent = message;
-            document.body.appendChild(toast);
+            container.appendChild(toast);
             
             // Trigger reflow to enable animation
             toast.offsetHeight;
@@ -803,9 +820,11 @@
         }
 
         async function submitLog() {
-            const activeFleet = allFleetsData[activeFleetIndex];
-            if (!activeFleet) {
-                showToast('No active fleet data to submit.', 'error');
+            // Submit all individual fleets, not the summary
+            const fleetsToSubmit = allFleetsData.slice(1);
+
+            if (!fleetsToSubmit || fleetsToSubmit.length === 0) {
+                showToast('No individual fleets detected to submit.', 'error');
                 return;
             }
             
@@ -815,11 +834,9 @@
             try {
                 const response = await fetch(`/isk/${token}/submit`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        fleetData: activeFleet,
+                        fleets: fleetsToSubmit,
                         commanderName: commanderName
                     }),
                 });
@@ -836,7 +853,7 @@
                 showToast(`Error: ${error.message}`, 'error');
             } finally {
                 submitLogBtn.disabled = false;
-                submitLogBtn.textContent = 'Submit Fleet Log';
+                submitLogBtn.textContent = 'Submit All Fleets';
             }
         }
 
@@ -846,5 +863,3 @@
     </script>
 </body>
 </html>
-
-

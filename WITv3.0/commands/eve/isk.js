@@ -92,7 +92,7 @@ async function handleStats(interaction) {
         interaction.client.activeIskTokens = new Map();
     }
 
-    const EXPIRATION_MINUTES = 15;
+    const EXPIRATION_MINUTES = 60;
     const expiryTimestamp = Date.now() + (EXPIRATION_MINUTES * 60 * 1000);
 
     interaction.client.activeIskTokens.set(token, {

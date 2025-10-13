@@ -3,21 +3,12 @@ const roleManager = require('@helpers/roleManager');
 const iskManager = require('@helpers/iskManager');
 const charManager = require('@helpers/characterManager');
 
-
-/**
- * Renders the ISK Tracker form page if the provided token is valid.
- * @param {import('discord.js').Client} client - The Discord client instance.
- */
-exports.showIskForm = (client) => async (req, res) => {
+const showIskForm = (client) => async (req, res) => {
     const { token } = req.params;
     const tokenData = client.activeIskTokens?.get(token);
 
-    // Validate the token
     if (!tokenData || Date.now() > tokenData.expires) {
-        if (tokenData) {
-            // Clean up expired token
-            client.activeIskTokens.delete(token);
-        }
+        if (tokenData) client.activeIskTokens.delete(token);
         return res.status(403).render('error', { title: 'Link Invalid', message: 'This ISK tracker link is invalid or has expired.' });
     }
 
@@ -26,7 +17,6 @@ exports.showIskForm = (client) => async (req, res) => {
         const charData = await charManager.getChars(tokenData.user.id);
         const commanderName = charData?.main?.character_name || tokenData.user.tag;
 
-        // Render the EJS view, passing necessary data
         res.render('iskForm', {
             token,
             user: tokenData.user,
@@ -39,37 +29,38 @@ exports.showIskForm = (client) => async (req, res) => {
     }
 };
 
-/**
- * Renders the ISK Statistics page if the token is valid.
- * @param {import('discord.js').Client} client - The Discord client instance.
- */
-exports.showIskStats = (client) => async (req, res) => {
+const showIskStats = (client) => async (req, res) => {
     const { token } = req.params;
     const tokenData = client.activeIskTokens?.get(token);
 
-    // Validate the token
     if (!tokenData || Date.now() > tokenData.expires) {
-        if (tokenData) {
-            client.activeIskTokens.delete(token);
-        }
+        if (tokenData) client.activeIskTokens.delete(token);
         return res.status(403).render('error', { title: 'Link Invalid', message: 'This ISK stats link is invalid or has expired.' });
     }
 
     try {
-        // Permission check
         if (!roleManager.hasPermission(tokenData.member, ['commander'])) {
             return res.status(403).render('error', { title: 'Permission Denied', message: 'You do not have permission to view this page.' });
         }
 
-        const statsResult = await iskManager.getStats();
+        const page = parseInt(req.query.page, 10) || 1;
 
-        if (!statsResult.success) {
-            return res.status(500).render('error', { title: 'Database Error', message: statsResult.message });
+        const [statsResult, fleetsResult] = await Promise.all([
+            iskManager.getStats(),
+            iskManager.getPaginatedFleets(page)
+        ]);
+
+        if (!statsResult.success || !fleetsResult.success) {
+            const message = statsResult.message || fleetsResult.message || 'Could not fetch all required data.';
+            return res.status(500).render('error', { title: 'Database Error', message });
         }
 
         res.render('iskStats', {
+            token,
+            currentUserId: tokenData.user.id,
+            isLeadership: roleManager.isLeadershipOrHigher(tokenData.member),
             stats: statsResult.data,
-            // Helper function to pass to the template for formatting numbers
+            fleetData: fleetsResult.data,
             formatIsk: (value) => {
                 if (value === null || value === undefined || isNaN(value)) return 'N/A';
                 const num = Number(value);
@@ -86,11 +77,7 @@ exports.showIskStats = (client) => async (req, res) => {
     }
 };
 
-/**
- * Handles the submission of an ISK log from commanders.
- * @param {import('discord.js').Client} client - The Discord client instance.
- */
-exports.handleLogSubmission = (client) => async (req, res) => {
+const handleLogSubmission = (client) => async (req, res) => {
     const { token } = req.params;
     const tokenData = client.activeIskTokens?.get(token);
 
@@ -103,61 +90,137 @@ exports.handleLogSubmission = (client) => async (req, res) => {
     }
 
     try {
-        const { fleetData, journalData, commanderName } = req.body;
-
-        // Defensive check: Ensure fleetData and metrics exist
-        if (!fleetData || !fleetData.metrics) {
-            logger.error('ISK log submission failed: fleetData or metrics object was missing from the request body.');
-            return res.status(400).json({ success: false, message: 'Invalid data submitted. The fleet metrics object is missing.' });
+        const { fleets, commanderName } = req.body;
+        if (!fleets || !Array.isArray(fleets)) {
+            return res.status(400).json({ success: false, message: 'Invalid data format: expected a "fleets" array.' });
         }
 
-        const { metrics } = fleetData;
-
-        // Helper to ensure values passed to the database are valid numbers or null
-        const sanitizeNumber = (value) => {
-            // Check for undefined, null
-            if (value === undefined || value === null) {
-                return null;
+        const results = [];
+        for (const fleet of fleets) {
+            if (!fleet || !fleet.metrics) {
+                logger.warn('Skipping invalid fleet object in submission.');
+                continue;
             }
-            const num = Number(value);
-            // Check for NaN, Infinity, -Infinity
-            if (isNaN(num) || !isFinite(num)) {
-                return null;
+
+            const { metrics } = fleet;
+            const sanitizeNumber = (value) => {
+                if (value === undefined || value === null) return null;
+                const num = Number(value);
+                return (isNaN(num) || !isFinite(num)) ? null : num;
+            };
+
+            const logData = {
+                discordId: tokenData.user.id,
+                commanderName: commanderName || 'Unknown Commander',
+                fleetTimestamp: new Date(metrics.logStart),
+                durationMinutes: Math.round(sanitizeNumber(metrics.durationMinutes) ?? 0),
+                totalIsk: sanitizeNumber(metrics.totalFleetIncome),
+                iskPerHour: sanitizeNumber(metrics.totalIskRate),
+                pilotCount: sanitizeNumber(metrics.avgUserAlts),
+                sitesRun: sanitizeNumber(metrics.sitesRun),
+                journalData: JSON.stringify(fleet.payouts) || null,
+            };
+
+            if (isNaN(logData.fleetTimestamp.getTime())) {
+                logger.error(`ISK log submission failed due to invalid logStart date: ${metrics.logStart}`);
+                results.push({ success: false, message: 'Invalid fleet start time provided for one or more fleets.' });
+                continue;
             }
-            return num;
-        };
 
-        const logData = {
-            discordId: tokenData.user.id,
-            commanderName: commanderName || 'Unknown Commander',
-            fleetTimestamp: new Date(metrics.logStart),
-            durationMinutes: Math.round(sanitizeNumber(metrics.durationMinutes) ?? 0),
-            totalIsk: sanitizeNumber(metrics.totalFleetIncome),
-            iskPerHour: sanitizeNumber(metrics.totalIskRate),
-            pilotCount: sanitizeNumber(metrics.avgUserAlts),
-            sitesRun: sanitizeNumber(metrics.sitesRun),
-            journalData: journalData || null, // Ensure journalData is null if missing, not undefined
-        };
-
-        // Final validation before sending to DB manager
-        if (isNaN(logData.fleetTimestamp.getTime())) {
-            logger.error(`ISK log submission failed due to invalid logStart date: ${metrics.logStart}`);
-            return res.status(400).json({ success: false, message: 'Invalid fleet start time provided.' });
+            const result = await iskManager.addLog(logData);
+            results.push(result);
         }
 
+        const successfulSubmissions = results.filter(r => r.success).length;
+        const failedSubmissions = results.length - successfulSubmissions;
 
-        const result = await iskManager.addLog(logData);
+        res.json({
+            success: failedSubmissions === 0,
+            message: `Submission complete. ${successfulSubmissions} fleets logged. ${failedSubmissions} duplicates skipped.`
+        });
 
-        if (result.success) {
-            res.json({ success: true, message: 'Fleet log successfully submitted!' });
-        } else {
-            // The manager already logged the specific DB error, so just send a generic message
-            res.status(500).json({ success: false, message: result.message });
-        }
     } catch (error) {
-        // This will catch errors from destructuring (e.g., if req.body.fleetData is undefined)
         logger.error('Error processing ISK log submission:', error);
         res.status(500).json({ success: false, message: 'An internal server error occurred.' });
     }
+};
+
+const handleLogDeletion = (client) => async (req, res) => {
+    const { token } = req.params;
+    const tokenData = client.activeIskTokens?.get(token);
+
+    if (!tokenData || Date.now() > tokenData.expires) {
+        return res.status(403).json({ success: false, message: 'Session expired. Please generate a new link.' });
+    }
+
+    try {
+        const logId = parseInt(req.body.logId, 10);
+
+        if (isNaN(logId)) {
+            return res.status(400).json({ success: false, message: 'Invalid Log ID provided.' });
+        }
+
+        const result = await iskManager.deleteLog(logId, tokenData.member);
+
+        let statusCode = 200;
+        if (!result.success) {
+            if (result.message.includes('permission')) {
+                statusCode = 403; // Forbidden
+            } else if (result.message.includes('not found')) {
+                statusCode = 404; // Not Found
+            } else {
+                statusCode = 500; // Internal Server Error
+            }
+        }
+        res.status(statusCode).json(result);
+
+    } catch (error) {
+        logger.error('Error processing ISK log deletion:', error);
+        res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+    }
+};
+
+const getFleetLogsPage = (client) => async (req, res) => {
+    const { token } = req.params;
+    const tokenData = client.activeIskTokens?.get(token);
+
+    if (!tokenData || Date.now() > tokenData.expires) {
+        return res.status(403).json({ success: false, message: 'Session expired.' });
+    }
+
+    try {
+        const page = parseInt(req.query.page, 10) || 1;
+        const result = await iskManager.getPaginatedFleets(page);
+        res.json(result);
+    } catch (error) {
+        logger.error('Error fetching paginated fleet data:', error);
+        res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+    }
+};
+
+const getFullStats = (client) => async (req, res) => {
+    const { token } = req.params;
+    const tokenData = client.activeIskTokens?.get(token);
+
+    if (!tokenData || Date.now() > tokenData.expires) {
+        return res.status(403).json({ success: false, message: 'Session expired.' });
+    }
+    try {
+        const statsResult = await iskManager.getStats();
+        res.json(statsResult);
+    } catch (error) {
+        logger.error('Error fetching full stats data:', error);
+        res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+    }
+};
+
+
+module.exports = {
+    showIskForm,
+    showIskStats,
+    handleLogSubmission,
+    handleLogDeletion,
+    getFleetLogsPage,
+    getFullStats,
 };
 
