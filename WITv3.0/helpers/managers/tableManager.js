@@ -11,6 +11,7 @@ const editableTables = [
     'google_sheets',
     'incursion_state',
     'incursion_systems',
+    'isk_logs',
     'quizzes', // Added for quiz management
     'quiz_questions', // Added for quiz management
     'quiz_answers', // Added for quiz management
@@ -32,6 +33,7 @@ const tableKeyMap = {
     google_sheets: 'alias',
     incursion_state: 'id',
     incursion_systems: 'Constellation_id',
+    isk_logs: 'log_id',
     quizzes: 'quiz_id', // Added key for new table
     quiz_questions: 'question_id', // Added key for new table
     quiz_answers: 'answer_id', // Added key for new table

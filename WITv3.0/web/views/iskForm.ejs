@@ -60,6 +60,13 @@
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { position: relative; width: 90%; height: 90%; max-width: 1400px; padding: 2rem; background-color: #1e293b; border-radius: 0.5rem; }
         .modal-overlay.visible { display: flex; }
+
+        /* Toast Styles */
+        .toast { position: fixed; top: 1.5rem; right: 1.5rem; padding: 1rem 1.5rem; border-radius: 0.5rem; z-index: 1001; opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background-color: #4ade80; color: black; }
+        .toast.error { background-color: #f87171; color: white; }
+        .toast.info { background-color: #38bdf8; color: white; }
     </style>
 </head>
 <body>
@@ -136,6 +143,13 @@
                     <div class="result-item"><span class="result-item-label">Unknown Sites</span><span class="result-item-value" id="unknown-sites">0</span></div>
                 </div>
 
+                 <% if (isCommander) { %>
+                    <div class="form-group full-width" style="margin-top: 2rem; text-align: center;">
+                        <button id="submit-log-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white;">Submit Fleet Log</button>
+                        <small>As a commander, you can submit this fleet's data for long-term statistical tracking.</small>
+                    </div>
+                <% } %>
+
                 <div class="chart-container">
                      <div id="iskRateChartContainer" class="chart-panel">
                         <canvas id="iskRateChart"></canvas>
@@ -166,6 +180,10 @@
     </div>
 
     <script>
+        const token = "<%= token %>";
+        const isCommander = <%- JSON.stringify(isCommander) %>;
+        const commanderName = <%- JSON.stringify(commanderName) %>;
+
         const PAYOUT_DATA = {
             "Vanguard": { "H": { 10: 10395000, 11: 9615375, 12: 8713775, 13: 7900200 }, "LN": { 15: 15000000, 16: 13875000, 17: 12674000 } },
             "Assault": { "H": { 20: 18200000, 21: 16835000, 22: 15379000 }, "LN": { 30: 26000000 } },
@@ -177,7 +195,7 @@
         let allFleetsData = [];
         let activeFleetIndex = 0;
         let currentPage = 0;
-        const FLEETS_PER_PAGE = 7; // 7 individual + 1 summary tab
+        const FLEETS_PER_PAGE = 5; // 5 individual fleet tabs per page
 
         // --- Chart Instances ---
         let iskRateChartInstance;
@@ -195,6 +213,7 @@
         const fleetTabsEl = document.getElementById('fleet-tabs');
         const fleetPaginationEl = document.getElementById('fleet-pagination');
         const chartModalEl = document.getElementById('chart-modal');
+        const submitLogBtn = document.getElementById('submit-log-btn');
         
         // --- Result Elements ---
         const pilotCountDetectedEl = document.getElementById('pilot-count-detected');
@@ -233,6 +252,9 @@
         const elementsToWatch = [journalDataEl, pilotCountEl, manualDurationEl, maxGapEl];
         elementsToWatch.forEach(el => el.addEventListener('input', calculateAndRender));
         copyButton.addEventListener('click', copyResults);
+        if (submitLogBtn) {
+            submitLogBtn.addEventListener('click', submitLog);
+        }
 
         // --- Modal Logic ---
         document.getElementById('iskRateChart').onclick = () => openModal(iskRateChartInstance);
@@ -536,9 +558,7 @@
             const individualFleets = allFleetsData.slice(1);
             const totalPages = Math.ceil(individualFleets.length / FLEETS_PER_PAGE);
             
-            if(totalPages <= 1 && individualFleets.length <= FLEETS_PER_PAGE) {
-                fleetPaginationEl.innerHTML = '';
-            } else {
+            if(totalPages > 1) {
                 fleetPaginationEl.innerHTML = `
                     <button id="prev-page-btn" class="page-btn">&laquo; Prev</button>
                     <span id="page-indicator">Page ${currentPage + 1} of ${totalPages}</span>
@@ -548,6 +568,8 @@
                 document.getElementById('next-page-btn').onclick = () => { if(currentPage < totalPages - 1) { currentPage++; renderTabsAndPagination(); } };
                 document.getElementById('prev-page-btn').disabled = currentPage === 0;
                 document.getElementById('next-page-btn').disabled = currentPage >= totalPages - 1;
+            } else {
+                 fleetPaginationEl.innerHTML = '';
             }
 
             const startIndex = currentPage * FLEETS_PER_PAGE;
@@ -760,9 +782,69 @@
             pilotCountDetectedEl.textContent = '';
         }
 
+        function showToast(message, type = 'info') {
+            const existingToast = document.querySelector('.toast');
+            if(existingToast) existingToast.remove();
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            // Trigger reflow to enable animation
+            toast.offsetHeight;
+            
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        async function submitLog() {
+            const activeFleet = allFleetsData[activeFleetIndex];
+            if (!activeFleet) {
+                showToast('No active fleet data to submit.', 'error');
+                return;
+            }
+            
+            submitLogBtn.disabled = true;
+            submitLogBtn.textContent = 'Submitting...';
+
+            try {
+                const response = await fetch(`/isk/${token}/submit`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fleetData: activeFleet,
+                        commanderName: commanderName
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    showToast(result.message, 'success');
+                } else {
+                    throw new Error(result.message || 'Submission failed.');
+                }
+
+            } catch (error) {
+                showToast(`Error: ${error.message}`, 'error');
+            } finally {
+                submitLogBtn.disabled = false;
+                submitLogBtn.textContent = 'Submit Fleet Log';
+            }
+        }
+
+
         // Initial call to set the page state correctly
         resetAndHideResults();
     </script>
 </body>
 </html>
+
 
