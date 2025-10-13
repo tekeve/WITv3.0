@@ -141,7 +141,8 @@ async function promoteToTfc(discordId, pilotName) {
         await connection.beginTransaction();
 
         // Check if pilot is already in the commander_training table
-        const [existingPilot] = await connection.query('SELECT pilot_id, status FROM commander_training WHERE discord_id = ?', [discordId]);
+        const [existingPilotRows] = await connection.query('SELECT pilot_id, status FROM commander_training WHERE discord_id = ?', [discordId]);
+        const existingPilot = existingPilotRows[0]; // This will be the pilot object or undefined
 
         let pilotId;
 
@@ -156,16 +157,20 @@ async function promoteToTfc(discordId, pilotName) {
             await connection.query("UPDATE commander_training SET status = 'training_fc', last_active = NOW() WHERE pilot_id = ?", [pilotId]);
         } else {
             // Pilot is not in the training program, so add them
-            await connection.query(
+            const [insertResult] = await connection.query(
                 'INSERT INTO commander_training (pilot_name, discord_id, start_date, last_active, status) VALUES (?, ?, NOW(), NOW(), ?)',
                 [pilotName, discordId, 'training_fc']
             );
-            // Instead of relying on insertId, fetch the ID we just created to be safe.
-            const [newPilot] = await connection.query('SELECT pilot_id FROM commander_training WHERE discord_id = ?', [discordId]);
-            if (!newPilot) {
-                throw new Error('Failed to retrieve pilot_id after insertion.');
+            pilotId = insertResult.insertId;
+
+            if (!pilotId) {
+                // Fallback just in case insertId isn't returned, though it should be.
+                const [newPilotRows] = await connection.query('SELECT pilot_id FROM commander_training WHERE discord_id = ?', [discordId]);
+                if (!newPilotRows[0]) {
+                    throw new Error('Failed to retrieve pilot_id after insertion.');
+                }
+                pilotId = newPilotRows[0].pilot_id;
             }
-            pilotId = newPilot.pilot_id;
         }
 
         // Ensure a corresponding entry exists in the tfc tracker
@@ -472,5 +477,6 @@ module.exports = {
     searchEligibleTfcCandidates,
     removePilotFromTraining
 };
+
 
 
