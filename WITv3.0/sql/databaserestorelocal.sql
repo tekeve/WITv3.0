@@ -90,14 +90,7 @@ CREATE TABLE IF NOT EXISTS `commander_training` (
   UNIQUE KEY `discord_id` (`discord_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.commander_training: ~6 rows (approximately)
-REPLACE INTO `commander_training` (`pilot_id`, `pilot_name`, `discord_id`, `status`, `start_date`, `last_active`, `resident_orientation_by`, `quiz_scouting`, `quiz_fitting`, `quiz_fleet_roles`, `quiz_site_mechanics`, `signoff_scouting`, `signoff_trusted_logi`, `signoff_bastion`, `signoff_new_pilot_orientation`, `exam_multiple_choice`, `exam_ct`, `comments`) VALUES
-	(36, 'Bella Cadelanne', '368778318415265792', 'training_fc', '2025-10-11 09:31:45', '2025-10-11 09:32:04', NULL, 0, 0, 0, 0, NULL, 0, 0, NULL, 0, 0, NULL),
-	(37, 'Ezabella', '107396590653698048', 'training_fc', '2025-10-11 09:31:48', '2025-10-11 12:26:13', NULL, 0, 0, 0, 0, '[{"discordId":"107396590653698048","commander":"Ezabella","comment":"scouting comment","date":"2025-10-10T23:33:29.795Z"}]', 1, 0, '[{"discordId":"107396590653698048","commander":"Ezabella","comment":"","date":"2025-10-11T00:48:40.118Z"}]', 0, 0, '[{"discordId":"107396080869593088","commander":"Personal Cyno","comment":"comment","date":"2025-10-10T23:32:23.417Z"},{"discordId":"107396590653698048","commander":"Ezabella","comment":"general comment","date":"2025-10-10T23:53:33.047Z"}]'),
-	(39, 'Personal Cyno', '107396080869593088', 'resident', '2025-10-11 09:31:52', '2025-10-11 10:59:37', NULL, 0, 0, 0, 0, NULL, 0, 0, NULL, 0, 0, NULL),
-	(40, 'Skeltek', '266657286355681280', 'resident', '2025-10-11 09:31:53', '2025-10-11 10:52:12', NULL, 0, 0, 0, 0, NULL, 0, 0, NULL, 0, 0, NULL),
-	(41, 'Tee Gun', '524711946268835840', 'resident', '2025-10-11 09:31:55', '2025-10-11 09:31:55', NULL, 0, 0, 0, 0, NULL, 0, 0, NULL, 0, 0, NULL),
-	(42, 'Emerald Volpe', '473893999376334848', 'training_fc', '2025-10-11 12:26:23', '2025-10-11 12:26:26', NULL, 0, 0, 0, 0, NULL, 1, 0, NULL, 0, 0, NULL);
+-- Dumping data for table wit-db.commander_training: ~0 rows (approximately)
 
 -- Dumping structure for table wit-db.config
 CREATE TABLE IF NOT EXISTS `config` (
@@ -122,7 +115,7 @@ REPLACE INTO `config` (`key_name`, `value`) VALUES
 	('githubChannelId', '["1418129590143942718"]'),
 	('githubRepoUrl', '["https://github.com/tekeve/WITv3.0"]'),
 	('incursionChannelId', '["1364223029814759444"]'),
-	('lastCommitSha', '{"master":"c2dfe5b24f0a8599268270ea21cf8382379e25ec","v1.1":"f95cabbe7a122e9cafa7d6263a6334ac0217dc72","v1.2":"96c38cf1b1e89c0121c96b520222cc7b1a7fed8f","v1.3":"d0d2f2c42b057adcc1985b2cd98a7e17e1dfd3c3"}'),
+	('lastCommitSha', '{"master":"77dace39f8c9fb264987073ed0d0ce38ab46bc6b","v1.1":"f95cabbe7a122e9cafa7d6263a6334ac0217dc72","v1.2":"96c38cf1b1e89c0121c96b520222cc7b1a7fed8f","v1.3":"fba196d9914c2c52a706ee467354d2f035ce8fdb"}'),
 	('leadershipRoles', '["1412546107975929917"]'),
 	('lineCommanderRoles', '["1412545877163118704"]'),
 	('logiSignoffChannelId', '["1420720850654597331"]'),
@@ -155,11 +148,12 @@ CREATE TABLE IF NOT EXISTS `google_sheets` (
   `alias` varchar(50) NOT NULL,
   `sheet_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.google_sheets: ~0 rows (approximately)
+-- Dumping data for table wit-db.google_sheets: ~2 rows (approximately)
 REPLACE INTO `google_sheets` (`id`, `alias`, `sheet_id`) VALUES
-	(1, 'anonfeedback', '1Pe_6hyoXVbrFwC0zAohzrF8Y2aubJRC97faqoZMHDbE');
+	(1, 'anonfeedback', '1Pe_6hyoXVbrFwC0zAohzrF8Y2aubJRC97faqoZMHDbE'),
+	(2, 'CommandCoreList', '1i_PkAuBCxTuySKNyA8GchqGajVYboPikoh0-HU3o0WE');
 
 -- Dumping structure for table wit-db.incursion_state
 CREATE TABLE IF NOT EXISTS `incursion_state` (
@@ -178,7 +172,7 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
 
 -- Dumping data for table wit-db.incursion_state: ~1 rows (approximately)
 REPLACE INTO `incursion_state` (`id`, `lastIncursionState`, `incursionMessageId`, `lastHqSystemId`, `spawnTimestamp`, `mobilizingTimestamp`, `withdrawingTimestamp`, `endedTimestamp`, `lastIncursionStats`, `route_data`) VALUES
-	(1, '20000434-established-1', '1425483749734486076', 30003434, 1759932207, NULL, NULL, NULL, NULL, '{"tradeHubRoutes":"**Jita**:\\n[35j (safest)](https://eve-gatecheck.space/eve/#Jita:Odin:secure) / [19j (shortest)](https://eve-gatecheck.space/eve/#Jita:Odin:shortest)\\n**Amarr**:\\n[10j (safest)](https://eve-gatecheck.space/eve/#Amarr:Odin:secure) / [8j (shortest)](https://eve-gatecheck.space/eve/#Amarr:Odin:shortest)\\n**Dodixie**:\\n[24j (safest)](https://eve-gatecheck.space/eve/#Dodixie:Odin:secure) / [10j (shortest)](https://eve-gatecheck.space/eve/#Dodixie:Odin:shortest)\\n**Rens**:\\n[10j (safest)](https://eve-gatecheck.space/eve/#Rens:Odin:secure) / [7j (shortest)](https://eve-gatecheck.space/eve/#Rens:Odin:shortest)\\n**Hek**:\\n[16j (safest)](https://eve-gatecheck.space/eve/#Hek:Odin:secure) / [11j (shortest)](https://eve-gatecheck.space/eve/#Hek:Odin:shortest)","lastHqRoute":"**Ansher**: [19j (safest)](https://eve-gatecheck.space/eve/#Ansher:Odin:secure) / [15j (shortest)](https://eve-gatecheck.space/eve/#Ansher:Odin:shortest)"}');
+	(1, '20000434-mobilizing-1', '1426460995332870155', 30003434, 1759932207, 1760165201, NULL, NULL, NULL, '{"tradeHubRoutes":"**Jita**:\\n[35j (safest)](https://eve-gatecheck.space/eve/#Jita:Odin:secure) / [19j (shortest)](https://eve-gatecheck.space/eve/#Jita:Odin:shortest)\\n**Amarr**:\\n[10j (safest)](https://eve-gatecheck.space/eve/#Amarr:Odin:secure) / [8j (shortest)](https://eve-gatecheck.space/eve/#Amarr:Odin:shortest)\\n**Dodixie**:\\n[24j (safest)](https://eve-gatecheck.space/eve/#Dodixie:Odin:secure) / [10j (shortest)](https://eve-gatecheck.space/eve/#Dodixie:Odin:shortest)\\n**Rens**:\\n[10j (safest)](https://eve-gatecheck.space/eve/#Rens:Odin:secure) / [7j (shortest)](https://eve-gatecheck.space/eve/#Rens:Odin:shortest)\\n**Hek**:\\n[16j (safest)](https://eve-gatecheck.space/eve/#Hek:Odin:secure) / [11j (shortest)](https://eve-gatecheck.space/eve/#Hek:Odin:shortest)","lastHqRoute":"**Ansher**: [19j (safest)](https://eve-gatecheck.space/eve/#Ansher:Odin:secure) / [15j (shortest)](https://eve-gatecheck.space/eve/#Ansher:Odin:shortest)"}');
 
 -- Dumping structure for table wit-db.incursion_systems
 CREATE TABLE IF NOT EXISTS `incursion_systems` (
@@ -304,6 +298,24 @@ REPLACE INTO `incursion_systems` (`Constellation_id`, `Constellation`, `vanguard
 	(20000779, 'Ancbeu', 'Annelle, Claulenne, Masalle', 'Sortet', 'Scolluzer (0.8)', 'Scolluzer VI - DED Logistic Support', '30005322', 'NOTISLAND', '500004', 'Verge Vendor', 10000068),
 	(20000784, 'Aokinen', 'Onnamon,Tsuruma, Uuhulanen', 'Astoh, Rohamaa, Samanuhi', 'Uchomida (0.5)', 'Samanuni VI - Caldari Navy Anchorage', '30045322', 'NOTISLAND', '500001', 'Black Rise', 10000069);
 
+-- Dumping structure for table wit-db.isk_logs
+CREATE TABLE IF NOT EXISTS `isk_logs` (
+  `log_id` int(11) NOT NULL AUTO_INCREMENT,
+  `discord_id` varchar(50) NOT NULL,
+  `commander_name` varchar(255) NOT NULL,
+  `fleet_timestamp` datetime NOT NULL,
+  `duration_minutes` int(11) NOT NULL,
+  `total_isk` bigint(20) NOT NULL,
+  `isk_per_hour` bigint(20) NOT NULL,
+  `pilot_count` decimal(5,2) NOT NULL,
+  `sites_run` int(11) NOT NULL,
+  `journal_data` text DEFAULT NULL,
+  PRIMARY KEY (`log_id`),
+  KEY `discord_id_idx` (`discord_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=129 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- Dumping data for table wit-db.isk_logs: ~0 rows (approximately)
+
 -- Dumping structure for table wit-db.logi_signoffs
 CREATE TABLE IF NOT EXISTS `logi_signoffs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -370,7 +382,7 @@ CREATE TABLE IF NOT EXISTS `quizzes` (
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.quizzes: ~4 rows (approximately)
+-- Dumping data for table wit-db.quizzes: ~5 rows (approximately)
 REPLACE INTO `quizzes` (`quiz_id`, `name`, `pass_mark_percentage`, `category`) VALUES
 	(1, 'Scouting Quiz', 90, 'resident'),
 	(2, 'Fitting Quiz', 90, 'resident'),
@@ -390,7 +402,7 @@ CREATE TABLE IF NOT EXISTS `quiz_answers` (
   CONSTRAINT `fk_quiz_answers_question` FOREIGN KEY (`question_id`) REFERENCES `quiz_questions` (`question_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=147 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.quiz_answers: ~111 rows (approximately)
+-- Dumping data for table wit-db.quiz_answers: ~113 rows (approximately)
 REPLACE INTO `quiz_answers` (`answer_id`, `question_id`, `answer_text`, `is_correct`, `order_index`) VALUES
 	(34, 9, '7 minutes, 10 seconds', 0, 0),
 	(35, 9, '7 minutes, 15 seconds', 1, 1),
@@ -520,22 +532,7 @@ CREATE TABLE IF NOT EXISTS `quiz_attempts` (
   CONSTRAINT `fk_quiz_attempts_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.quiz_attempts: ~12 rows (approximately)
-REPLACE INTO `quiz_attempts` (`attempt_id`, `discord_id`, `quiz_id`, `score`, `passed`, `timestamp`) VALUES
-	(6, '107396590653698048', 1, 100, 1, '2025-10-07 20:13:07'),
-	(7, '107396590653698048', 1, 100, 1, '2025-10-07 20:14:44'),
-	(8, '107396590653698048', 1, 100, 1, '2025-10-07 21:53:39'),
-	(9, '107396590653698048', 1, 100, 1, '2025-10-08 03:19:16'),
-	(10, '107396590653698048', 1, 100, 1, '2025-10-08 03:20:51'),
-	(11, '107396590653698048', 1, 100, 1, '2025-10-08 03:44:03'),
-	(12, '107396590653698048', 1, 100, 1, '2025-10-08 04:03:01'),
-	(13, '107396590653698048', 1, 100, 1, '2025-10-08 04:04:25'),
-	(14, '107396590653698048', 1, 100, 1, '2025-10-08 04:06:03'),
-	(15, '107396590653698048', 3, 100, 1, '2025-10-08 09:31:23'),
-	(16, '107396590653698048', 4, 100, 1, '2025-10-08 10:14:50'),
-	(17, '107396590653698048', 4, 100, 1, '2025-10-10 21:28:36'),
-	(18, '107396590653698048', 3, 100, 1, '2025-10-10 21:35:58'),
-	(19, '107396080869593088', 4, 100, 1, '2025-10-11 00:59:37');
+-- Dumping data for table wit-db.quiz_attempts: ~0 rows (approximately)
 
 -- Dumping structure for table wit-db.quiz_completions
 CREATE TABLE IF NOT EXISTS `quiz_completions` (
@@ -549,9 +546,7 @@ CREATE TABLE IF NOT EXISTS `quiz_completions` (
   CONSTRAINT `fk_completion_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.quiz_completions: ~1 rows (approximately)
-REPLACE INTO `quiz_completions` (`completion_id`, `discord_id`, `quiz_id`, `completed_at`) VALUES
-	(5, '107396080869593088', 4, '2025-10-11 00:59:37');
+-- Dumping data for table wit-db.quiz_completions: ~0 rows (approximately)
 
 -- Dumping structure for table wit-db.quiz_questions
 CREATE TABLE IF NOT EXISTS `quiz_questions` (
@@ -565,7 +560,7 @@ CREATE TABLE IF NOT EXISTS `quiz_questions` (
   CONSTRAINT `fk_quiz_questions_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.quiz_questions: ~28 rows (approximately)
+-- Dumping data for table wit-db.quiz_questions: ~29 rows (approximately)
 REPLACE INTO `quiz_questions` (`question_id`, `quiz_id`, `question_text`, `question_type`, `order_index`) VALUES
 	(9, 1, 'How long does it take for a new site to spawn after completing a site?', 'single', 0),
 	(10, 1, 'What is the best way to scout?', 'single', 1),
@@ -784,11 +779,7 @@ CREATE TABLE IF NOT EXISTS `training_fc_tracker` (
   CONSTRAINT `fk_tfc_pilot` FOREIGN KEY (`pilot_id`) REFERENCES `commander_training` (`pilot_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
--- Dumping data for table wit-db.training_fc_tracker: ~1 rows (approximately)
-REPLACE INTO `training_fc_tracker` (`pilot_id`, `t1_tagging`, `t1_voicing`, `t1_waitlist`, `t2_situational_awareness`, `t2_evacuations`, `practice_fleet_speed`, `practice_system_awareness`, `competency_final`, `last_reported_active`, `comments`, `special_notes`) VALUES
-	(36, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-	(37, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-	(42, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+-- Dumping data for table wit-db.training_fc_tracker: ~0 rows (approximately)
 
 -- Dumping structure for table wit-db.trusted_pilots
 CREATE TABLE IF NOT EXISTS `trusted_pilots` (
@@ -842,7 +833,7 @@ REPLACE INTO `users` (`character_id`, `discord_id`, `character_name`, `roles`, `
 	(93220962, '368778318415265792', 'Bella Cadelanne', '["410301376162299906","1055468376866168853","1412545597021622383","1412545877163118704","1412546080448712826","366076789438808064"]', NULL, NULL, NULL, 1, 0),
 	(95000233, '107396590653698048', 'Mirror Saisima', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwuc2VuZF9tYWlsLnYxIiwiZXNpLW1haWwucmVhZF9tYWlsLnYxIiwiZXNpLXNlYXJjaC5zZWFyY2hfc3RydWN0dXJlcy52MSJdLCJqdGkiOiIxZDZjNTY4My1jNThhLTRlZjMtOGY1OS03NmU2YzViNTdkYjQiLCJraWQiOiJKV1QtU2lnbmF0dXJlLUtleSIsInN1YiI6IkNIQVJBQ1RFUjpFVkU6OTUwMDAyMzMiLCJhenAiOiI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsInRlbmFudCI6InRyYW5xdWlsaXR5IiwidGllciI6ImxpdmUiLCJyZWdpb24iOiJ3b3JsZCIsImF1ZCI6WyI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsIkVWRSBPbmxpbmUiXSwibmFtZSI6Ik1pcnJvciBTYWlzaW1hIiwib3duZXIiOiJMTUJWbmNBTWhJNWxpcnRVN0J2cWdPRzR5MUk9IiwiZXhwIjoxNzU5NDk2OTc5LCJpYXQiOjE3NTk0OTU3NzksImlzcyI6Imh0dHBzOi8vbG9naW4uZXZlb25saW5lLmNvbSJ9.fSP_2fI_QP-frawhgaEgXyCyBwTw0Dl1zsP8lM_xXnwKFzHjsaEtjampsf0gUqI3Xp6uoAiQUyQTiKeFrLlhovnBj8JeXKS1TTYBd-_p5KrmtvmAQjnyn0HlSQ_6gTSPI_8TuDfKWy66liEGqW3v0y_cXkESk6-4D24Qi3X7pAVtDUKNP1i0x-bX3y97MIkHCdmCQ-szIfPZXq9m8_CwfLO7WZSVQHpa5_Y5NKzk4dk1guNoXac7vPwZFUT9Kw9CfpHHOpETKm36haLUV8uSB3mJRwJW6_vVYt6xK-szaknfyN_OlAZ1ZPpY1AHvKMhQBfsWsLrklFuJrLHTjv6WEQ', 'zCny+8LAtUC+WhN3tRtRZA==', 1759496978606, 0, 1),
 	(95000238, '107396590653698048', 'Mirror Erata', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 0, 0),
-	(96408902, '107396080869593088', 'Personal Cyno', '["1055468376866168853","1412545597021622383","1412545820015857724","1412545877163118704","1412545912462512168","366076789438808064"]', NULL, NULL, NULL, 1, 0),
+	(96408902, '107396080869593088', 'Personal Cyno', '["1055468376866168853","366076789438808064"]', NULL, NULL, NULL, 1, 0),
 	(96566328, '107396590653698048', 'Ezabella', '["410301376162299906","1109274919134572624","1109275396727373876","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 1, 0),
 	(97173610, '266657286355681280', 'Kitsune Miyamoto', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', NULL, NULL, NULL, 0, 0),
 	(163565361, '266657286355681280', 'Skeltek', '["1055468376866168853","1412545597021622383","1412545877163118704","1412546107975929917","366076789438808064"]', 'eyJhbGciOiJSUzI1NiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5IiwidHlwIjoiSldUIn0.eyJzY3AiOlsiZXNpLW1haWwuc2VuZF9tYWlsLnYxIiwiZXNpLW1haWwucmVhZF9tYWlsLnYxIl0sImp0aSI6IjM1ODY3NmQyLWQ4NzEtNDdiOS1iYjUzLWRiZWNiZDYzNGNhNiIsImtpZCI6IkpXVC1TaWduYXR1cmUtS2V5Iiwic3ViIjoiQ0hBUkFDVEVSOkVWRToxNjM1NjUzNjEiLCJhenAiOiI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsInRlbmFudCI6InRyYW5xdWlsaXR5IiwidGllciI6ImxpdmUiLCJyZWdpb24iOiJ3b3JsZCIsImF1ZCI6WyI4ZDUxZTZkYzA5NGU0OTFmOTNlOGNkZDIxMjc0NGE4NSIsIkVWRSBPbmxpbmUiXSwibmFtZSI6IlNrZWx0ZWsiLCJvd25lciI6IlNPN3F3dHpGOUY0eFE5c29kTEk1dVFjd0E3ST0iLCJleHAiOjE3NTgxNzA2ODEsImlhdCI6MTc1ODE2OTQ4MSwiaXNzIjoiaHR0cHM6Ly9sb2dpbi5ldmVvbmxpbmUuY29tIn0.W3DUD8CLjPaQNVXH-k1ddQ7lLRTjMVNWBX0Gtc33yGGUjKjkcjo5J203rzWhpXZsx49ySNoWI4NCL4ddeSmSrx2Bv-35uCpDhBSq65Z76O5YUrBGewDbM9Oxe3AXcPPNrN7sKxdvt7mu7eFyIgERwSF-RI4wRbeRKqxSIUmK3e93RwplPXiRl3dQf3xw2T3-MBb0j1byDXc07O6Y2Vppjh1ALVfIf10DJcjmg9NQrjoCAfaEGP77ABVbXK6IVR_NwFG0XDg-PQniQFszVu1pcA8cLsQpp4gVpQWg0e-X52PrWWnBKWsjS1l89raTJ10ZkHlZWIyZ_cDrThGukNYGWg', '4sVwNTj7ykOtLjBvPcTTtg==', 1758170679890, 1, 1),
