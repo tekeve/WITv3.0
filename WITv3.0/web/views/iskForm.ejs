@@ -110,10 +110,10 @@
                             Copy
                         </button>
                      </div>
-                     <div class="result-item"><span class="result-item-label" id="pilot-speed-label">ISK/Hour (per Alt)</span><span class="result-item-value" id="pilot-speed">0 ISK/hr</span></div>
-                     <div class="result-item"><span class="result-item-label" id="fleet-speed-label">ISK/Hour (Total)</span><span class="result-item-value" id="fleet-speed">0 ISK/hr</span></div>
-                     <div class="result-item"><span class="result-item-label">Total Income</span><span class="result-item-value" id="total-income">0 ISK</span></div>
+                     <div class="result-item"><span class="result-item-label" id="pilot-speed-label">ISK/Hour (Fleet Speed)</span><span class="result-item-value" id="pilot-speed">0 ISK/hr</span></div>
+                     <div class="result-item"><span class="result-item-label" id="fleet-speed-label">ISK/Hour (Box Speed)</span><span class="result-item-value" id="fleet-speed">0 ISK/hr</span></div>
                      <div class="result-item"><span class="result-item-label">Fleet Income</span><span class="result-item-value" id="fleet-income">0 ISK</span></div>
+                     <div class="result-item"><span class="result-item-label">Box Income</span><span class="result-item-value" id="total-income">0 ISK</span></div>                     
                      <div class="result-item"><span class="result-item-label">Total Time</span><span class="result-item-value" id="total-time">0h 0m</span></div>
                      <div class="result-item"><span class="result-item-label">Best Site Time</span><span class="result-item-value" id="best-site-time">0m 0s</span></div>
                      <div class="result-item"><span class="result-item-label">Average Site Time</span><span class="result-item-value" id="avg-site-time">0m 0s</span></div>
@@ -143,8 +143,8 @@
                 </div>
 
                  <% if (isCommander) { %>
-                    <div class="form-group full-width" style="margin-top: 2rem; text-align: center;">
-                        <button id="submit-log-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white;">Submit All Fleets</button>
+                    <div class="form-group full-width" style="text-align: center; margin: 0 auto;">
+                        <button id="submit-log-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white; margin: 0 auto;">Submit Fleets</button>
                         <small>As a commander, you can submit all detected fleets for long-term statistical tracking.</small>
                     </div>
                 <% } %>
