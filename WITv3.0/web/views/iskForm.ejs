@@ -34,14 +34,16 @@
         @media (min-width: 1024px) { .results-grid { grid-template-columns: repeat(3, 1fr); } }
         .results-panel { background-color: #1e293b; border-radius: 0.5rem; padding: 1.5rem; border: 1px solid #475569;}
         .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #475569; padding-bottom: 0.75rem; margin-bottom: 1rem; }
-        .panel-header h2 { font-size: 1.25rem; margin: 0; }
+        .panel-header h2 { font-size: 1.25rem; margin: 0; text-align: left; border: none; padding: 0;}
+        .panel-header .header-buttons { display: flex; gap: 0.5rem; }
         .copy-btn { background-color: #475569; color: #cbd5e1; border: none; padding: 0.4rem 0.8rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; transition: background-color 0.2s; }
         .copy-btn:hover { background-color: #525f75; }
         .copy-btn svg { width: 16px; height: 16px; }
         .result-item { display: flex; justify-content: space-between; align-items: center; font-size: 1rem; padding: 0.75rem 0; border-bottom: 1px solid #475569; }
         .result-item:last-child { border-bottom: none; }
         .result-item-label { color: #94a3b8; }
-        .result-item-value { color: #f8fafc; font-weight: 600; }
+        .result-item-value { color: #f8fafc; font-weight: 600; text-align: right; }
+        .result-item-value small { display: block; color: #94a3b8; font-weight: 400; font-size: 0.8em; }
         .chart-container { display: grid; grid-template-columns: 1fr; gap: 2rem; margin-top: 2rem; grid-column: 1 / -1; }
         @media (min-width: 1024px) { .chart-container { grid-template-columns: repeat(2, 1fr); } }
         .chart-panel { background-color: #1e293b; border-radius: 0.5rem; padding: 1.5rem; border: 1px solid #475569; }
@@ -62,8 +64,9 @@
         .modal-overlay.visible { display: flex; }
 
         /* Toast Styles */
-        .toast { position: fixed; top: 1.5rem; right: 1.5rem; padding: 1rem 1.5rem; border-radius: 0.5rem; z-index: 1001; opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-        .toast.show { opacity: 1; transform: translateY(0); }
+        #toast-container { position: fixed; top: 1.5rem; right: 1.5rem; z-index: 2000; }
+        .toast { padding: 1rem 1.5rem; border-radius: 0.5rem; margin-bottom: 0.5rem; opacity: 0; transform: translateX(100%); transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .toast.show { opacity: 1; transform: translateX(0); }
         .toast.success { background-color: #4ade80; color: black; }
         .toast.error { background-color: #f87171; color: white; }
         .toast.info { background-color: #38bdf8; color: white; }
@@ -105,10 +108,12 @@
                 <div class="results-panel">
                      <div class="panel-header">
                         <h2>Performance Metrics</h2>
-                        <button id="copy-button" class="copy-btn">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                            Copy
-                        </button>
+                        <div class="header-buttons">
+                            <button id="copy-button" class="copy-btn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                Copy
+                            </button>
+                        </div>
                      </div>
                      <div class="result-item"><span class="result-item-label" id="pilot-speed-label">Fleet Speed</span><span class="result-item-value" id="pilot-speed">0 ISK/hr</span></div>
                      <div class="result-item"><span class="result-item-label">Fleet Income</span><span class="result-item-value" id="fleet-income">0 ISK</span></div>
@@ -141,11 +146,15 @@
                     <div class="result-item"><span class="result-item-label">Unknown Sites</span><span class="result-item-value" id="unknown-sites">0</span></div>
                     <div class="result-item"><span class="result-item-label">Adjusted Sites</span><span class="result-item-value" id="adjusted-sites">0</span></div>
                 </div>
-
+                
                  <% if (isCommander) { %>
-                    <div class="form-group full-width" style="text-align: center; margin: 0 auto;">
-                        <button id="submit-log-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white; margin: 0 auto;">Submit Fleets</button>
+                    <div id="submit-all-container" class="form-group full-width" style="text-align: center; margin: 0 auto;">
+                        <button type="button" id="submit-log-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white; margin: 0 auto;">Submit All Fleets</button>
                         <small>As a commander, you can submit all detected fleets for long-term statistical tracking.</small>
+                    </div>
+                    <div id="submit-single-container" class="form-group full-width" style="text-align: center; margin: 0 auto; display: none;">
+                        <button type="button" id="submit-single-fleet-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white; margin: 0 auto;">Submit This Fleet</button>
+                        <small>Submit only the currently viewed fleet for long-term statistical tracking.</small>
                     </div>
                 <% } %>
 
@@ -167,6 +176,25 @@
                         </div>
                         <div id="character-income-list" class="income-list"></div>
                     </div>
+                </div>
+                 <div class="results-panel full-width" id="debug-panel" style="display: none; margin-top: 2rem;">
+                    <div class="panel-header">
+                        <h2>Debug Information</h2>
+                    </div>
+                    <div class="result-item"><span class="result-item-label">Avg. Characters per Payout Tick</span><span class="result-item-value" id="debug-numberofcharacters">0</span></div>
+                    <div class="result-item"><span class="result-item-label">Total Payout Lines</span><span class="result-item-value" id="debug-numberofpayouts">0</span></div>
+                    <hr style="border-color: #475569; margin: 0.5rem 0; border-style: dashed;">
+                    <div class="result-item"><span class="result-item-label"># Sites (Calculated)</span><span class="result-item-value" id="debug-numberofsites">0</span></div>
+                    <div class="result-item"><span class="result-item-label"># Sites Skipped</span><span class="result-item-value" id="debug-numberofsites_skipped">0</span></div>
+                    <div class="result-item"><span class="result-item-label"># Total Sites Found</span><span class="result-item-value" id="debug-numberofsites_with_skip">0</span></div>
+                    <hr style="border-color: #475569; margin: 0.5rem 0; border-style: dashed;">
+                    <div class="result-item"><span class="result-item-label">Sum Payout (Calculated)</span><span class="result-item-value" id="debug-sumpayout">0 ISK</span></div>
+                    <div class="result-item"><span class="result-item-label">Sum Payout (Skipped)</span><span class="result-item-value" id="debug-sumpayout_skip">0 ISK</span></div>
+                    <div class="result-item"><span class="result-item-label">Sum Payout (Total)</span><span class="result-item-value" id="debug-sumpayout_w_skip">0 ISK</span></div>
+                    <hr style="border-color: #475569; margin: 0.5rem 0; border-style: dashed;">
+                    <div class="result-item"><span class="result-item-label">Box Payout (Calculated)</span><span class="result-item-value" id="debug-boxpayout">0 ISK</span></div>
+                    <div class="result-item"><span class="result-item-label">Box Payout (Skipped)</span><span class="result-item-value" id="debug-boxpayout_skip">0 ISK</span></div>
+                    <div class="result-item"><span class="result-item-label">Box Payout (Total)</span><span class="result-item-value" id="debug-boxpayout_w_skip">0 ISK</span></div>
                 </div>
              </div>
         </div>
@@ -216,6 +244,9 @@
         const fleetPaginationEl = document.getElementById('fleet-pagination');
         const chartModalEl = document.getElementById('chart-modal');
         const submitLogBtn = document.getElementById('submit-log-btn');
+        const submitSingleFleetBtn = document.getElementById('submit-single-fleet-btn');
+        const submitAllContainer = document.getElementById('submit-all-container');
+        const submitSingleContainer = document.getElementById('submit-single-container');
         
         // --- Result Elements ---
         const pilotCountDetectedEl = document.getElementById('pilot-count-detected');
@@ -244,6 +275,10 @@
         const unknownSitesEl = document.getElementById('unknown-sites');
         const adjustedSitesEl = document.getElementById('adjusted-sites');
 
+        // --- Debug Elements ---
+        const debugPanel = document.getElementById('debug-panel');
+
+
         // --- Character Income Elements ---
         const characterIncomePanelEl = document.getElementById('character-income-panel');
         const characterIncomeListEl = document.getElementById('character-income-list');
@@ -258,7 +293,18 @@
         
         copyButton.addEventListener('click', copyResults);
         if (submitLogBtn) {
-            submitLogBtn.addEventListener('click', submitLog);
+            submitLogBtn.addEventListener('click', () => {
+                const fleetsToSubmit = allFleetsData.slice(1);
+                submitFleets(fleetsToSubmit, submitLogBtn);
+            });
+        }
+        if (submitSingleFleetBtn) {
+            submitSingleFleetBtn.addEventListener('click', () => {
+                const fleetToSubmit = allFleetsData[activeFleetIndex];
+                if (fleetToSubmit) {
+                    submitFleets([fleetToSubmit], submitSingleFleetBtn);
+                }
+            });
         }
 
         // --- Modal Logic ---
@@ -292,60 +338,71 @@
                 modalChartInstance = null;
             }
         }
+        
+        function formatIsk(value) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+            const num = Number(value);
+            if (num >= 1e9) return `${(num / 1e9).toFixed(2)}b`;
+            if (num >= 1e6) return `${(num / 1e6).toFixed(2)}m`;
+            if (num >= 1e3) return `${(num / 1e3).toFixed(1)}k`;
+            return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        }
+        
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            toast.offsetHeight;
+            
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
 
         function copyResults() {
             const activeFleet = allFleetsData[activeFleetIndex];
-            if (!activeFleet) return;
-
-            const {
-                perAltIskRate,
-                totalIskRate,
-                totalUserIncome,
-                totalFleetIncome,
-                sitesRun,
-                avgUserAlts,
-                durationMinutes,
-                minPayout,
-                maxPayout,
-                bestTime,
-                avgTime,
-                worstTime,
-                logStart
-            } = activeFleet.metrics;
-
-            const time = `${Math.floor(durationMinutes / 60)}h ${Math.round(durationMinutes % 60)}m`;
-            const isPerMinute = durationMinutes > 0 && durationMinutes < 60;
-            const isSingleBox = avgUserAlts === 1;
-
-            const totalIskRateText = totalIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
-            const perAltIskText = perAltIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
-
-
-            if (totalIskRate === 0) {
-                copyButton.textContent = 'No data';
-                setTimeout(() => { copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`; }, 2000);
+            if (!activeFleet) {
+                showToast('No data to copy.', 'error');
                 return;
-            };
+            }
+            const { metrics } = activeFleet;
 
-            const formattedLogStart = logStart ? `${logStart.getUTCHours().toString().padStart(2, '0')}:${logStart.getUTCMinutes().toString().padStart(2, '0')}` : 'N/A';
+            const isPerMinute = metrics.durationMinutes > 0 && metrics.durationMinutes < 60;
+            const isSingleBox = metrics.avgUserAlts === 1;
+            
+            const time = `${Math.floor(metrics.durationMinutes / 60)}h ${Math.round(metrics.durationMinutes % 60)}m`;
+            const perAltIskRateText = metrics.perAltIskRate.toLocaleString('en-US', { maximumFractionDigits: 0 }) + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+            const totalFleetIncomeText = metrics.totalFleetIncome.toLocaleString('en-US') + ' ISK';
+            const totalIskRateText = metrics.totalIskRate.toLocaleString('en-US', { maximumFractionDigits: 0 }) + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+            const totalUserIncomeText = metrics.totalUserIncome.toLocaleString('en-US') + ' ISK';
 
+            const formattedLogStart = metrics.logStart ? 
+                `${metrics.logStart.getUTCFullYear()}-${(metrics.logStart.getUTCMonth() + 1).toString().padStart(2, '0')}-${metrics.logStart.getUTCDate().toString().padStart(2, '0')} ${metrics.logStart.getUTCHours().toString().padStart(2, '0')}:${metrics.logStart.getUTCMinutes().toString().padStart(2, '0')}` 
+                : 'N/A';
+            
             let copyText = `.\n`;
-            copyText += `Fleet Speed: ${perAltIskText}\n`;
-            copyText += `Fleet Income: ${totalFleetIncome.toLocaleString('en-US')} ISK\n`;
+            copyText += `Fleet Speed: ${perAltIskRateText}\n`;
+            copyText += `Fleet Income: ${totalFleetIncomeText}\n`;
 
             if (!isSingleBox) {
                 copyText += `Box Speed: ${totalIskRateText}\n`;
-                copyText += `Box Income: ${totalUserIncome.toLocaleString('en-US')} ISK\n`;
+                copyText += `Box Income: ${totalUserIncomeText}\n`;
             }
 
-            copyText += `# of boxes: ${avgUserAlts.toFixed(3)}\n` +
+            copyText += `# of boxes: ${metrics.avgUserAlts.toFixed(3)}\n` +
                 `Total Time: ${time}\n` +
-                `Best Site: ${formatTime(bestTime)}\n` +
-                `Worst Site: ${formatTime(worstTime)}\n` +
-                `Average Site: ${formatTime(avgTime)}\n` +
-                `Total Sites: ${sitesRun}\n` +
+                `Best Site: ${formatTime(metrics.bestTime)}\n` +
+                `Worst Site: ${formatTime(metrics.worstTime)}\n` +
+                `Average Site: ${formatTime(metrics.avgTime)}\n` +
+                `Total Sites: ${metrics.sitesRun}\n` +
                 `Log Start Time: ${formattedLogStart}\n` +
-                `Min/Max Payout: ${minPayout.toLocaleString('en-US')} ISK / ${maxPayout.toLocaleString('en-US')} ISK`;
+                `Min/Max Payout: ${(metrics.minPayout === Infinity ? 0 : metrics.minPayout).toLocaleString('en-US')} ISK / ${metrics.maxPayout.toLocaleString('en-US')} ISK`;
 
             const tempTextArea = document.createElement('textarea');
             tempTextArea.value = copyText;
@@ -354,12 +411,11 @@
             document.execCommand('copy');
             document.body.removeChild(tempTextArea);
 
-            copyButton.textContent = 'Copied!';
-            setTimeout(() => { copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy`; }, 2000);
+            showToast('Results copied to clipboard!', 'success');
         }
 
         function formatTime(ms) {
-            if (ms <= 0) return '0m 0s';
+            if (ms <= 0 || isNaN(ms)) return '0m 0s';
             const totalSeconds = Math.round(ms / 1000);
             const minutes = Math.floor(totalSeconds / 60);
             const seconds = totalSeconds % 60;
@@ -467,16 +523,16 @@
             let incomeForRateCalc_perAlt = 0;
 
 
-            if (groupedTicks.length === 1) {
-                incomeForRateCalc = totalUserIncome;
-                incomeForRateCalc_perAlt = totalFleetIncome;
+            if (groupedTicks.length <= 1) { // Changed to <= 1 to handle single site fleets
+                incomeForRateCalc = 0;
+                incomeForRateCalc_perAlt = 0;
             } else {
                 const firstTickUserIncome = groupedTicks[0].reduce((sum, p) => sum + p.amount, 0);
                 incomeForRateCalc = totalUserIncome - firstTickUserIncome;
                 incomeForRateCalc_perAlt = totalFleetIncome - groupedTicks[0][0].amount;
             }
             
-            if (durationMinutes > 0) {
+            if (durationMinutes > 0 && groupedTicks.length > 1) {
                 if (durationMinutes < 60) {
                     totalIskRate = incomeForRateCalc / durationMinutes;
                     perAltIskRate = avgUserAlts > 0 ? totalIskRate / avgUserAlts : 0;
@@ -497,7 +553,8 @@
                     bestTime: siteTimesSorted[0] || 0,
                     avgTime: avgSiteTimeMs,
                     worstTime: siteTimesSorted[siteTimesSorted.length - 1] || 0,
-                    totalIskRate: Math.round(totalIskRate), perAltIskRate: Math.round(perAltIskRate),
+                    totalIskRate: totalIskRate, 
+                    perAltIskRate: perAltIskRate,
                     siteCounts,
                     characterIncome: incomeByCharacter,
                     adjustedSitesCount
@@ -520,7 +577,6 @@
                     siteCounts: { Vanguard: 0, Assault: 0, Headquarter: 0, Mothership: 0, Unknown: 0 },
                     characterIncome: {},
                     adjustedSitesCount: 0,
-                    // Metrics for rate calculation
                     totalIskRate: 0,
                     perAltIskRate: 0,
                     avgUserAlts: 0,
@@ -532,7 +588,6 @@
             
             const allSiteTimes = [];
             
-            // First pass: calculate totals for ALL fleets (single and multi-site)
             fleets.forEach(fleet => {
                 summary.metrics.totalUserIncome += fleet.metrics.totalUserIncome;
                 summary.metrics.totalFleetIncome += fleet.metrics.totalFleetIncome;
@@ -550,28 +605,27 @@
                 }
             });
 
-            // Calculate simple average alts across ALL sites
             summary.metrics.avgUserAlts = summary.metrics.sitesRun > 0 ? summary.metrics.payoutCount / summary.metrics.sitesRun : 0;
 
-            // Second pass: calculate rate-based metrics using ONLY multi-site fleets
             const multiSiteFleets = fleets.filter(f => f.metrics.sitesRun > 1);
             let totalRateDuration = 0;
-            let totalRateIncomePerAlt = 0;
+            let totalRateIncomeUser = 0;
+            let totalRateIncomeFleet = 0;
 
             multiSiteFleets.forEach(fleet => {
                  totalRateDuration += fleet.metrics.durationMinutes;
-                 totalRateIncomePerAlt += fleet.metrics.incomeForRateCalc_perAlt;
+                 totalRateIncomeUser += fleet.metrics.incomeForRateCalc;
+                 totalRateIncomeFleet += fleet.metrics.incomeForRateCalc_perAlt;
                  allSiteTimes.push(...fleet.chartData.siteDataChronological.map(d => d.time));
                  summary.chartData.siteDataChronological.push(...fleet.chartData.siteDataChronological);
             });
 
             summary.metrics.durationMinutes = totalRateDuration;
             
-            // Calculate final rates based on multi-site data
             if (totalRateDuration > 0) {
                 const totalRateDurationHours = totalRateDuration / 60;
-                summary.metrics.perAltIskRate = Math.round(totalRateIncomePerAlt / totalRateDurationHours);
-                summary.metrics.totalIskRate = Math.round(summary.metrics.perAltIskRate * summary.metrics.avgUserAlts);
+                summary.metrics.totalIskRate = (totalRateIncomeUser / totalRateDurationHours);
+                summary.metrics.perAltIskRate = summary.metrics.avgUserAlts > 0 ? summary.metrics.totalIskRate / summary.metrics.avgUserAlts : 0;
             }
 
             allSiteTimes.sort((a, b) => a - b);
@@ -626,6 +680,7 @@
             }
             
             const fleets = [];
+            
             if (ticks.length > 0) {
                 fleets.push([ticks[0]]);
                 for (let i = 1; i < ticks.length; i++) {
@@ -640,9 +695,37 @@
             
             const individualFleets = fleets.map(fleetOfTicks => processFleet(fleetOfTicks.flat())).filter(Boolean);
             if (individualFleets.length === 0) { resetAndHideResults(); return; }
+            
+            const calculableFleets = individualFleets.filter(f => f.metrics.sitesRun > 1);
+            const skippedFleets = individualFleets.filter(f => f.metrics.sitesRun === 1);
+
+            const numberofsites_skipped = skippedFleets.length + calculableFleets.length;
+            const numberofsites_calculated = ticks.length - numberofsites_skipped;
+            
+            const debugData = {
+                numberofcharacters: ticks.length > 0 ? allPayouts.length / ticks.length : 0,
+                numberofpayouts: allPayouts.length,
+                numberofsites: numberofsites_calculated,
+                numberofsites_skipped: numberofsites_skipped,
+                numberofsites_with_skip: ticks.length,
+
+                sumpayout: calculableFleets.reduce((sum, f) => sum + f.metrics.incomeForRateCalc_perAlt, 0),
+                sumpayout_skip: skippedFleets.reduce((sum, f) => sum + f.metrics.totalFleetIncome, 0) + 
+                                calculableFleets.reduce((sum, f) => sum + (f.chartData.groupedTicks[0][0].amount), 0),
+                sumpayout_w_skip: individualFleets.reduce((sum, f) => sum + f.metrics.totalFleetIncome, 0),
+
+                boxpayout: calculableFleets.reduce((sum, f) => sum + f.metrics.incomeForRateCalc, 0),
+                boxpayout_skip: skippedFleets.reduce((sum, f) => sum + f.metrics.totalUserIncome, 0) + 
+                               calculableFleets.reduce((sum, f) => sum + f.chartData.groupedTicks[0].reduce((tickSum, p) => tickSum + p.amount, 0), 0),
+                boxpayout_w_skip: individualFleets.reduce((sum, f) => sum + f.metrics.totalUserIncome, 0),
+            };
 
             const summaryFleet = generateAllFleetsSummary(individualFleets);
-            allFleetsData = [summaryFleet, ...individualFleets];
+            if(summaryFleet) {
+                summaryFleet.debug = debugData;
+            }
+            
+            allFleetsData = [summaryFleet, ...individualFleets].filter(Boolean);
 
             resultsContainerEl.style.display = 'block';
             
@@ -711,18 +794,50 @@
                 tab.classList.toggle('active', parseInt(tab.dataset.index) === index);
             });
 
-            const { metrics, chartData } = fleetData;
+            const { metrics, chartData, debug } = fleetData;
             
-            iskRateChartContainer.style.display = index === 0 ? 'none' : 'block';
-            if(submitLogBtn) {
-                 submitLogBtn.style.display = index === 0 ? 'block' : 'none';
+            // Show the ISK Rate chart on the "All Fleets" tab ONLY if there's just one fleet.
+            const showIskRateChart = (index === 0 && allFleetsData.length === 2) || (index !== 0);
+            iskRateChartContainer.style.display = showIskRateChart ? 'block' : 'none';
+
+            // Show/hide submit buttons
+            if (isCommander) {
+                if (index === 0) {
+                    submitAllContainer.style.display = 'block';
+                    submitSingleContainer.style.display = 'none';
+                } else {
+                    submitAllContainer.style.display = 'none';
+                    submitSingleContainer.style.display = 'block';
+                }
+            }
+
+            // Show/hide and populate debug panel
+            if (index === 0 && debug) {
+                debugPanel.style.display = 'block';
+                document.getElementById('debug-numberofcharacters').textContent = (debug.numberofcharacters || 0).toLocaleString(undefined, { maximumFractionDigits: 10 });
+                document.getElementById('debug-numberofpayouts').textContent = (debug.numberofpayouts || 0).toLocaleString();
+                document.getElementById('debug-numberofsites').textContent = (debug.numberofsites || 0).toLocaleString();
+                document.getElementById('debug-numberofsites_skipped').textContent = (debug.numberofsites_skipped || 0).toLocaleString();
+                document.getElementById('debug-sumpayout').textContent = (debug.sumpayout || 0).toLocaleString() + ' ISK';
+                document.getElementById('debug-sumpayout_skip').textContent = (debug.sumpayout_skip || 0).toLocaleString() + ' ISK';
+                document.getElementById('debug-boxpayout').textContent = (debug.boxpayout || 0).toLocaleString() + ' ISK';
+                document.getElementById('debug-boxpayout_skip').textContent = (debug.boxpayout_skip || 0).toLocaleString() + ' ISK';
+                document.getElementById('debug-sumpayout_w_skip').textContent = (debug.sumpayout_w_skip || 0).toLocaleString() + ' ISK';
+                document.getElementById('debug-boxpayout_w_skip').textContent = (debug.boxpayout_w_skip || 0).toLocaleString() + ' ISK';
+                document.getElementById('debug-numberofsites_with_skip').textContent = (debug.numberofsites_with_skip || 0).toLocaleString();
+            } else {
+                debugPanel.style.display = 'none';
             }
 
             updatePerformanceMetrics(metrics);
             updateAnalysisMetrics(metrics);
             updateSiteBreakdownMetrics(metrics);
             updateCharacterIncomeBreakdown(metrics.characterIncome);
-            if (index !== 0) updateIskRateChart(chartData);
+            if (showIskRateChart) {
+                // If we are showing the chart on the summary tab, we need to get the chart data from the single fleet
+                const dataForChart = index === 0 ? allFleetsData[1].chartData : chartData;
+                updateIskRateChart(dataForChart);
+            }
             updateSiteTimeChart(chartData);
         }
 
@@ -733,10 +848,10 @@
             boxSpeedContainerEl.style.display = isSingleBox ? 'none' : 'flex';
             boxIncomeContainerEl.style.display = isSingleBox ? 'none' : 'flex';
             
-            pilotSpeedEl.textContent = m.perAltIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
-            fleetIncomeEl.textContent = m.totalFleetIncome.toLocaleString('en-US') + ' ISK';
-            fleetSpeedEl.textContent = m.totalIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
-            totalIncomeEl.textContent = m.totalUserIncome.toLocaleString('en-US') + ' ISK';
+            pilotSpeedEl.innerHTML = `${formatIsk(m.perAltIskRate)} ISK/hr <small>(${m.perAltIskRate.toLocaleString('en-US', { maximumFractionDigits: 0 })} ISK/hr)</small>`;
+            fleetIncomeEl.innerHTML = `${formatIsk(m.totalFleetIncome)} ISK <small>(${m.totalFleetIncome.toLocaleString('en-US')} ISK)</small>`;
+            fleetSpeedEl.innerHTML = `${formatIsk(m.totalIskRate)} ISK/hr <small>(${m.totalIskRate.toLocaleString('en-US', { maximumFractionDigits: 0 })} ISK/hr)</small>`;
+            totalIncomeEl.innerHTML = `${formatIsk(m.totalUserIncome)} ISK <small>(${m.totalUserIncome.toLocaleString('en-US')} ISK)</small>`;
             
             totalTimeEl.textContent = `${Math.floor(m.durationMinutes / 60)}h ${Math.round(m.durationMinutes % 60)}m`;
             bestSiteTimeEl.textContent = formatTime(m.bestTime);
@@ -751,9 +866,12 @@
             payoutCountEl.textContent = m.payoutCount;
 
             if (m.logStart) {
+                const year = m.logStart.getUTCFullYear();
+                const month = (m.logStart.getUTCMonth() + 1).toString().padStart(2, '0');
+                const day = m.logStart.getUTCDate().toString().padStart(2, '0');
                 const utcHours = m.logStart.getUTCHours().toString().padStart(2, '0');
                 const utcMinutes = m.logStart.getUTCMinutes().toString().padStart(2, '0');
-                logStartEl.textContent = `${utcHours}:${utcMinutes}`;
+                logStartEl.textContent = `${year}-${month}-${day} ${utcHours}:${utcMinutes}`;
             } else {
                  logStartEl.textContent = 'N/A';
             }
@@ -849,7 +967,7 @@
             iskRateChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: totalDataPoints.map(p => p.x.toFixed(3) + ' min'),
+                    labels: totalDataPoints.map(p => p.x.toFixed(1) + ' min'),
                     datasets: [ 
                         { type: 'line', label: 'Total ISK/Hour', data: totalDataPoints.map(p => p.y), borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.2)', fill: true, tension: 0.1, yAxisID: 'y' }, 
                         { type: 'line', label: 'Per Alt ISK/Hour', data: perAltDataPoints.map(p => p.y), borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.2)', fill: true, tension: 0.1, yAxisID: 'y' },
@@ -859,7 +977,7 @@
                 options: { responsive: true, plugins: { title: { display: true, text: 'ISK/Hour & Alts Over Time', color: '#e2e8f0', font: { size: 16 } }, legend: { labels: { color: '#cbd5e1' } } }, 
                     scales: { 
                         x: { title: { display: true, text: 'Time (Minutes)', color: '#94a3b8' }, ticks: { color: '#cbd5e1' }, grid: { color: '#475569' } }, 
-                        y: { type: 'linear', position: 'left', title: { display: true, text: 'ISK/Hour', color: '#94a3b8' }, ticks: { color: '#cbd5e1', callback: value => value.toLocaleString() }, grid: { color: '#475569' } },
+                        y: { type: 'linear', position: 'left', title: { display: true, text: 'ISK/Hour', color: '#94a3b8' }, ticks: { color: '#cbd5e1', callback: value => formatIsk(value) }, grid: { color: '#475569' } },
                         y1: { type: 'linear', position: 'right', title: { display: true, text: 'Number of Alts', color: '#94a3b8' }, ticks: { color: '#cbd5e1', stepSize: 1 }, grid: { drawOnChartArea: false } }
                     } 
                 }
@@ -894,33 +1012,15 @@
             pilotCountDetectedEl.textContent = '';
         }
 
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            container.appendChild(toast);
-            
-            toast.offsetHeight;
-            
-            toast.classList.add('show');
-
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        async function submitLog() {
-            const fleetsToSubmit = allFleetsData.slice(1);
-
+        async function submitFleets(fleetsToSubmit, buttonElement) {
             if (!fleetsToSubmit || fleetsToSubmit.length === 0) {
-                showToast('No individual fleets detected to submit.', 'error');
+                showToast('No fleets selected to submit.', 'error');
                 return;
             }
             
-            submitLogBtn.disabled = true;
-            submitLogBtn.textContent = 'Submitting...';
+            const originalButtonText = buttonElement.textContent;
+            buttonElement.disabled = true;
+            buttonElement.textContent = 'Submitting...';
 
             try {
                 const response = await fetch(`/isk/${token}/submit`, {
@@ -943,8 +1043,8 @@
             } catch (error) {
                 showToast(`Error: ${error.message}`, 'error');
             } finally {
-                submitLogBtn.disabled = false;
-                submitLogBtn.textContent = 'Submit All Fleets';
+                buttonElement.disabled = false;
+                buttonElement.textContent = originalButtonText;
             }
         }
 
@@ -952,6 +1052,7 @@
     </script>
 </body>
 </html>
+
 
 
 
