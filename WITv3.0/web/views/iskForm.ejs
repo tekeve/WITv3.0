@@ -35,7 +35,6 @@
         .results-panel { background-color: #1e293b; border-radius: 0.5rem; padding: 1.5rem; border: 1px solid #475569;}
         .panel-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #475569; padding-bottom: 0.75rem; margin-bottom: 1rem; }
         .panel-header h2 { font-size: 1.25rem; margin: 0; text-align: left; border: none; padding: 0;}
-        .panel-header .header-buttons { display: flex; gap: 0.5rem; }
         .copy-btn { background-color: #475569; color: #cbd5e1; border: none; padding: 0.4rem 0.8rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; transition: background-color 0.2s; }
         .copy-btn:hover { background-color: #525f75; }
         .copy-btn svg { width: 16px; height: 16px; }
@@ -108,12 +107,10 @@
                 <div class="results-panel">
                      <div class="panel-header">
                         <h2>Performance Metrics</h2>
-                        <div class="header-buttons">
-                            <button id="copy-button" class="copy-btn">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                Copy
-                            </button>
-                        </div>
+                        <button id="copy-button" class="copy-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy
+                        </button>
                      </div>
                      <div class="result-item"><span class="result-item-label" id="pilot-speed-label">Fleet Speed</span><span class="result-item-value" id="pilot-speed">0 ISK/hr</span></div>
                      <div class="result-item"><span class="result-item-label">Fleet Income</span><span class="result-item-value" id="fleet-income">0 ISK</span></div>
@@ -148,13 +145,9 @@
                 </div>
                 
                  <% if (isCommander) { %>
-                    <div id="submit-all-container" class="form-group full-width" style="text-align: center; margin: 0 auto;">
-                        <button type="button" id="submit-log-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white; margin: 0 auto;">Submit All Fleets</button>
+                    <div class="form-group full-width" style="text-align: center; margin: 0 auto;">
+                        <button type="button" id="submit-log-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white; margin: 0 auto;">Submit Fleets</button>
                         <small>As a commander, you can submit all detected fleets for long-term statistical tracking.</small>
-                    </div>
-                    <div id="submit-single-container" class="form-group full-width" style="text-align: center; margin: 0 auto; display: none;">
-                        <button type="button" id="submit-single-fleet-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white; margin: 0 auto;">Submit This Fleet</button>
-                        <small>Submit only the currently viewed fleet for long-term statistical tracking.</small>
                     </div>
                 <% } %>
 
@@ -244,9 +237,6 @@
         const fleetPaginationEl = document.getElementById('fleet-pagination');
         const chartModalEl = document.getElementById('chart-modal');
         const submitLogBtn = document.getElementById('submit-log-btn');
-        const submitSingleFleetBtn = document.getElementById('submit-single-fleet-btn');
-        const submitAllContainer = document.getElementById('submit-all-container');
-        const submitSingleContainer = document.getElementById('submit-single-container');
         
         // --- Result Elements ---
         const pilotCountDetectedEl = document.getElementById('pilot-count-detected');
@@ -293,18 +283,7 @@
         
         copyButton.addEventListener('click', copyResults);
         if (submitLogBtn) {
-            submitLogBtn.addEventListener('click', () => {
-                const fleetsToSubmit = allFleetsData.slice(1);
-                submitFleets(fleetsToSubmit, submitLogBtn);
-            });
-        }
-        if (submitSingleFleetBtn) {
-            submitSingleFleetBtn.addEventListener('click', () => {
-                const fleetToSubmit = allFleetsData[activeFleetIndex];
-                if (fleetToSubmit) {
-                    submitFleets([fleetToSubmit], submitSingleFleetBtn);
-                }
-            });
+            submitLogBtn.addEventListener('click', submitLog);
         }
 
         // --- Modal Logic ---
@@ -373,13 +352,12 @@
             }
             const { metrics } = activeFleet;
 
-            const isPerMinute = metrics.durationMinutes > 0 && metrics.durationMinutes < 60;
             const isSingleBox = metrics.avgUserAlts === 1;
             
             const time = `${Math.floor(metrics.durationMinutes / 60)}h ${Math.round(metrics.durationMinutes % 60)}m`;
-            const perAltIskRateText = metrics.perAltIskRate.toLocaleString('en-US', { maximumFractionDigits: 0 }) + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+            const perAltIskRateText = metrics.perAltIskRate.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' ISK/hr';
             const totalFleetIncomeText = metrics.totalFleetIncome.toLocaleString('en-US') + ' ISK';
-            const totalIskRateText = metrics.totalIskRate.toLocaleString('en-US', { maximumFractionDigits: 0 }) + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+            const totalIskRateText = metrics.totalIskRate.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' ISK/hr';
             const totalUserIncomeText = metrics.totalUserIncome.toLocaleString('en-US') + ' ISK';
 
             const formattedLogStart = metrics.logStart ? 
@@ -533,13 +511,9 @@
             }
             
             if (durationMinutes > 0 && groupedTicks.length > 1) {
-                if (durationMinutes < 60) {
-                    totalIskRate = incomeForRateCalc / durationMinutes;
-                    perAltIskRate = avgUserAlts > 0 ? totalIskRate / avgUserAlts : 0;
-                } else {
-                    totalIskRate = incomeForRateCalc / (durationMinutes / 60);
-                    perAltIskRate = avgUserAlts > 0 ? totalIskRate / avgUserAlts : 0;
-                }
+                const durationHours = durationMinutes / 60;
+                totalIskRate = incomeForRateCalc / durationHours;
+                perAltIskRate = incomeForRateCalc_perAlt / durationHours;
             }
 
             return {
@@ -577,6 +551,7 @@
                     siteCounts: { Vanguard: 0, Assault: 0, Headquarter: 0, Mothership: 0, Unknown: 0 },
                     characterIncome: {},
                     adjustedSitesCount: 0,
+                    // Metrics for rate calculation
                     totalIskRate: 0,
                     perAltIskRate: 0,
                     avgUserAlts: 0,
@@ -588,6 +563,7 @@
             
             const allSiteTimes = [];
             
+            // First pass: calculate totals for ALL fleets (single and multi-site)
             fleets.forEach(fleet => {
                 summary.metrics.totalUserIncome += fleet.metrics.totalUserIncome;
                 summary.metrics.totalFleetIncome += fleet.metrics.totalFleetIncome;
@@ -605,27 +581,28 @@
                 }
             });
 
+            // Calculate simple average alts across ALL sites
             summary.metrics.avgUserAlts = summary.metrics.sitesRun > 0 ? summary.metrics.payoutCount / summary.metrics.sitesRun : 0;
 
+            // Second pass: calculate rate-based metrics using ONLY multi-site fleets
             const multiSiteFleets = fleets.filter(f => f.metrics.sitesRun > 1);
             let totalRateDuration = 0;
-            let totalRateIncomeUser = 0;
-            let totalRateIncomeFleet = 0;
+            let totalRateIncomePerAlt = 0;
 
             multiSiteFleets.forEach(fleet => {
                  totalRateDuration += fleet.metrics.durationMinutes;
-                 totalRateIncomeUser += fleet.metrics.incomeForRateCalc;
-                 totalRateIncomeFleet += fleet.metrics.incomeForRateCalc_perAlt;
+                 totalRateIncomePerAlt += fleet.metrics.incomeForRateCalc_perAlt;
                  allSiteTimes.push(...fleet.chartData.siteDataChronological.map(d => d.time));
                  summary.chartData.siteDataChronological.push(...fleet.chartData.siteDataChronological);
             });
 
             summary.metrics.durationMinutes = totalRateDuration;
             
+            // Calculate final rates based on multi-site data
             if (totalRateDuration > 0) {
                 const totalRateDurationHours = totalRateDuration / 60;
-                summary.metrics.totalIskRate = (totalRateIncomeUser / totalRateDurationHours);
-                summary.metrics.perAltIskRate = summary.metrics.avgUserAlts > 0 ? summary.metrics.totalIskRate / summary.metrics.avgUserAlts : 0;
+                summary.metrics.perAltIskRate = (totalRateIncomePerAlt / totalRateDurationHours);
+                summary.metrics.totalIskRate = (summary.metrics.perAltIskRate * summary.metrics.avgUserAlts);
             }
 
             allSiteTimes.sort((a, b) => a - b);
@@ -695,11 +672,11 @@
             
             const individualFleets = fleets.map(fleetOfTicks => processFleet(fleetOfTicks.flat())).filter(Boolean);
             if (individualFleets.length === 0) { resetAndHideResults(); return; }
-            
-            const calculableFleets = individualFleets.filter(f => f.metrics.sitesRun > 1);
-            const skippedFleets = individualFleets.filter(f => f.metrics.sitesRun === 1);
 
-            const numberofsites_skipped = skippedFleets.length + calculableFleets.length;
+            const calculableFleets = individualFleets.filter(f => f.metrics.sitesRun > 1);
+            const skippedSiteFleets = individualFleets.filter(f => f.metrics.sitesRun === 1);
+
+            const numberofsites_skipped = skippedSiteFleets.length + calculableFleets.length;
             const numberofsites_calculated = ticks.length - numberofsites_skipped;
             
             const debugData = {
@@ -710,12 +687,12 @@
                 numberofsites_with_skip: ticks.length,
 
                 sumpayout: calculableFleets.reduce((sum, f) => sum + f.metrics.incomeForRateCalc_perAlt, 0),
-                sumpayout_skip: skippedFleets.reduce((sum, f) => sum + f.metrics.totalFleetIncome, 0) + 
+                sumpayout_skip: skippedSiteFleets.reduce((sum, f) => sum + f.metrics.totalFleetIncome, 0) + 
                                 calculableFleets.reduce((sum, f) => sum + (f.chartData.groupedTicks[0][0].amount), 0),
                 sumpayout_w_skip: individualFleets.reduce((sum, f) => sum + f.metrics.totalFleetIncome, 0),
 
                 boxpayout: calculableFleets.reduce((sum, f) => sum + f.metrics.incomeForRateCalc, 0),
-                boxpayout_skip: skippedFleets.reduce((sum, f) => sum + f.metrics.totalUserIncome, 0) + 
+                boxpayout_skip: skippedSiteFleets.reduce((sum, f) => sum + f.metrics.totalUserIncome, 0) + 
                                calculableFleets.reduce((sum, f) => sum + f.chartData.groupedTicks[0].reduce((tickSum, p) => tickSum + p.amount, 0), 0),
                 boxpayout_w_skip: individualFleets.reduce((sum, f) => sum + f.metrics.totalUserIncome, 0),
             };
@@ -796,19 +773,9 @@
 
             const { metrics, chartData, debug } = fleetData;
             
-            // Show the ISK Rate chart on the "All Fleets" tab ONLY if there's just one fleet.
-            const showIskRateChart = (index === 0 && allFleetsData.length === 2) || (index !== 0);
-            iskRateChartContainer.style.display = showIskRateChart ? 'block' : 'none';
-
-            // Show/hide submit buttons
-            if (isCommander) {
-                if (index === 0) {
-                    submitAllContainer.style.display = 'block';
-                    submitSingleContainer.style.display = 'none';
-                } else {
-                    submitAllContainer.style.display = 'none';
-                    submitSingleContainer.style.display = 'block';
-                }
+            iskRateChartContainer.style.display = index === 0 ? 'none' : 'block';
+            if (submitLogBtn) {
+                 submitLogBtn.style.display = index === 0 ? 'block' : 'none';
             }
 
             // Show/hide and populate debug panel
@@ -833,16 +800,11 @@
             updateAnalysisMetrics(metrics);
             updateSiteBreakdownMetrics(metrics);
             updateCharacterIncomeBreakdown(metrics.characterIncome);
-            if (showIskRateChart) {
-                // If we are showing the chart on the summary tab, we need to get the chart data from the single fleet
-                const dataForChart = index === 0 ? allFleetsData[1].chartData : chartData;
-                updateIskRateChart(dataForChart);
-            }
+            if (showIskRateChart) updateIskRateChart(chartData);
             updateSiteTimeChart(chartData);
         }
 
         function updatePerformanceMetrics(m) {
-            const isPerMinute = m.durationMinutes > 0 && m.durationMinutes < 60;
             const isSingleBox = m.avgUserAlts === 1;
 
             boxSpeedContainerEl.style.display = isSingleBox ? 'none' : 'flex';
@@ -1012,15 +974,16 @@
             pilotCountDetectedEl.textContent = '';
         }
 
-        async function submitFleets(fleetsToSubmit, buttonElement) {
+        async function submitLog() {
+            const fleetsToSubmit = allFleetsData.slice(1);
+
             if (!fleetsToSubmit || fleetsToSubmit.length === 0) {
-                showToast('No fleets selected to submit.', 'error');
+                showToast('No individual fleets detected to submit.', 'error');
                 return;
             }
             
-            const originalButtonText = buttonElement.textContent;
-            buttonElement.disabled = true;
-            buttonElement.textContent = 'Submitting...';
+            submitLogBtn.disabled = true;
+            submitLogBtn.textContent = 'Submitting...';
 
             try {
                 const response = await fetch(`/isk/${token}/submit`, {
@@ -1043,8 +1006,8 @@
             } catch (error) {
                 showToast(`Error: ${error.message}`, 'error');
             } finally {
-                buttonElement.disabled = false;
-                buttonElement.textContent = originalButtonText;
+                submitLogBtn.disabled = false;
+                submitLogBtn.textContent = 'Submit All Fleets';
             }
         }
 
@@ -1052,7 +1015,6 @@
     </script>
 </body>
 </html>
-
 
 
 
