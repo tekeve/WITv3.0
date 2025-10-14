@@ -145,9 +145,13 @@
                 </div>
                 
                  <% if (isCommander) { %>
-                    <div class="form-group full-width" style="text-align: center; margin: 0 auto;">
-                        <button type="button" id="submit-log-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white; margin: 0 auto;">Submit Fleets</button>
+                    <div class="form-group full-width" id="all-submit-container" style="text-align: center; margin: 0 auto;">
+                        <button type="button" id="submit-all-fleets-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white; margin: 0 auto;">Submit All Fleets</button>
                         <small>As a commander, you can submit all detected fleets for long-term statistical tracking.</small>
+                    </div>
+                     <div class="form-group full-width" id="individual-submit-container" style="display: none; text-align: center; margin: 0 auto;">
+                        <button type="button" id="submit-individual-fleet-btn" class="page-btn" style="padding: 0.75rem 1.5rem; font-size: 1rem; background-color: #22c55e; color: white;">Submit This Fleet</button>
+                        <small>Submit only the currently selected fleet for tracking.</small>
                     </div>
                 <% } %>
 
@@ -236,7 +240,8 @@
         const fleetTabsEl = document.getElementById('fleet-tabs');
         const fleetPaginationEl = document.getElementById('fleet-pagination');
         const chartModalEl = document.getElementById('chart-modal');
-        const submitLogBtn = document.getElementById('submit-log-btn');
+        const submitAllFleetsBtn = document.getElementById('submit-all-fleets-btn');
+        const submitIndividualFleetBtn = document.getElementById('submit-individual-fleet-btn');
         
         // --- Result Elements ---
         const pilotCountDetectedEl = document.getElementById('pilot-count-detected');
@@ -273,6 +278,7 @@
         const characterIncomePanelEl = document.getElementById('character-income-panel');
         const characterIncomeListEl = document.getElementById('character-income-list');
         const iskRateChartContainer = document.getElementById('iskRateChartContainer');
+        const siteTimeChartContainer = document.getElementById('siteTimeChartContainer');
 
 
         const elementsToWatch = [journalDataEl, pilotCountEl, manualDurationEl, maxGapEl];
@@ -282,8 +288,9 @@
         }));
         
         copyButton.addEventListener('click', copyResults);
-        if (submitLogBtn) {
-            submitLogBtn.addEventListener('click', submitLog);
+        if (isCommander) {
+            submitAllFleetsBtn.addEventListener('click', submitAllFleets);
+            submitIndividualFleetBtn.addEventListener('click', submitIndividualFleet);
         }
 
         // --- Modal Logic ---
@@ -772,12 +779,20 @@
             });
 
             const { metrics, chartData, debug } = fleetData;
-            
-            iskRateChartContainer.style.display = index === 0 ? 'none' : 'block';
-            if (submitLogBtn) {
-                 submitLogBtn.style.display = index === 0 ? 'block' : 'none';
-            }
 
+            const allFleetsSubmitContainer = document.getElementById('all-submit-container');
+            const individualFleetSubmitContainer = document.getElementById('individual-submit-container');
+            
+            if (isCommander) {
+                if (index === 0) { // "All Fleets" tab
+                    allFleetsSubmitContainer.style.display = 'block';
+                    individualFleetSubmitContainer.style.display = 'none';
+                } else { // Individual fleet tab
+                    allFleetsSubmitContainer.style.display = 'none';
+                    individualFleetSubmitContainer.style.display = 'block';
+                }
+            }
+            
             // Show/hide and populate debug panel
             if (index === 0 && debug) {
                 debugPanel.style.display = 'block';
@@ -800,8 +815,39 @@
             updateAnalysisMetrics(metrics);
             updateSiteBreakdownMetrics(metrics);
             updateCharacterIncomeBreakdown(metrics.characterIncome);
-            if (showIskRateChart) updateIskRateChart(chartData);
-            updateSiteTimeChart(chartData);
+            
+            // Logic for ISK Rate Chart
+            const individualFleetsCount = allFleetsData.length - 1;
+            let showIskRateChart = false;
+            let iskRateChartData = null;
+
+            if (index !== 0) { // An individual fleet tab is selected
+                // Check if the individual fleet has enough data for this chart
+                if (chartData && chartData.groupedTicks && chartData.groupedTicks.length > 1) {
+                    showIskRateChart = true;
+                    iskRateChartData = chartData;
+                }
+            } else if (index === 0 && individualFleetsCount === 1) { // "All Fleets" tab is selected, AND there is only one fleet
+                const singleFleetData = allFleetsData[1]; // Get the data for that single fleet
+                if (singleFleetData.chartData && singleFleetData.chartData.groupedTicks && singleFleetData.chartData.groupedTicks.length > 1) {
+                   showIskRateChart = true;
+                   iskRateChartData = singleFleetData.chartData;
+                }
+            }
+
+            if (showIskRateChart) {
+                iskRateChartContainer.style.display = 'block';
+                updateIskRateChart(iskRateChartData);
+            } else {
+                iskRateChartContainer.style.display = 'none';
+            }
+
+            if (chartData && chartData.siteDataChronological && chartData.siteDataChronological.length > 0) {
+                siteTimeChartContainer.style.display = 'block';
+                updateSiteTimeChart(chartData);
+            } else {
+                siteTimeChartContainer.style.display = 'none';
+            }
         }
 
         function updatePerformanceMetrics(m) {
@@ -974,7 +1020,7 @@
             pilotCountDetectedEl.textContent = '';
         }
 
-        async function submitLog() {
+        async function submitAllFleets() {
             const fleetsToSubmit = allFleetsData.slice(1);
 
             if (!fleetsToSubmit || fleetsToSubmit.length === 0) {
@@ -982,8 +1028,8 @@
                 return;
             }
             
-            submitLogBtn.disabled = true;
-            submitLogBtn.textContent = 'Submitting...';
+            submitAllFleetsBtn.disabled = true;
+            submitAllFleetsBtn.textContent = 'Submitting...';
 
             try {
                 const response = await fetch(`/isk/${token}/submit`, {
@@ -1006,8 +1052,43 @@
             } catch (error) {
                 showToast(`Error: ${error.message}`, 'error');
             } finally {
-                submitLogBtn.disabled = false;
-                submitLogBtn.textContent = 'Submit All Fleets';
+                submitAllFleetsBtn.disabled = false;
+                submitAllFleetsBtn.textContent = 'Submit All Fleets';
+            }
+        }
+
+        async function submitIndividualFleet() {
+            const fleetToSubmit = allFleetsData[activeFleetIndex];
+            if (!fleetToSubmit || activeFleetIndex === 0) {
+                showToast('No fleet selected or summary tab is active.', 'error');
+                return;
+            }
+
+            submitIndividualFleetBtn.disabled = true;
+            submitIndividualFleetBtn.textContent = 'Submitting...';
+
+            try {
+                const response = await fetch(`/isk/${token}/submit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fleets: [fleetToSubmit],
+                        commanderName: commanderName
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    showToast(result.message, 'success');
+                } else {
+                    throw new Error(result.message || 'Submission failed.');
+                }
+            } catch (error) {
+                showToast(`Error: ${error.message}`, 'error');
+            } finally {
+                submitIndividualFleetBtn.disabled = false;
+                submitIndividualFleetBtn.textContent = 'Submit This Fleet';
             }
         }
 
@@ -1015,6 +1096,5 @@
     </script>
 </body>
 </html>
-
 
 
