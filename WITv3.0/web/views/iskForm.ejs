@@ -76,8 +76,8 @@
         <form id="isk-form">
             <div class="form-group full-width">
                 <label for="journal-data">Wallet Journal Data</label>
-                <textarea id="journal-data" name="journal-data" placeholder="2025.10.10 07:16   Corporate Reward Payout   31,500,000 ISK ..."></textarea>
-                 <small>Only lines containing "Corporate Reward Payout" will be processed.</small>
+                <textarea id="journal-data" name="journal-data" placeholder="2025.10.10 07:16:30   Corporate Reward Payout   31,500,000 ISK   1,234,567,890 ISK   CONCORD rewarded YourName for services performed."></textarea>
+                 <small>Only lines containing "Corporate Reward Payout" and "CONCORD rewarded" will be processed.</small>
             </div>
             <div class="form-grid">
                 <div class="form-group">
@@ -116,9 +116,7 @@
                      <div class="result-item"><span class="result-item-label">Fleet Income</span><span class="result-item-value" id="fleet-income">0 ISK</span></div>
                      <div class="result-item"><span class="result-item-label">Total Time</span><span class="result-item-value" id="total-time">0h 0m</span></div>
                      <div class="result-item"><span class="result-item-label">Best Site Time</span><span class="result-item-value" id="best-site-time">0m 0s</span></div>
-                     <div class="result-item"><span class="result-item-label">2nd Best Site</span><span class="result-item-value" id="second-best-site-time">0m 0s</span></div>
                      <div class="result-item"><span class="result-item-label">Average Site Time</span><span class="result-item-value" id="avg-site-time">0m 0s</span></div>
-                     <div class="result-item"><span class="result-item-label">2nd Worst Site</span><span class="result-item-value" id="second-worst-site-time">0m 0s</span></div>
                      <div class="result-item"><span class="result-item-label">Worst Site Time</span><span class="result-item-value" id="worst-site-time">0m 0s</span></div>
                 </div>
                 <div class="results-panel">
@@ -141,6 +139,7 @@
                     <div class="result-item"><span class="result-item-label">Headquarters Run</span><span class="result-item-value" id="hq-sites">0</span></div>
                     <div class="result-item"><span class="result-item-label">Motherships Run</span><span class="result-item-value" id="mothership-sites">0</span></div>
                     <div class="result-item"><span class="result-item-label">Unknown Sites</span><span class="result-item-value" id="unknown-sites">0</span></div>
+                    <div class="result-item"><span class="result-item-label">Adjusted Sites</span><span class="result-item-value" id="adjusted-sites">0</span></div>
                 </div>
 
                  <% if (isCommander) { %>
@@ -234,9 +233,7 @@
         const fleetIncomeEl = document.getElementById('fleet-income');
         const totalTimeEl = document.getElementById('total-time');
         const bestSiteTimeEl = document.getElementById('best-site-time');
-        const secondBestSiteTimeEl = document.getElementById('second-best-site-time');
         const avgSiteTimeEl = document.getElementById('avg-site-time');
-        const secondWorstSiteTimeEl = document.getElementById('second-worst-site-time');
         const worstSiteTimeEl = document.getElementById('worst-site-time');
         
         // --- Site Count Elements ---
@@ -245,6 +242,7 @@
         const hqSitesEl = document.getElementById('hq-sites');
         const mothershipSitesEl = document.getElementById('mothership-sites');
         const unknownSitesEl = document.getElementById('unknown-sites');
+        const adjustedSitesEl = document.getElementById('adjusted-sites');
 
         // --- Character Income Elements ---
         const characterIncomePanelEl = document.getElementById('character-income-panel');
@@ -351,8 +349,6 @@
         }
 
         function processFleet(payouts) {
-            if (payouts.length === 0) return null;
-
             const manualAltCount = parseInt(pilotCountEl.value, 10) || 0;
             const manualDuration = parseInt(manualDurationEl.value, 10) || 0;
 
@@ -371,7 +367,7 @@
                 }
             }
 
-            if (groupedTicks.length < 2) return null;
+            if (groupedTicks.length === 0) return null;
 
             const totalUserIncome = payouts.reduce((sum, p) => sum + p.amount, 0);
             let totalFleetIncome = groupedTicks.reduce((sum, group) => sum + group[0].amount, 0);
@@ -394,10 +390,29 @@
                 }
                 incomeByCharacter[charName] += payout.amount;
             });
+            
+            let adjustedSitesCount = 0;
+            const representativeTimestamps = [groupedTicks[0][0].time];
+            for (let i = 1; i < groupedTicks.length; i++) {
+                let currentTickTime = groupedTicks[i][0].time;
+                let previousTickTime = representativeTimestamps[i-1];
+                if (currentTickTime - previousTickTime <= 60000) {
+                    currentTickTime = previousTickTime;
+                    adjustedSitesCount++;
+                }
+                representativeTimestamps.push(currentTickTime);
+            }
 
-            const representativeTimestamps = groupedTicks.map(group => group[0].time);
             const firstPayoutTime = representativeTimestamps[0];
-            let durationMinutes = manualDuration > 0 ? manualDuration : (representativeTimestamps[representativeTimestamps.length - 1] - firstPayoutTime) / (1000 * 60);
+            let durationMinutes = 0;
+
+            if (groupedTicks.length > 1) {
+                 durationMinutes = manualDuration > 0 ? manualDuration : (representativeTimestamps[representativeTimestamps.length - 1] - firstPayoutTime) / (1000 * 60);
+            } else if (manualDuration > 0) {
+                durationMinutes = manualDuration;
+            } else {
+                durationMinutes = 7; // Assumed duration for single-site fleets
+            }
             
             const siteDataChronological = [];
             for (let i = 1; i < representativeTimestamps.length; i++) {
@@ -415,28 +430,44 @@
             const payoutAmounts = payouts.map(p => p.amount);
             
             let totalIskRate = 0, perAltIskRate = 0;
+            let incomeForRateCalc;
+            let incomeForRateCalc_perAlt = 0;
+
+
+            if (groupedTicks.length === 1) {
+                incomeForRateCalc = totalUserIncome;
+                incomeForRateCalc_perAlt = totalFleetIncome;
+            } else {
+                const firstTickUserIncome = groupedTicks[0].reduce((sum, p) => sum + p.amount, 0);
+                incomeForRateCalc = totalUserIncome - firstTickUserIncome;
+                incomeForRateCalc_perAlt = totalFleetIncome - groupedTicks[0][0].amount;
+            }
+            
             if (durationMinutes > 0) {
                 if (durationMinutes < 60) {
-                    totalIskRate = totalUserIncome / durationMinutes;
+                    totalIskRate = incomeForRateCalc / durationMinutes;
                     perAltIskRate = avgUserAlts > 0 ? totalIskRate / avgUserAlts : 0;
                 } else {
-                    totalIskRate = totalUserIncome / (durationMinutes / 60);
+                    totalIskRate = incomeForRateCalc / (durationMinutes / 60);
                     perAltIskRate = avgUserAlts > 0 ? totalIskRate / avgUserAlts : 0;
                 }
             }
 
             return {
-                payouts, // Include original payouts
+                payouts,
                 metrics: {
                     totalUserIncome, totalFleetIncome, durationMinutes, avgUserAlts,
+                    incomeForRateCalc,
+                    incomeForRateCalc_perAlt,
                     sitesRun: groupedTicks.length, payoutCount: payouts.length,
                     logStart: new Date(firstPayoutTime), maxPayout: Math.max(...payoutAmounts), minPayout: Math.min(...payoutAmounts),
-                    bestTime: siteTimesSorted[0] || 0, secondBestTime: siteTimesSorted[1] || 0,
-                    avgTime: avgSiteTimeMs, secondWorstTime: siteTimesSorted[siteTimesSorted.length - 2] || 0,
+                    bestTime: siteTimesSorted[0] || 0,
+                    avgTime: avgSiteTimeMs,
                     worstTime: siteTimesSorted[siteTimesSorted.length - 1] || 0,
                     totalIskRate: Math.round(totalIskRate), perAltIskRate: Math.round(perAltIskRate),
                     siteCounts,
-                    characterIncome: incomeByCharacter
+                    characterIncome: incomeByCharacter,
+                    adjustedSitesCount
                 },
                 chartData: {
                     groupedTicks, firstPayoutTime, avgUserAlts, siteDataChronological
@@ -455,76 +486,88 @@
                     maxPayout: 0, minPayout: Infinity,
                     siteCounts: { Vanguard: 0, Assault: 0, Headquarter: 0, Mothership: 0, Unknown: 0 },
                     characterIncome: {},
+                    adjustedSitesCount: 0,
+                    // Metrics for rate calculation
+                    totalIskRate: 0,
+                    perAltIskRate: 0,
+                    avgUserAlts: 0,
                 },
                 chartData: {
                     siteDataChronological: []
                 }
             };
             
-            let totalWeightedAlts = 0;
             const allSiteTimes = [];
-
+            
+            // First pass: calculate totals for ALL fleets (single and multi-site)
             fleets.forEach(fleet => {
                 summary.metrics.totalUserIncome += fleet.metrics.totalUserIncome;
                 summary.metrics.totalFleetIncome += fleet.metrics.totalFleetIncome;
-                summary.metrics.durationMinutes += fleet.metrics.durationMinutes;
                 summary.metrics.sitesRun += fleet.metrics.sitesRun;
                 summary.metrics.payoutCount += fleet.metrics.payoutCount;
                 summary.metrics.maxPayout = Math.max(summary.metrics.maxPayout, fleet.metrics.maxPayout);
                 summary.metrics.minPayout = Math.min(summary.metrics.minPayout, fleet.metrics.minPayout);
+                summary.metrics.adjustedSitesCount += fleet.metrics.adjustedSitesCount;
                 
-                totalWeightedAlts += fleet.metrics.avgUserAlts * fleet.metrics.durationMinutes;
-
                 for (const siteType in fleet.metrics.siteCounts) {
                     summary.metrics.siteCounts[siteType] += fleet.metrics.siteCounts[siteType];
                 }
                 for (const charName in fleet.metrics.characterIncome) {
                     summary.metrics.characterIncome[charName] = (summary.metrics.characterIncome[charName] || 0) + fleet.metrics.characterIncome[charName];
                 }
-                
-                allSiteTimes.push(...fleet.chartData.siteDataChronological.map(d => d.time));
-                summary.chartData.siteDataChronological.push(...fleet.chartData.siteDataChronological);
             });
+
+            // Calculate simple average alts across ALL sites
+            summary.metrics.avgUserAlts = summary.metrics.sitesRun > 0 ? summary.metrics.payoutCount / summary.metrics.sitesRun : 0;
+
+            // Second pass: calculate rate-based metrics using ONLY multi-site fleets
+            const multiSiteFleets = fleets.filter(f => f.metrics.sitesRun > 1);
+            let totalRateDuration = 0;
+            let totalRateIncomePerAlt = 0;
+
+            multiSiteFleets.forEach(fleet => {
+                 totalRateDuration += fleet.metrics.durationMinutes;
+                 totalRateIncomePerAlt += fleet.metrics.incomeForRateCalc_perAlt;
+                 allSiteTimes.push(...fleet.chartData.siteDataChronological.map(d => d.time));
+                 summary.chartData.siteDataChronological.push(...fleet.chartData.siteDataChronological);
+            });
+
+            summary.metrics.durationMinutes = totalRateDuration;
             
-            summary.metrics.avgUserAlts = summary.metrics.durationMinutes > 0 ? totalWeightedAlts / summary.metrics.durationMinutes : 0;
-            
-            const duration = summary.metrics.durationMinutes;
-            if (duration > 0) {
-                 if (duration < 60) {
-                    summary.metrics.totalIskRate = Math.round(summary.metrics.totalUserIncome / duration);
-                    summary.metrics.perAltIskRate = summary.metrics.avgUserAlts > 0 ? Math.round(summary.metrics.totalIskRate / summary.metrics.avgUserAlts) : 0;
-                } else {
-                    summary.metrics.totalIskRate = Math.round(summary.metrics.totalUserIncome / (duration / 60));
-                    summary.metrics.perAltIskRate = summary.metrics.avgUserAlts > 0 ? Math.round(summary.metrics.totalIskRate / summary.metrics.avgUserAlts) : 0;
-                }
-            } else {
-                summary.metrics.totalIskRate = 0;
-                summary.metrics.perAltIskRate = 0;
+            // Calculate final rates based on multi-site data
+            if (totalRateDuration > 0) {
+                const totalRateDurationHours = totalRateDuration / 60;
+                summary.metrics.perAltIskRate = Math.round(totalRateIncomePerAlt / totalRateDurationHours);
+                summary.metrics.totalIskRate = Math.round(summary.metrics.perAltIskRate * summary.metrics.avgUserAlts);
             }
 
             allSiteTimes.sort((a, b) => a - b);
             summary.metrics.bestTime = allSiteTimes[0] || 0;
-            summary.metrics.secondBestTime = allSiteTimes[1] || 0;
             summary.metrics.avgTime = allSiteTimes.length > 0 ? allSiteTimes.reduce((a, b) => a + b, 0) / allSiteTimes.length : 0;
-            summary.metrics.secondWorstTime = allSiteTimes[allSiteTimes.length - 2] || 0;
             summary.metrics.worstTime = allSiteTimes[allSiteTimes.length - 1] || 0;
             
             return summary;
         }
 
         function calculateAndRender() {
-            const lines = journalDataEl.value.split('\n');
+            const lines = journalDataEl.value.split(/\r?\n/);
             const maxGapMinutes = parseInt(maxGapEl.value, 10) || 10;
-            const payoutRegex = /^(\d{4}\.\d{2}\.\d{2}\s\d{2}:\d{2})\s+Corporate Reward Payout\s+([\d,]+)\sISK.*?(?:CONCORD rewarded (.+?) for services performed\.?)?$/;
+            const payoutRegex = /^(\d{4}\.\d{2}\.\d{2}\s\d{2}:\d{2}(:\d{2})?)\s+Corporate Reward Payout\s+([\d,.\s]+)\s*ISK\s+[\d,.\s]+\s*ISK\s+CONCORD rewarded (.+?) for services performed\.$/;
 
             const allPayouts = lines.map(line => {
                 const match = line.match(payoutRegex);
                 if (match) {
-                    const dateTimeString = match[1].replace(/\./g, '-') + ':00Z';
+                    let dateTimeString = match[1].replace(/\./g, '-');
+                    if (!match[2]) {
+                        dateTimeString += ':00';
+                    }
+                    dateTimeString += 'Z';
+                    
+                    const iskString = match[3].replace(/[^0-9]/g, '');
                     return { 
                         time: new Date(dateTimeString).getTime(), 
-                        amount: parseInt(match[2].replace(/,/g, ''), 10),
-                        characterName: match[3] ? match[3].trim() : 'Unknown Character'
+                        amount: parseInt(iskString, 10),
+                        characterName: match[4] ? match[4].trim() : 'Unknown Character'
                     };
                 }
                 return null;
@@ -533,18 +576,36 @@
             if (allPayouts.length === 0) { resetAndHideResults(); return; }
             
             allPayouts.sort((a,b) => a.time - b.time);
+            
+            const ticks = [];
+            if (allPayouts.length > 0) {
+                ticks.push([allPayouts[0]]);
+                for (let i = 1; i < allPayouts.length; i++) {
+                    const currentPayout = allPayouts[i];
+                    const lastGroup = ticks[ticks.length - 1];
+                    const lastPayoutInGroup = lastGroup[lastGroup.length - 1];
+                    if ((currentPayout.time - lastPayoutInGroup.time) <= 60000) {
+                        lastGroup.push(currentPayout);
+                    } else {
+                        ticks.push([currentPayout]);
+                    }
+                }
+            }
 
             const fleets = [];
-            if (allPayouts.length > 0) {
-                fleets.push([allPayouts[0]]);
-                for (let i = 1; i < allPayouts.length; i++) {
-                    const timeDiffMinutes = (allPayouts[i].time - allPayouts[i - 1].time) / (1000 * 60);
-                    if (timeDiffMinutes > maxGapMinutes) { fleets.push([]); }
-                    fleets[fleets.length - 1].push(allPayouts[i]);
+            if (ticks.length > 0) {
+                fleets.push([ticks[0]]);
+                for (let i = 1; i < ticks.length; i++) {
+                    const timeDiffMinutes = (ticks[i][0].time - ticks[i-1][0].time) / (1000 * 60);
+                    if (timeDiffMinutes > maxGapMinutes) {
+                        fleets.push([ticks[i]]);
+                    } else {
+                        fleets[fleets.length - 1].push(ticks[i]);
+                    }
                 }
             }
             
-            const individualFleets = fleets.map(fleet => processFleet(fleet)).filter(Boolean);
+            const individualFleets = fleets.map(fleetOfTicks => processFleet(fleetOfTicks.flat())).filter(Boolean);
             if (individualFleets.length === 0) { resetAndHideResults(); return; }
 
             const summaryFleet = generateAllFleetsSummary(individualFleets);
@@ -552,7 +613,7 @@
 
             resultsContainerEl.style.display = 'block';
             
-            activeFleetIndex = 0; // Default to summary
+            activeFleetIndex = 0;
             currentPage = 0;
 
             renderTabsAndPagination();
@@ -562,7 +623,6 @@
         function renderTabsAndPagination() {
             fleetTabsEl.innerHTML = '';
             
-            // Add summary tab
             const summaryButton = document.createElement('button');
             summaryButton.classList.add('tab-link');
             summaryButton.textContent = `All Fleets (${allFleetsData.length -1})`;
@@ -592,7 +652,7 @@
             const fleetsForPage = individualFleets.slice(startIndex, endIndex);
 
             fleetsForPage.forEach((fleetData, i) => {
-                const globalIndex = startIndex + i + 1; // +1 to account for summary
+                const globalIndex = startIndex + i + 1;
                 const button = document.createElement('button');
                 button.classList.add('tab-link');
                 const startDate = fleetData.metrics.logStart;
@@ -604,7 +664,6 @@
                 fleetTabsEl.appendChild(button);
             });
 
-            // Re-apply active class after re-rendering
             Array.from(fleetTabsEl.children).forEach(tab => {
                 tab.classList.toggle('active', parseInt(tab.dataset.index) === activeFleetIndex);
             });
@@ -621,16 +680,14 @@
 
             const { metrics, chartData } = fleetData;
             
-            // Hide ISK Rate chart for summary, show for individual
             iskRateChartContainer.style.display = index === 0 ? 'none' : 'block';
             if(submitLogBtn) {
                  submitLogBtn.style.display = index === 0 ? 'block' : 'none';
             }
 
-
             updatePerformanceMetrics(metrics);
             updateAnalysisMetrics(metrics);
-            updateSiteBreakdownMetrics(metrics.siteCounts);
+            updateSiteBreakdownMetrics(metrics);
             updateCharacterIncomeBreakdown(metrics.characterIncome);
             if (index !== 0) updateIskRateChart(chartData);
             updateSiteTimeChart(chartData);
@@ -647,9 +704,7 @@
             fleetIncomeEl.textContent = m.totalFleetIncome.toLocaleString('en-US') + ' ISK';
             totalTimeEl.textContent = `${Math.floor(m.durationMinutes / 60)}h ${Math.round(m.durationMinutes % 60)}m`;
             bestSiteTimeEl.textContent = formatTime(m.bestTime);
-            secondBestSiteTimeEl.textContent = formatTime(m.secondBestTime);
             avgSiteTimeEl.textContent = formatTime(m.avgTime);
-            secondWorstSiteTimeEl.textContent = formatTime(m.secondWorstTime);
             worstSiteTimeEl.textContent = formatTime(m.worstTime);
         }
 
@@ -671,12 +726,13 @@
             payoutMinEl.textContent = m.minPayout === Infinity ? '0 ISK' : m.minPayout.toLocaleString('en-US') + ' ISK';
         }
 
-        function updateSiteBreakdownMetrics(siteCounts) {
-            vanguardSitesEl.textContent = siteCounts.Vanguard;
-            assaultSitesEl.textContent = siteCounts.Assault;
-            hqSitesEl.textContent = siteCounts.Headquarter;
-            mothershipSitesEl.textContent = siteCounts.Mothership;
-            unknownSitesEl.textContent = siteCounts.Unknown;
+        function updateSiteBreakdownMetrics(metrics) {
+            vanguardSitesEl.textContent = metrics.siteCounts.Vanguard;
+            assaultSitesEl.textContent = metrics.siteCounts.Assault;
+            hqSitesEl.textContent = metrics.siteCounts.Headquarter;
+            mothershipSitesEl.textContent = metrics.siteCounts.Mothership;
+            unknownSitesEl.textContent = metrics.siteCounts.Unknown;
+            adjustedSitesEl.textContent = metrics.adjustedSitesCount;
         }
 
         function updateCharacterIncomeBreakdown(characterIncome) {
@@ -740,7 +796,8 @@
             const totalDataPoints = [], perAltDataPoints = [], altCountDataPoints = [];
             let cumulativeIsk = 0;
 
-            groupedTicks.forEach(group => {
+            const ticksForRate = groupedTicks.slice(1);
+            ticksForRate.forEach(group => {
                 const tickTime = group[0].time;
                 const elapsedMinutes = (tickTime - firstPayoutTime) / (1000 * 60);
                 cumulativeIsk += group.reduce((sum, p) => sum + p.amount, 0);
@@ -808,7 +865,6 @@
             toast.textContent = message;
             container.appendChild(toast);
             
-            // Trigger reflow to enable animation
             toast.offsetHeight;
             
             toast.classList.add('show');
@@ -820,7 +876,6 @@
         }
 
         async function submitLog() {
-            // Submit all individual fleets, not the summary
             const fleetsToSubmit = allFleetsData.slice(1);
 
             if (!fleetsToSubmit || fleetsToSubmit.length === 0) {
@@ -857,9 +912,8 @@
             }
         }
 
-
-        // Initial call to set the page state correctly
         resetAndHideResults();
     </script>
 </body>
 </html>
+
