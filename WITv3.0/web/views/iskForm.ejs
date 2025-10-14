@@ -110,10 +110,10 @@
                             Copy
                         </button>
                      </div>
-                     <div class="result-item"><span class="result-item-label" id="pilot-speed-label">ISK/Hour (Fleet Speed)</span><span class="result-item-value" id="pilot-speed">0 ISK/hr</span></div>
-                     <div class="result-item"><span class="result-item-label" id="fleet-speed-label">ISK/Hour (Box Speed)</span><span class="result-item-value" id="fleet-speed">0 ISK/hr</span></div>
+                     <div class="result-item"><span class="result-item-label" id="pilot-speed-label">Fleet Speed</span><span class="result-item-value" id="pilot-speed">0 ISK/hr</span></div>
                      <div class="result-item"><span class="result-item-label">Fleet Income</span><span class="result-item-value" id="fleet-income">0 ISK</span></div>
-                     <div class="result-item"><span class="result-item-label">Box Income</span><span class="result-item-value" id="total-income">0 ISK</span></div>                     
+                     <div class="result-item" id="box-speed-container"><span class="result-item-label">Box Speed</span><span class="result-item-value" id="fleet-speed">0 ISK/hr</span></div>
+                     <div class="result-item" id="box-income-container"><span class="result-item-label">Box Income</span><span class="result-item-value" id="total-income">0 ISK</span></div>
                      <div class="result-item"><span class="result-item-label">Total Time</span><span class="result-item-value" id="total-time">0h 0m</span></div>
                      <div class="result-item"><span class="result-item-label">Best Site Time</span><span class="result-item-value" id="best-site-time">0m 0s</span></div>
                      <div class="result-item"><span class="result-item-label">Average Site Time</span><span class="result-item-value" id="avg-site-time">0m 0s</span></div>
@@ -227,10 +227,10 @@
         const payoutMinEl = document.getElementById('payout-min');
         const pilotSpeedEl = document.getElementById('pilot-speed');
         const fleetSpeedEl = document.getElementById('fleet-speed');
-        const pilotSpeedLabelEl = document.getElementById('pilot-speed-label');
-        const fleetSpeedLabelEl = document.getElementById('fleet-speed-label');
         const totalIncomeEl = document.getElementById('total-income');
         const fleetIncomeEl = document.getElementById('fleet-income');
+        const boxSpeedContainerEl = document.getElementById('box-speed-container');
+        const boxIncomeContainerEl = document.getElementById('box-income-container');
         const totalTimeEl = document.getElementById('total-time');
         const bestSiteTimeEl = document.getElementById('best-site-time');
         const avgSiteTimeEl = document.getElementById('avg-site-time');
@@ -297,14 +297,29 @@
             const activeFleet = allFleetsData[activeFleetIndex];
             if (!activeFleet) return;
 
-            const { perAltIskRate, totalIskRate, totalUserIncome, totalFleetIncome, sitesRun, avgUserAlts, durationMinutes, minPayout, maxPayout } = activeFleet.metrics;
-            
+            const {
+                perAltIskRate,
+                totalIskRate,
+                totalUserIncome,
+                totalFleetIncome,
+                sitesRun,
+                avgUserAlts,
+                durationMinutes,
+                minPayout,
+                maxPayout,
+                bestTime,
+                avgTime,
+                worstTime,
+                logStart
+            } = activeFleet.metrics;
+
             const time = `${Math.floor(durationMinutes / 60)}h ${Math.round(durationMinutes % 60)}m`;
             const isPerMinute = durationMinutes > 0 && durationMinutes < 60;
-            const rateLabel = isPerMinute ? 'ISK/m' : 'ISK/h';
+            const isSingleBox = avgUserAlts === 1;
 
-            const perAltIskText = perAltIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
             const totalIskRateText = totalIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+            const perAltIskText = perAltIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+
 
             if (totalIskRate === 0) {
                 copyButton.textContent = 'No data';
@@ -312,8 +327,26 @@
                 return;
             };
 
-            const copyText = `.\n${rateLabel} (per Alt): ${perAltIskText}\n${rateLabel} (Total): ${totalIskRateText}\nTotal Income: ${totalUserIncome.toLocaleString('en-US')} ISK\nFleet Income: ${totalFleetIncome.toLocaleString('en-US')} ISK\nTotal Sites: ${sitesRun}\nAverage Alts: ${avgUserAlts.toFixed(1)}\nTotal Time: ${time}\nMin/Max Payout: ${minPayout.toLocaleString('en-US')} ISK / ${maxPayout.toLocaleString('en-US')} ISK`;
-            
+            const formattedLogStart = logStart ? `${logStart.getUTCHours().toString().padStart(2, '0')}:${logStart.getUTCMinutes().toString().padStart(2, '0')}` : 'N/A';
+
+            let copyText = `.\n`;
+            copyText += `Fleet Speed: ${perAltIskText}\n`;
+            copyText += `Fleet Income: ${totalFleetIncome.toLocaleString('en-US')} ISK\n`;
+
+            if (!isSingleBox) {
+                copyText += `Box Speed: ${totalIskRateText}\n`;
+                copyText += `Box Income: ${totalUserIncome.toLocaleString('en-US')} ISK\n`;
+            }
+
+            copyText += `# of boxes: ${avgUserAlts.toFixed(3)}\n` +
+                `Total Time: ${time}\n` +
+                `Best Site: ${formatTime(bestTime)}\n` +
+                `Worst Site: ${formatTime(worstTime)}\n` +
+                `Average Site: ${formatTime(avgTime)}\n` +
+                `Total Sites: ${sitesRun}\n` +
+                `Log Start Time: ${formattedLogStart}\n` +
+                `Min/Max Payout: ${minPayout.toLocaleString('en-US')} ISK / ${maxPayout.toLocaleString('en-US')} ISK`;
+
             const tempTextArea = document.createElement('textarea');
             tempTextArea.value = copyText;
             document.body.appendChild(tempTextArea);
@@ -591,7 +624,7 @@
                     }
                 }
             }
-
+            
             const fleets = [];
             if (ticks.length > 0) {
                 fleets.push([ticks[0]]);
@@ -695,13 +728,16 @@
 
         function updatePerformanceMetrics(m) {
             const isPerMinute = m.durationMinutes > 0 && m.durationMinutes < 60;
-            pilotSpeedEl.textContent = m.perAltIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
-            fleetSpeedEl.textContent = m.totalIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
-            pilotSpeedLabelEl.textContent = isPerMinute ? 'ISK/Minute (per Alt)' : 'ISK/Hour (per Alt)';
-            fleetSpeedLabelEl.textContent = isPerMinute ? 'ISK/Minute (Total)' : 'ISK/Hour (Total)';
+            const isSingleBox = m.avgUserAlts === 1;
+
+            boxSpeedContainerEl.style.display = isSingleBox ? 'none' : 'flex';
+            boxIncomeContainerEl.style.display = isSingleBox ? 'none' : 'flex';
             
-            totalIncomeEl.textContent = m.totalUserIncome.toLocaleString('en-US') + ' ISK';
+            pilotSpeedEl.textContent = m.perAltIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
             fleetIncomeEl.textContent = m.totalFleetIncome.toLocaleString('en-US') + ' ISK';
+            fleetSpeedEl.textContent = m.totalIskRate.toLocaleString('en-US') + (isPerMinute ? ' ISK/min' : ' ISK/hr');
+            totalIncomeEl.textContent = m.totalUserIncome.toLocaleString('en-US') + ' ISK';
+            
             totalTimeEl.textContent = `${Math.floor(m.durationMinutes / 60)}h ${Math.round(m.durationMinutes % 60)}m`;
             bestSiteTimeEl.textContent = formatTime(m.bestTime);
             avgSiteTimeEl.textContent = formatTime(m.avgTime);
@@ -709,8 +745,8 @@
         }
 
         function updateAnalysisMetrics(m) {
-            avgPilotsEl.textContent = m.avgUserAlts.toFixed(1);
-            pilotCountDetectedEl.textContent = parseInt(pilotCountEl.value, 10) > 0 ? `(manual override)` : `(avg detected: ${m.avgUserAlts.toFixed(1)})`;
+            avgPilotsEl.textContent = m.avgUserAlts.toFixed(3);
+            pilotCountDetectedEl.textContent = parseInt(pilotCountEl.value, 10) > 0 ? `(manual override)` : `(avg detected: ${m.avgUserAlts.toFixed(3)})`;
             measuredSitesEl.textContent = m.sitesRun;
             payoutCountEl.textContent = m.payoutCount;
 
@@ -813,7 +849,7 @@
             iskRateChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: totalDataPoints.map(p => p.x.toFixed(0) + ' min'),
+                    labels: totalDataPoints.map(p => p.x.toFixed(3) + ' min'),
                     datasets: [ 
                         { type: 'line', label: 'Total ISK/Hour', data: totalDataPoints.map(p => p.y), borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.2)', fill: true, tension: 0.1, yAxisID: 'y' }, 
                         { type: 'line', label: 'Per Alt ISK/Hour', data: perAltDataPoints.map(p => p.y), borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.2)', fill: true, tension: 0.1, yAxisID: 'y' },
@@ -916,4 +952,6 @@
     </script>
 </body>
 </html>
+
+
 
