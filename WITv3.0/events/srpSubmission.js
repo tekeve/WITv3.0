@@ -1,52 +1,66 @@
 const { MessageFlags, ThreadAutoArchiveDuration, ChannelType } = require('discord.js');
 const logger = require('@helpers/logger');
-const { buildSrpEmbed } = require('@embeds/srpEmbed.js');
+const { buildSrpDetailsEmbed, buildSrpItemsEmbed } = require('@embeds/srpEmbed.js');
 const configManager = require('@helpers/configManager');
 const authManager = require('@helpers/authManager'); // For ESI authentication
 const esiService = require('@helpers/esiService');   // For making ESI calls
 const charManager = require('@helpers/characterManager');
 
 /**
+ * Formats an ISK value for EVE mail.
+ * @param {number} value The ISK value.
+ * @returns {string} The formatted string.
+ */
+function formatIskForMail(value) {
+    return new Intl.NumberFormat('en-US').format(value || 0);
+}
+
+/**
  * Formats the form data into a clean text body for an EVE mail.
  * @param {object} formData - The data collected from the web form.
  * @param {string} submitterName - The in-game name of the person who ran the /srp command.
+ * @param {object} processedKillmail - The processed killmail data from srpManager.
  * @returns {string} The formatted EVE mail body.
  */
-function formatEveMailBody(formData, submitterName) {
-    const formattedValue = new Intl.NumberFormat('en-US').format(formData.kill_value);
+function formatEveMailBody(formData, submitterName, processedKillmail) {
     const backseatDetails = formData.backseat_info === 'Other'
         ? `Other: ${formData.backseat_other_details || 'N/A'}`
         : formData.backseat_info;
 
-    // 1. Declare the report_link variable here with a default value.
     let report_link = 'Not Provided';
-
-    // 2. Check for and process the kill report link.
     if (formData.kill_report_option === 'link' && formData.kill_report_link) {
         const match = formData.kill_report_link.match(/killmails\/(\d+)\/([a-f0-9]+)\//);
         if (match) {
             const killmail_id = match[1];
             const killmail_hash = match[2];
-            // 3. If a valid link is found, update the variable.
             report_link = `<url=killReport:${killmail_id}:${killmail_hash}>Kill: ${formData.pilot_name} (${formData.ship_type})</url>`;
         } else {
-            // As a fallback, if the link is invalid, just show the text they entered.
             report_link = formData.kill_report_link;
         }
     }
 
-    // Use a template literal to build the mail body.
+    let itemsList = '';
+    if (processedKillmail) {
+        const { victim, items } = processedKillmail;
+        itemsList += `\n<b>Destroyed Items:</b>\n`;
+        itemsList += `- ${victim.shipTypeName} - ${formatIskForMail(victim.shipValue)} ISK\n`;
+        items.destroyed.forEach(item => {
+            itemsList += `- ${item.quantity.toLocaleString()}x ${item.name} - ${formatIskForMail(item.value)} ISK\n`;
+        });
+    }
+
     return `
 SRP Request Details
 -------------------
 <b>Pilot Name:</b> ${formData.pilot_name}
 <b>Ship Lost:</b> ${formData.ship_type}
-<b>ISK Value:</b> ${formattedValue} ISK
+<b>Calculated Value:</b> ${formatIskForMail(processedKillmail ? processedKillmail.totalValue : formData.kill_value)} ISK
+
 <b>FC Name:</b> ${formData.fc_name}
 <b>FC Status:</b> ${backseatDetails}
 
 <b>Kill Report Link:</b> ${report_link}
-
+${itemsList}
 <b>Loss Description (AAR):</b>
 ${formData.loss_description || 'No description provided.'}
 
@@ -61,7 +75,7 @@ module.exports = {
     name: 'srpSubmission',
     async execute(payload, client) {
         logger.info(`Processing srpSubmission event for user ${payload.user.tag}`);
-        const { interaction, user, formData } = payload;
+        const { interaction, user, formData, processedKillmail } = payload;
         const config = configManager.get();
 
         try {
@@ -69,21 +83,22 @@ module.exports = {
             const srpChannelId = config.srpChannelId ? config.srpChannelId[0] : null;
             if (!srpChannelId) {
                 logger.error("srpChannelId is not configured in the database.");
-                // Continue to attempt EVE mail even if Discord part fails
             } else {
                 const srpChannel = await client.channels.fetch(srpChannelId);
                 if (srpChannel && (srpChannel.type === ChannelType.GuildText || srpChannel.type === ChannelType.GuildAnnouncement)) {
-                    const srpEmbed = await buildSrpEmbed(payload);
-
-                    // Create a new thread for the SRP request
                     const thread = await srpChannel.threads.create({
                         name: `SRP: ${formData.pilot_name} - ${formData.ship_type}`,
                         autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
                         reason: `New SRP request for ${formData.pilot_name}`,
                     });
 
-                    // Send the embed to the new thread
-                    await thread.send({ embeds: [srpEmbed] });
+                    // Build both embeds
+                    const detailsEmbed = await buildSrpDetailsEmbed(payload);
+                    const itemEmbeds = await buildSrpItemsEmbed(payload); // This returns an array
+
+                    // Combine them and send
+                    const allEmbeds = [detailsEmbed, ...itemEmbeds];
+                    await thread.send({ embeds: allEmbeds });
 
                 } else {
                     logger.error(`Could not find the SRP channel with ID: ${srpChannelId} or it's not a text-based channel.`);
@@ -92,7 +107,6 @@ module.exports = {
 
             // --- Send EVE Mail ---
             const srpMailingListId = config.srpMailingListId ? config.srpMailingListId[0] : null;
-            logger.info('Mail list ID', srpMailingListId);
             if (!srpMailingListId) {
                 logger.warn('srpMailingListId is not configured in the database. Skipping EVE mail.');
             } else {
@@ -106,7 +120,7 @@ module.exports = {
                         const submitterName = submitterCharData?.main?.character_name || user.tag;
 
                         const mailSubject = `SRP Request: ${formData.pilot_name} - ${formData.ship_type}`;
-                        const mailBody = formatEveMailBody(formData, submitterName);
+                        const mailBody = formatEveMailBody(formData, submitterName, processedKillmail);
 
                         await esiService.post({
                             endpoint: `/characters/${authData.character_id}/mail/`,
