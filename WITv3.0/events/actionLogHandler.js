@@ -219,7 +219,7 @@ async function handleInviteCreate(invite) {
             .setDescription(`Invite \`${invite.code}\` created by **${invite.inviter.tag}** for channel ${invite.channel}.`)
             .addFields(
                 { name: 'Max Uses', value: `${invite.maxUses || 'Infinite'}`, inline: true },
-                { name: 'Expires', value: invite.expiresTimestamp ? `` : 'Never', inline: true }
+                { name: 'Expires', value: invite.expiresTimestamp ? `<t:${Math.floor(invite.expiresTimestamp / 1000)}:R>` : 'Never', inline: true }
             )
             .setTimestamp();
 
@@ -330,30 +330,51 @@ async function handleMemberRemove(member) {
  * Handles timeout changes for a member
  */
 async function handleTimeoutChanges(oldMember, newMember) {
-    const oldTimeout = oldMember.communicationDisabledUntilTimestamp;
-    const newTimeout = newMember.communicationDisabledUntilTimestamp;
+    const oldTimeoutTimestamp = oldMember.communicationDisabledUntilTimestamp;
+    const newTimeoutTimestamp = newMember.communicationDisabledUntilTimestamp;
 
-    if ((oldTimeout || null) !== (newTimeout || null)) {
-        try {
-            const logEntry = await getAuditLogEntry(
-                newMember.guild,
-                AuditLogEvent.MemberUpdate,
-                newMember.id,
-                (changes) => changes.some(c => c.key === 'communication_disabled_until')
-            );
-            const executor = logEntry ? logEntry.executor : null;
+    // No change in timeout status
+    if (oldTimeoutTimestamp === newTimeoutTimestamp) {
+        return;
+    }
 
-            if (newTimeout && newTimeout > Date.now()) {
-                const embed = new EmbedBuilder()
-                    .setColor(0x43B581)
-                    .setTitle('Member Timeout Removed')
-                    .setDescription(`The timeout for ${newMember.user.tag} was removed ${executor ? `by **${executor.tag}**` : ''}.`)
-                    .setTimestamp();
-                actionLog.postLog(newMember.guild, 'log_member_timeout', embed, { member: newMember });
-            }
-        } catch (error) {
-            await ErrorHandler.handleDiscordError(error, `handling timeout changes for ${newMember.user.tag}`);
+    try {
+        const logEntry = await getAuditLogEntry(
+            newMember.guild,
+            AuditLogEvent.MemberUpdate,
+            newMember.id,
+            (changes) => changes.some(c => c.key === 'communication_disabled_until')
+        );
+        const executor = logEntry ? logEntry.executor : null;
+
+        const wasTimedOut = oldTimeoutTimestamp && oldTimeoutTimestamp > Date.now();
+        const isTimedOut = newTimeoutTimestamp && newTimeoutTimestamp > Date.now();
+
+        // Case 1: Timeout was applied
+        if (!wasTimedOut && isTimedOut) {
+            const expiryTimestamp = Math.floor(newTimeoutTimestamp / 1000);
+            const embed = new EmbedBuilder()
+                .setColor(0xED4245) // Red for punishment
+                .setTitle('Member Timed Out')
+                .setDescription(`${newMember.user.tag} was timed out ${executor ? `by **${executor.tag}**` : ''}.`)
+                .addFields(
+                    { name: 'Reason', value: logEntry?.reason || 'No reason provided.' },
+                    { name: 'Expires', value: `<t:${expiryTimestamp}:R>` }
+                )
+                .setTimestamp();
+            actionLog.postLog(newMember.guild, 'log_member_timeout', embed, { member: newMember });
         }
+        // Case 2: Timeout was removed
+        else if (wasTimedOut && !isTimedOut) {
+            const embed = new EmbedBuilder()
+                .setColor(0x43B581) // Green for removal
+                .setTitle('Member Timeout Removed')
+                .setDescription(`The timeout for ${newMember.user.tag} was removed ${executor ? `by **${executor.tag}**` : ''}.`)
+                .setTimestamp();
+            actionLog.postLog(newMember.guild, 'log_member_timeout', embed, { member: newMember });
+        }
+    } catch (error) {
+        await ErrorHandler.handleDiscordError(error, `handling timeout changes for ${newMember.user.tag}`);
     }
 }
 

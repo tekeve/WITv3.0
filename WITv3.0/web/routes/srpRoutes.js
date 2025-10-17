@@ -9,6 +9,9 @@ const srpController = require('@webControllers/srpController');
  * @returns The configured Express router.
  */
 module.exports = (client, activeSrpTokens) => {
+    // NEW: API route for the form to fetch killmail details
+    router.post('/srp/api/killmail-details/:token', srpController.getKillmailDetails(client, activeSrpTokens));
+
     // Route to display the form
     router.get('/srp/:token', srpController.showSrpForm(activeSrpTokens));
 

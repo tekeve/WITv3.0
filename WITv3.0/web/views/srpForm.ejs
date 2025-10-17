@@ -14,7 +14,7 @@
             color: #e2e8f0;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start; /* Changed to flex-start */
             min-height: 100vh;
             margin: 0;
             padding: 20px;
@@ -87,63 +87,79 @@
             box-sizing: border-box;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-        textarea {
-            resize: none;
-        }
+        textarea { resize: none; }
         input[type=number]::-webkit-outer-spin-button,
-        input[type=number]::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        input[type=number] {
-            -moz-appearance: textfield;
-        }
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
         input:focus, textarea:focus {
             outline: none;
             border-color: #38bdf8;
             box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
         }
-        .radio-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            padding-top: 0.25rem;
-        }
-        .radio-group label {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            cursor: pointer;
-            font-weight: normal;
-            margin-bottom: 0;
-        }
-        .conditional-input {
-            margin-top: 1rem;
-            display: none;
-        }
+        .radio-group { display: flex; flex-wrap: wrap; gap: 1rem; padding-top: 0.25rem; }
+        .radio-group label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal; margin-bottom: 0; }
+        .conditional-input { margin-top: 1rem; display: none; }
         button {
-            width: 100%;
-            padding: 0.85rem 1.5rem;
-            border: none;
-            border-radius: 0.375rem;
-            background-color: #0ea5e9;
-            color: #ffffff;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
+            width: 100%; padding: 0.85rem 1.5rem; border: none; border-radius: 0.375rem;
+            background-color: #0ea5e9; color: #ffffff; font-size: 1rem; font-weight: 600;
+            cursor: pointer; transition: background-color 0.2s ease;
         }
-        button:hover { 
-            background-color: #38bdf8;
-        }
+        button:hover { background-color: #38bdf8; }
         .char-counter {
-            position: absolute;
-            bottom: 8px;
-            right: 12px;
-            font-size: 0.75rem;
-            color: #94a3b8;
-            pointer-events: none;
+            position: absolute; bottom: 8px; right: 12px;
+            font-size: 0.75rem; color: #94a3b8; pointer-events: none;
         }
+        /* NEW STYLES for killmail details */
+        #killmail-details-container {
+            display: none;
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        #killmail-details-container h3 {
+            margin-top: 0;
+            font-size: 1rem;
+            color: #f1f5f9;
+            border-bottom: 1px solid #475569;
+            padding-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .item-list {
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.875rem;
+            padding-right: 10px; /* For scrollbar */
+        }
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #334155;
+        }
+        .item-row:last-child { border-bottom: none; }
+        .item-name { color: #cbd5e1; }
+        .item-value { color: #f8fafc; font-weight: 500; }
+        .spinner {
+            display: inline-block;
+            width: 1em; height: 1em;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spinner-border .75s linear infinite;
+            vertical-align: text-bottom;
+            margin-left: 0.5rem;
+            display: none; /* Initially hidden */
+        }
+        @keyframes spinner-border { to { transform: rotate(360deg); } }
+        .status-message {
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        .status-message.success { color: #4ade80; }
+        .status-message.error { color: #f87171; }
     </style>
 </head>
 <body>
@@ -151,9 +167,33 @@
         <h1>Ship Replacement Program</h1>
         <p class="form-subtitle">Please fill out the details for your loss.</p>
         <form action="/srp/<%= token %>" method="POST">
+            <input type="hidden" name="processed_killmail_data" id="processed_killmail_data">
 
             <fieldset>
                 <legend>Pilot & Loss Details</legend>
+                 <div class="form-group">
+                    <label>Kill Report <span id="killmail-spinner" class="spinner"></span></label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="kill_report_option" value="link" required> Link Provided</label>
+                        <label><input type="radio" name="kill_report_option" value="not_obtained"> Not Obtained</label>
+                    </div>
+                    <div id="kill_report_link_container" class="conditional-input">
+                        <input 
+                            type="text" 
+                            name="kill_report_link" 
+                            id="kill_report_link"
+                            placeholder="Paste the full 'External Kill Link' from in-game"
+                            pattern="^https:\/\/esi\.evetech\.net\/v\d+\/killmails\/\d+\/[a-f0-9]+\/.*$"
+                            title="Please paste the full, unmodified ESI link copied from the in-game kill report.">
+                         <div id="killmail-status" class="status-message"></div>
+                    </div>
+                </div>
+
+                <div id="killmail-details-container">
+                    <h3>Killmail Details</h3>
+                    <div id="destroyed-items-list" class="item-list"></div>
+                </div>
+
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="pilot_name">Pilot's Name (in-game)</label>
@@ -165,26 +205,11 @@
                     </div>
                 </div>
                  <div class="form-group">
-                    <label>Kill Report</label>
-                    <div class="radio-group">
-                        <label><input type="radio" name="kill_report_option" value="link" required> Link Provided</label>
-                        <label><input type="radio" name="kill_report_option" value="not_obtained"> Not Obtained</label>
-                    </div>
-                    <div id="kill_report_link_container" class="conditional-input">
-                        <input 
-                            type="text" 
-                            name="kill_report_link" 
-                            placeholder="Paste the full 'External Kill Link' from in-game"
-                            pattern="^https:\/\/esi\.evetech\.net\/v\d+\/killmails\/\d+\/[a-f0-9]+\/.*$"
-                            title="Please paste the full, unmodified ESI link copied from the in-game kill report.">
-                    </div>
-                </div>
-                 <div class="form-group">
-                    <label for="kill_value">Kill Report Value (ISK)</label>
-                    <input type="number" id="kill_value" name="kill_value" placeholder="e.g., 150000000" required>
+                    <label for="kill_value">Estimated Kill Value (ISK)</label>
+                    <input type="number" id="kill_value" name="kill_value" placeholder="Auto-filled from killmail or enter manually" required>
                 </div>
             </fieldset>
-
+            
             <fieldset>
                 <legend>Fleet Information</legend>
                 <div class="form-grid">
@@ -193,10 +218,11 @@
                         <input type="text" id="fc_name" name="fc_name" required>
                     </div>
                     <div class="form-group">
+                        <label>FC Status</label>
                         <div class="radio-group">
                             <label><input type="radio" name="backseat_info" value="Full FC" required> Full FC</label>
                             <label><input type="radio" name="backseat_info" value="Solo T-FC"> Solo T-FC</label>
-                            <label><input type="radio" name="backseat_info" value="T-FC"> T-FC</label>
+                            <label><input type="radio" name="backseat_info" value="T-FC"> T-FC</col>
                         </div>
                          <div id="backseat_other_container" class="conditional-input">
                             <input type="text" name="backseat_other_details" placeholder="Backseat Name">
@@ -240,19 +266,114 @@
     </div>
 
     <script>
+        const token = "<%= token %>";
+        const killReportLinkInput = document.getElementById('kill_report_link');
+        const pilotNameInput = document.getElementById('pilot_name');
+        const shipTypeInput = document.getElementById('ship_type');
+        const killValueInput = document.getElementById('kill_value');
+        const killmailDetailsContainer = document.getElementById('killmail-details-container');
+        const destroyedItemsList = document.getElementById('destroyed-items-list');
+        const killmailSpinner = document.getElementById('killmail-spinner');
+        const killmailStatus = document.getElementById('killmail-status');
+        const processedKillmailDataInput = document.getElementById('processed_killmail_data');
+
+        let debounceTimeout;
+
+        function formatIsk(value) {
+            if (!value) return '0 ISK';
+            return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value) + ' ISK';
+        }
+
+        async function fetchKillmailData() {
+            const url = killReportLinkInput.value.trim();
+            const urlPattern = /^https:\/\/esi\.evetech\.net\/v\d+\/killmails\/\d+\/[a-f0-9]+\/.*?$/;
+            
+            killmailSpinner.style.display = 'inline-block';
+            killmailStatus.textContent = 'Fetching details...';
+            killmailStatus.className = 'status-message';
+            killmailDetailsContainer.style.display = 'none';
+            processedKillmailDataInput.value = '';
+
+            if (!urlPattern.test(url)) {
+                killmailSpinner.style.display = 'none';
+                if (url) { // only show error if there's text
+                    killmailStatus.textContent = 'Invalid ESI killmail link format.';
+                    killmailStatus.className = 'status-message error';
+                } else {
+                    killmailStatus.textContent = '';
+                }
+                return;
+            }
+
+            try {
+                const response = await fetch(`/srp/api/killmail-details/${token}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ killmailUrl: url })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    const { data } = result;
+                    pilotNameInput.value = data.victim.characterName || '';
+                    shipTypeInput.value = data.victim.shipTypeName || '';
+                    killValueInput.value = Math.round(data.totalValue) || '';
+                    processedKillmailDataInput.value = JSON.stringify(data);
+
+                    let itemsHTML = '<h4>Destroyed Items</h4>';
+                    if (data.items.destroyed.length > 0) {
+                        itemsHTML += data.items.destroyed.map(item => `
+                            <div class="item-row">
+                                <span class="item-name">${item.quantity.toLocaleString()}x ${item.name}</span>
+                                <span class="item-value">${formatIsk(item.value)}</span>
+                            </div>
+                        `).join('');
+                    } else {
+                        itemsHTML += '<p>No destroyed items found.</p>';
+                    }
+                    destroyedItemsList.innerHTML = itemsHTML;
+                    killmailDetailsContainer.style.display = 'block';
+                    killmailStatus.textContent = `Successfully fetched killmail worth ${formatIsk(data.totalValue)}.`;
+                    killmailStatus.className = 'status-message success';
+                } else {
+                    throw new Error(result.message || 'Failed to fetch data.');
+                }
+            } catch (error) {
+                killmailStatus.textContent = `Error: ${error.message}`;
+                killmailStatus.className = 'status-message error';
+            } finally {
+                killmailSpinner.style.display = 'none';
+            }
+        }
+        
+        killReportLinkInput.addEventListener('paste', () => {
+             // Use a short timeout to allow the pasted value to be set in the input field
+             setTimeout(() => {
+                clearTimeout(debounceTimeout);
+                fetchKillmailData();
+             }, 100);
+        });
+
+        killReportLinkInput.addEventListener('input', () => {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(fetchKillmailData, 750); // Debounce for 750ms
+        });
+
+
         // JS for conditional fields
         const killReportRadios = document.querySelectorAll('input[name="kill_report_option"]');
         const killReportLinkContainer = document.getElementById('kill_report_link_container');
-        const killReportLinkInput = killReportLinkContainer.querySelector('input');
 
         killReportRadios.forEach(radio => {
             radio.addEventListener('change', () => {
-                if (radio.value === 'link' && radio.checked) {
-                    killReportLinkContainer.style.display = 'block';
-                    killReportLinkInput.required = true;
-                } else {
-                    killReportLinkContainer.style.display = 'none';
-                    killReportLinkInput.required = false;
+                const isLink = radio.value === 'link' && radio.checked;
+                killReportLinkContainer.style.display = isLink ? 'block' : 'none';
+                killReportLinkInput.required = isLink;
+                if (!isLink) {
+                    killmailDetailsContainer.style.display = 'none';
+                    killmailStatus.textContent = '';
+                    processedKillmailDataInput.value = '';
                 }
             });
         });
@@ -263,30 +384,21 @@
 
         backseatRadios.forEach(radio => {
             radio.addEventListener('change', () => {
-                if (radio.value === 'T-FC' && radio.checked) {
-                    backseatOtherContainer.style.display = 'block';
-                    backseatOtherInput.required = true;
-                } else {
-                    backseatOtherContainer.style.display = 'none';
-                    backseatOtherInput.required = false;
-                }
+                const isOther = radio.value === 'T-FC' && radio.checked;
+                backseatOtherContainer.style.display = isOther ? 'block' : 'none';
+                backseatOtherInput.required = isOther;
             });
         });
 
-        // JS for character counters
         function setupCharCounter(textarea) {
             const counter = textarea.nextElementSibling;
             if (!counter || !counter.classList.contains('char-counter')) return;
-
             const maxLength = textarea.maxLength;
-
             const updateCounter = () => {
-                const remaining = maxLength - textarea.value.length;
-                counter.textContent = `${remaining} characters remaining`;
+                counter.textContent = `${maxLength - textarea.value.length} characters remaining`;
             };
-
             textarea.addEventListener('input', updateCounter);
-            updateCounter(); // Initial call
+            updateCounter();
         }
 
         setupCharCounter(document.getElementById('loss_description'));
@@ -294,4 +406,3 @@
     </script>
 </body>
 </html>
-

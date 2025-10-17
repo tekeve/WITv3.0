@@ -3,7 +3,6 @@ const configManager = require('@helpers/configManager');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 const logger = require('@helpers/logger');
 const auditLogger = require('@helpers/auditLogger');
-const { buildPromotionEmbed } = require('@embeds/promoteEmbed');
 const charManager = require('@helpers/characterManager');
 
 /**
@@ -242,7 +241,6 @@ async function getMemberHierarchyInfo(member) {
 async function manageRoles(interaction, action) {
     const targetUser = interaction.options.getUser('user');
     const targetRankName = interaction.options.getString('rank');
-    let dmSendFailed = false;
 
     const isLeadershipAction = targetRankName.toLowerCase() === 'leadership';
     const isRemoveAllAction = action === 'demote' && targetRankName === 'Remove All Roles';
@@ -299,21 +297,6 @@ async function manageRoles(interaction, action) {
     // --- END HIERARCHY CHECKS ---
 
     const config = configManager.get();
-
-    if (action === 'promote') {
-        const promotionDMs = config.promotionDMs || {};
-        const dmData = promotionDMs[targetRankName];
-
-        if (dmData && dmData.channelId && dmData.message) {
-            const promotionEmbed = buildPromotionEmbed(targetRankName, dmData);
-            try {
-                await targetUser.send({ embeds: [promotionEmbed] });
-            } catch (dmError) {
-                logger.warn(`Could not send promotion DM to ${targetUser.tag}. They may have DMs disabled.`);
-                dmSendFailed = true;
-            }
-        }
-    }
 
     try {
         // Special handling for Remove All Roles
@@ -377,9 +360,6 @@ async function manageRoles(interaction, action) {
         if (added.length === 0 && removed.length === 0) {
             replyMessage = `No role changes were necessary for ${targetUser.tag}. Their roles are already in the correct state.`;
         }
-        if (dmSendFailed) {
-            replyMessage += `\n*(Note: Could not send a confirmation DM to the user.)*`;
-        }
 
         if (discrepancies) {
             replyMessage += `\n\n**⚠️ Warning: Role discrepancies found after sync!**`;
@@ -389,7 +369,7 @@ async function manageRoles(interaction, action) {
             if (discrepancies.extra.length > 0) {
                 replyMessage += `\n- **Extra roles found on Discord:** ${discrepancies.extra.join(', ')}`;
             }
-            replyMessage += `\nThis can happen due to Discord API issues. You can run \`/refreshroles user:@${targetUser.tag}\` to try again.`;
+            replyMessage += `\nThis usually indicates a permissions issue. Please check the bot's role hierarchy in Discord's settings.`;
         }
 
         if (added.length > 0 || removed.length > 0) {
@@ -486,3 +466,4 @@ module.exports = {
     isResidentOrHigher,
     isCommanderOrHigher,
 };
+
