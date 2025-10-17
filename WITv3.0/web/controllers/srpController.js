@@ -126,10 +126,12 @@ exports.handleSrpSubmission = (client, activeSrpTokens) => async (req, res) => {
 
         logger.success(`SRP request received from ${user.tag} for a ${ship_type}.`);
 
+        // Emit the event with the processed killmail data at the top level
         client.emit('srpSubmission', {
             interaction,
             user,
-            formData: { ...req.body, processedKillmail } // Pass the parsed object
+            formData: req.body,
+            processedKillmail // Pass the parsed object at the top level
         });
 
         res.render('success', {

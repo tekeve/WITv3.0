@@ -97,7 +97,7 @@ module.exports = {
                     const itemEmbeds = await buildSrpItemsEmbed(payload); // This returns an array
 
                     // Combine them and send
-                    const allEmbeds = [detailsEmbed, ...itemEmbeds];
+                    const allEmbeds = [detailsEmbed, ...itemEmbeds].slice(0, 10); // Discord allows a max of 10 embeds
                     await thread.send({ embeds: allEmbeds });
 
                 } else {
@@ -165,4 +165,3 @@ module.exports = {
         }
     }
 };
-

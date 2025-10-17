@@ -23,6 +23,7 @@ function chunkLines(lines, maxLength = 4096) {
     return chunks;
 }
 
+
 /**
  * Formats an ISK value into a full, readable string with commas.
  * @param {number} value - The ISK value.
@@ -111,9 +112,7 @@ async function buildSrpItemsEmbed(payload) {
     const destroyedModules = items.destroyed || [];
     const embeds = [];
 
-    // Create a comprehensive list of all destroyed items.
     const allDestroyed = [
-        // Add ship hull as the first item
         {
             typeId: victim.shipTypeId,
             name: victim.shipTypeName,
@@ -123,18 +122,12 @@ async function buildSrpItemsEmbed(payload) {
         ...destroyedModules
     ];
 
-    // Sort the list: hull first, then modules by value descending.
-    const sortedItems = allDestroyed.sort((a, b) => {
-        if (a.typeId === victim.shipTypeId) return -1; // 'a' is the ship, it comes first
-        if (b.typeId === victim.shipTypeId) return 1;  // 'b' is the ship, it comes first
-        return b.value - a.value; // Otherwise, sort by value descending
-    });
+    const sortedItems = allDestroyed.sort((a, b) => b.value - a.value);
 
     const itemLines = sortedItems.map(item => {
-        const itemIconURL = `https://images.evetech.net/types/${item.typeId}/icon?size=32`;
-        const quantityString = item.quantity > 1 ? `\`${item.quantity.toLocaleString()}x\`` : '';
-        // Use the new full formatting for item values
-        return `[Icon](${itemIconURL}) ${quantityString} ${item.name} - **${formatIskFull(item.value)}**`;
+        const quantityString = item.quantity > 1 ? `\`${item.quantity.toLocaleString()}x\` ` : '';
+        // Reverted to plain text without icons
+        return `${quantityString}${item.name} - **${formatIskFull(item.value)}**`;
     });
 
     if (itemLines.length === 0) {
@@ -142,7 +135,7 @@ async function buildSrpItemsEmbed(payload) {
     }
 
     // Chunk the lines into separate descriptions for multiple embeds if needed
-    const itemChunks = chunkLines(itemLines, 2048); // Use a smaller chunk size for descriptions
+    const itemChunks = chunkLines(itemLines, 4000); // Use a smaller chunk size for descriptions
 
     itemChunks.forEach((chunk, index) => {
         const itemsEmbed = new EmbedBuilder()
