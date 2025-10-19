@@ -95,6 +95,11 @@
                 <label for="actionLogChannelId">Action Log Channel ID</label>
                 <input type="text" id="actionLogChannelId" name="actionLogChannelId" required value="<%= currentConfig.actionLogChannelId || '' %>">
             </div>
+            <div class="form-group">
+                <label for="moderationAlertChannelId">Moderation Alert Channel ID</label>
+                <input type="text" id="moderationAlertChannelId" name="moderationAlertChannelId" value="<%= currentConfig.moderationAlertChannelId || '' %>">
+                <small>Channel for alerts when non-Council use mod commands.</small>
+            </div>
         </div>
         
         <h2>EVE Integration</h2>

@@ -90,8 +90,10 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
 
     embed.addFields(fields);
 
-    // Add the influence progress bar as a new, non-inline field at the bottom
-    embed.addFields({ name: 'Influence', value: createProgressBar(highSecIncursion.influence * 100, 100) });
+    // The value passed is the direct influence, which determines the bar's fullness (Sansha control).
+    // The text is inverted from that value to show pilot progress towards completing the incursion.
+    const influencePercentage = highSecIncursion.influence * 100;
+    embed.addFields({ name: 'Sansha Control', value: createProgressBar(influencePercentage, 100, 30, true) });
 
     embed.setFooter({ text: 'WIT v3.0 Incursion Tracker | Data from ESI' }).setTimestamp();
 
@@ -144,7 +146,5 @@ function buildNoIncursionEmbed(state) {
 }
 
 module.exports = { buildActiveIncursionEmbed, buildNoIncursionEmbed, formatDuration };
-
-
 
 

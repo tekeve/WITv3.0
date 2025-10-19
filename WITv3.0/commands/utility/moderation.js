@@ -2,6 +2,7 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } =
 const roleManager = require('@helpers/roleManager');
 const moderationManager = require('@helpers/moderationManager');
 const logger = require('@helpers/logger');
+const configManager = require('@helpers/configManager');
 
 // Durations in milliseconds for timeout command
 const durationOptions = {
@@ -13,12 +14,20 @@ const durationOptions = {
     '1 week': 7 * 24 * 60 * 60 * 1000,
 };
 
+const durationValueNameMap = {
+    '300000': '5 Minutes',
+    '600000': '10 Minutes',
+    '3600000': '1 Hour',
+    '86400000': '1 Day',
+    '259200000': '3 Days',
+    '604800000': '1 Week'
+};
+
 module.exports = {
-    permissions: ['leadership', 'officer', 'council'],
+    permissions: ['line_commander'],
     data: new SlashCommandBuilder()
         .setName('moderation')
         .setDescription('Moderation tools for staff.')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
         .addSubcommand(subcommand =>
             subcommand
                 .setName('kick')
@@ -92,6 +101,19 @@ module.exports = {
             return interaction.editReply({ content: "You cannot moderate a member with an equal or higher role." });
         }
 
+        // Subcommand-specific permission checks
+        if (subcommand === 'kick' || subcommand === 'ban') {
+            if (!roleManager.isCouncilOrHigher(interaction.member)) {
+                return interaction.editReply({ content: 'You do not have permission to kick or ban members. This action is restricted to Council members and higher.' });
+            }
+        }
+
+        if (subcommand === 'timeout') {
+            if (!roleManager.isLineCommanderOrHigher(interaction.member)) {
+                return interaction.editReply({ content: 'You do not have permission to time out members. This action is restricted to Line Commanders and higher.' });
+            }
+        }
+
         let responseEmbed;
 
         switch (subcommand) {
@@ -155,7 +177,8 @@ module.exports = {
                 break;
 
             case 'timeout':
-                const duration = parseInt(interaction.options.getString('duration'), 10);
+                const durationStringValue = interaction.options.getString('duration');
+                const duration = parseInt(durationStringValue, 10);
                 if (!targetMember.moderatable) {
                     return interaction.editReply({ content: "I don't have permission to time out this member. They may have a higher role than me." });
                 }
@@ -177,6 +200,48 @@ module.exports = {
                         .setTimestamp();
 
                     await interaction.editReply({ embeds: [responseEmbed] });
+
+                    // Send alert to council if a Line Commander (but not higher) uses the command
+                    if (roleManager.isLineCommanderOrHigher(interaction.member) && !roleManager.isCouncilOrHigher(interaction.member)) {
+                        const config = configManager.get();
+                        const alertChannelId = config.moderationAlertChannelId ? config.moderationAlertChannelId[0] : null;
+                        const councilRoleIds = config.councilRoles || [];
+
+                        if (alertChannelId && councilRoleIds.length > 0) {
+                            try {
+                                const alertChannel = await interaction.client.channels.fetch(alertChannelId);
+                                const councilPings = councilRoleIds.map(id => `<@&${id}>`).join(' ');
+                                const durationName = durationValueNameMap[durationStringValue] || `${duration / 60000} minutes`;
+
+                                const alertEmbed = new EmbedBuilder()
+                                    .setColor(0xFFA500) // Orange for alert
+                                    .setTitle('Moderation Action Alert')
+                                    .setDescription(`A Line Commander has used the timeout command. Council review may be required.`)
+                                    .addFields(
+                                        { name: 'Moderator', value: interaction.user.toString(), inline: true },
+                                        { name: 'Target', value: targetUser.toString(), inline: true },
+                                        { name: 'Action', value: 'Timeout', inline: true },
+                                        { name: 'Duration', value: durationName, inline: true },
+                                        { name: 'Expires', value: `<t:${expiryTimestamp}:R>`, inline: true },
+                                        { name: 'Case ID', value: `#${caseId}`, inline: true },
+                                        { name: 'Reason', value: reason, inline: false }
+                                    )
+                                    .setTimestamp();
+
+                                await alertChannel.send({
+                                    content: councilPings,
+                                    embeds: [alertEmbed]
+                                });
+                                logger.info(`Sent moderation alert to channel ${alertChannelId} for timeout by ${interaction.user.tag}`);
+
+                            } catch (alertError) {
+                                logger.error('Failed to send moderation alert:', alertError);
+                            }
+                        } else {
+                            logger.warn('Moderation alert for Line Commander action could not be sent. `moderationAlertChannelId` or `councilRoles` is not configured.');
+                        }
+                    }
+
                 } catch (error) {
                     logger.error('Error timing out member:', error);
                     return interaction.editReply({ content: 'An error occurred while trying to time out the member.' });
@@ -185,3 +250,4 @@ module.exports = {
         }
     },
 };
+
