@@ -368,3 +368,4 @@ FodyWeavers.xsd
 /WITv3.0/.env.local
 /WITv3.0/sql/databaserestorelocal.sql
 /WITv3.0/sql/databaserestore.sql
+/WITv3.0/helpers/scheduler.js
