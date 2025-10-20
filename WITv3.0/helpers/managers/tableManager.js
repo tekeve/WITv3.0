@@ -20,7 +20,8 @@ const editableTables = [
     'role_hierarchy',
     'saved_embeds',
     'srp_history',
-    'users'
+    'users',
+    'combat_logs' // Added new table
 ];
 
 // Maps table names to their respective primary key column names.
@@ -43,6 +44,7 @@ const tableKeyMap = {
     saved_embeds: 'embed_name',
     srp_history: 'id',
     users: 'character_id',
+    combat_logs: 'log_id', // Added key for new table
 };
 
 /**

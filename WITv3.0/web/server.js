@@ -19,6 +19,7 @@ const trainingRoutes = require('./routes/trainingRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const quizManagerRoutes = require('./routes/quizManagerRoutes');
 const iskRoutes = require('./routes/iskRoutes');
+const logAnalysisRoutes = require('./routes/logAnalysisRoutes');
 
 /**
  * Initializes and starts the Express web server.
@@ -63,6 +64,7 @@ function startServer(client) {
     app.use('/', quizRoutes(client));
     app.use('/', quizManagerRoutes(client));
     app.use('/', iskRoutes(client));
+    app.use('/', logAnalysisRoutes(client));
 
     app.get('/', (req, res) => {
         res.send('Web server is running.');

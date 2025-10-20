@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EVE Online Combat Log Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+    <style>
+        :root {
+            --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569;
+            --text-primary: #e2e8f0; --text-secondary: #94a3b8; --accent-blue: #38bdf8;
+            --accent-green: #4ade80; --accent-red: #f87171; --border-color: #4a5568;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 2rem; }
+        .container { max-width: 1400px; margin: auto; }
+        .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 2rem; border: 1px solid var(--border-color); margin-bottom: 2rem; }
+        h1, h2 { color: #f8fafc; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-top: 0; }
+        textarea { width: 100%; min-height: 250px; background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; font-family: monospace; font-size: 0.9rem; }
+        button { padding: 0.75rem 1.5rem; border: none; border-radius: 0.375rem; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        .btn-primary { background-color: var(--accent-blue); color: #fff; } .btn-primary:hover:not(:disabled) { background-color: #0ea5e9; }
+        button:disabled { background-color: var(--bg-tertiary); cursor: not-allowed; }
+        #results-section { display: none; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .summary-card { background-color: var(--bg-tertiary); padding: 1.5rem; border-radius: 0.5rem; text-align: center; }
+        .summary-label { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase;}
+        .summary-value { font-size: 2rem; font-weight: 700; color: #f8fafc; }
+        .charts-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+        @media (min-width: 1024px) { .charts-grid { grid-template-columns: repeat(2, 1fr); } }
+        .chart-container { background-color: var(--bg-primary); padding: 1rem; border-radius: 0.5rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { font-weight: 600; color: var(--text-secondary); }
+        tbody tr:hover { background-color: var(--bg-tertiary); }
+        .damage-dealt { color: var(--accent-green); }
+        .damage-received { color: var(--accent-red); }
+        .repair-dealt { color: var(--accent-blue); }
+        .repair-received { color: #60a5fa; } /* Lighter blue */
+        .loader { text-align: center; padding: 2rem; display: none; }
+        .toast { position: fixed; top: 1.5rem; right: 1.5rem; padding: 1rem 1.5rem; border-radius: 0.5rem; z-index: 1001; opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { background-color: var(--accent-red); color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel">
+            <h1>EVE Online Combat Log Analyzer</h1>
+            <textarea id="log-input" placeholder="Paste your raw combat log text here..."></textarea>
+            <div style="text-align: right; margin-top: 1rem;">
+                <button id="process-btn" class="btn-primary">Analyze Log</button>
+            </div>
+            <div id="loader" class="loader">Processing...</div>
+        </div>
+
+        <div id="results-section" class="panel">
+            <h2>Analysis Results</h2>
+            <div id="summary-grid" class="summary-grid"></div>
+            <div class="charts-grid">
+                <div class="chart-container"><canvas id="dps-chart"></canvas></div>
+                <div class="chart-container"><canvas id="damage-composition-chart"></canvas></div>
+            </div>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h2>Damage Dealt Breakdown</h2>
+                    <table id="damage-dealt-table"></table>
+                </div>
+                <div class="chart-container">
+                    <h2>Damage Received Breakdown</h2>
+                    <table id="damage-received-table"></table>
+                </div>
+            </div>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h2>Repairs Dealt Breakdown</h2>
+                    <table id="repair-dealt-table"></table>
+                </div>
+                <div class="chart-container">
+                    <h2>Repairs Received Breakdown</h2>
+                    <table id="repair-received-table"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="toast"></div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = "<%= token %>";
+        const processBtn = document.getElementById('process-btn');
+        const logInput = document.getElementById('log-input');
+        const loader = document.getElementById('loader');
+        const resultsSection = document.getElementById('results-section');
+        
+        let dpsChart, compositionChart;
+
+        function showToast(message, type = 'error') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast show ${type}`;
+            setTimeout(() => { toast.className = 'toast'; }, 4000);
+        }
+
+        processBtn.addEventListener('click', async () => {
+            const rawLog = logInput.value;
+            if (!rawLog.trim()) {
+                showToast('Please paste log data into the text area.');
+                return;
+            }
+
+            processBtn.disabled = true;
+            loader.style.display = 'block';
+            resultsSection.style.display = 'none';
+
+            try {
+                const response = await fetch(`/loganalysis/process/${token}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rawLog })
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || 'Failed to process logs.');
+                }
+                
+                if (result.analysis) {
+                    displayResults(result.analysis);
+                    resultsSection.style.display = 'block';
+                } else {
+                    showToast(result.message || 'No data to display.', 'info');
+                }
+
+            } catch (error) {
+                showToast(error.message, 'error');
+            } finally {
+                processBtn.disabled = false;
+                loader.style.display = 'none';
+            }
+        });
+
+        function displayResults(analysis) {
+            // 1. Summary Cards
+            const summaryGrid = document.getElementById('summary-grid');
+            const dps = analysis.durationSeconds > 0 ? (analysis.damageDealt.total / analysis.durationSeconds) : 0;
+            const incomingDps = analysis.durationSeconds > 0 ? (analysis.damageReceived.total / analysis.durationSeconds) : 0;
+            const outgoingRps = analysis.durationSeconds > 0 ? (analysis.repairDealt.total / analysis.durationSeconds) : 0;
+            const incomingRps = analysis.durationSeconds > 0 ? (analysis.repairReceived.total / analysis.durationSeconds) : 0;
+            
+            summaryGrid.innerHTML = `
+                <div class="summary-card">
+                    <div class="summary-label">Duration</div>
+                    <div class="summary-value">${new Date(analysis.durationSeconds * 1000).toISOString().slice(11, 19)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Outgoing DPS</div>
+                    <div class="summary-value damage-dealt">${dps.toFixed(1)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Incoming DPS</div>
+                    <div class="summary-value damage-received">${incomingDps.toFixed(1)}</div>
+                </div>
+                 <div class="summary-card">
+                    <div class="summary-label">Outgoing RPS</div>
+                    <div class="summary-value repair-dealt">${outgoingRps.toFixed(1)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Incoming RPS</div>
+                    <div class="summary-value repair-received">${incomingRps.toFixed(1)}</div>
+                </div>
+            `;
+
+            // 2. Data Tables
+            renderTable('damage-dealt-table', analysis.damageDealt.byTarget, analysis.damageDealt.total, ['Target', 'Damage', '%']);
+            renderTable('damage-received-table', analysis.damageReceived.byAttacker, analysis.damageReceived.total, ['Attacker', 'Damage', '%']);
+            renderTable('repair-dealt-table', analysis.repairDealt.byTarget, analysis.repairDealt.total, ['Target', 'Amount', '%']);
+            renderTable('repair-received-table', analysis.repairReceived.bySource, analysis.repairReceived.total, ['Source', 'Amount', '%']);
+
+            // 3. Charts
+            renderDpsChart(analysis);
+            renderCompositionChart(analysis);
+        }
+
+        function renderTable(tableId, data, totalValue, headers) {
+            const table = document.getElementById(tableId);
+            const sortedData = Object.entries(data).sort(([, a], [, b]) => b - a);
+            let tableHtml = `<thead><tr><th>${headers[0]}</th><th>${headers[1]}</th><th>${headers[2]}</th></tr></thead><tbody>`;
+            sortedData.forEach(([name, value]) => {
+                const percentage = totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : 0;
+                tableHtml += `<tr><td>${name}</td><td>${value.toLocaleString()}</td><td>${percentage}%</td></tr>`;
+            });
+            tableHtml += '</tbody>';
+            table.innerHTML = tableHtml;
+        }
+
+        function renderDpsChart(analysis) {
+            const ctx = document.getElementById('dps-chart').getContext('2d');
+            if (dpsChart) dpsChart.destroy();
+            
+            dpsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        { label: 'Damage Dealt', data: analysis.damageDealt.timeline, borderColor: 'rgba(74, 222, 128, 0.8)', backgroundColor: 'rgba(74, 222, 128, 0.2)', fill: true, tension: 0.1 },
+                        { label: 'Damage Received', data: analysis.damageReceived.timeline, borderColor: 'rgba(248, 113, 113, 0.8)', backgroundColor: 'rgba(248, 113, 113, 0.2)', fill: true, tension: 0.1 },
+                        { label: 'Repair Dealt', data: analysis.repairDealt.timeline, borderColor: 'rgba(56, 189, 248, 0.8)', backgroundColor: 'rgba(56, 189, 248, 0.2)', fill: true, tension: 0.1 },
+                        { label: 'Repair Received', data: analysis.repairReceived.timeline, borderColor: 'rgba(96, 165, 250, 0.8)', backgroundColor: 'rgba(96, 165, 250, 0.2)', fill: true, tension: 0.1 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        title: { display: true, text: 'Events Over Time', color: '#e2e8f0' },
+                        legend: { labels: { color: '#cbd5e1' } },
+                        zoom: {
+                            pan: { enabled: true, mode: 'x' },
+                            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+                        }
+                    },
+                    scales: {
+                        x: { type: 'time', time: { unit: 'second', tooltipFormat: 'HH:mm:ss' }, ticks: { color: '#94a3b8' }, grid: { color: '#475569' } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#475569' }, title: { display: true, text: 'Amount', color: '#94a3b8' } }
+                    }
+                }
+            });
+        }
+        
+        function renderCompositionChart(analysis) {
+            const ctx = document.getElementById('damage-composition-chart').getContext('2d');
+            if (compositionChart) compositionChart.destroy();
+
+            const dealtData = Object.entries(analysis.damageDealt.byWeapon).sort(([,a],[,b]) => b-a).slice(0, 10);
+            const receivedData = Object.entries(analysis.damageReceived.byWeapon).sort(([,a],[,b]) => b-a).slice(0, 10);
+
+            const labels = [...new Set([...dealtData.map(d => d[0]), ...receivedData.map(d => d[0])])];
+            const dealtDataset = {
+                label: 'Damage Dealt',
+                data: labels.map(label => dealtData.find(d => d[0] === label)?.[1] || 0),
+                backgroundColor: 'rgba(74, 222, 128, 0.7)'
+            };
+            const receivedDataset = {
+                label: 'Damage Received',
+                data: labels.map(label => receivedData.find(d => d[0] === label)?.[1] || 0),
+                backgroundColor: 'rgba(248, 113, 113, 0.7)'
+            };
+
+
+            compositionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [ dealtDataset, receivedDataset ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: { 
+                        title: { display: true, text: 'Top 10 Weapons (Dealt vs Received)', color: '#e2e8f0' },
+                        legend: { labels: { color: '#cbd5e1' } }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#475569' }, title: { display: true, text: 'Total Damage', color: '#94a3b8' }, stacked: true },
+                        y: { ticks: { color: '#cbd5e1' }, grid: { color: '#475569' }, stacked: true }
+                    }
+                }
+            });
+        }
+    });
+</script>
+</body>
+</html>
+
