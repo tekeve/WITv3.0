@@ -24,7 +24,7 @@ function createProgressBar(value, maxValue, options = {}) {
     const {
         size = 30,
         invertBar = false,
-        invertText = true,
+        invertText = false,
         useAnsi = true,
         filledColor = 'blue',
         emptyColor = 'red'
@@ -57,7 +57,9 @@ function createProgressBar(value, maxValue, options = {}) {
         emptyStr = emptyChar.repeat(emptyBlocks);
     }
 
-    const bar = `[${filledStr}${emptyStr}]`;
+    const bar = useAnsi
+        ? `[${ansi.blue}|${ansi.reset}${filledStr}${emptyStr}${ansi.red}|${ansi.reset}]`
+        : `[|${filledStr}${emptyStr}|]`;
 
     return `${bar} ${percentageText}`;
 }
@@ -65,4 +67,5 @@ function createProgressBar(value, maxValue, options = {}) {
 module.exports = {
     createProgressBar,
 };
+
 

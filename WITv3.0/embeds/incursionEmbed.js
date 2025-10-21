@@ -59,11 +59,11 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
     }
     if (mobilizingTimestamp) {
         timelineParts.push(`Mobilizing: <t:${mobilizingTimestamp}:f> (<t:${mobilizingTimestamp}:R>)`);
+        if (withdrawingTimestamp) {
+            timelineParts.push(`Withdrawing: <t:${withdrawingTimestamp}:f> (<t:${withdrawingTimestamp}:R>)`);
+        }
         const despawnTime = mobilizingTimestamp + (3 * 24 * 3600);
         timelineParts.push(`Despawns by: <t:${despawnTime}:f> (<t:${despawnTime}:R>)`);
-    }
-    if (withdrawingTimestamp) {
-        timelineParts.push(`Withdrawing: <t:${withdrawingTimestamp}:f> (<t:${withdrawingTimestamp}:R>)`);
     }
     const timelineString = timelineParts.length > 0 ? timelineParts.join('\n') : 'Calculating...';
 
