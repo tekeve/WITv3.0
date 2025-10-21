@@ -13,6 +13,16 @@
             --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569;
             --text-primary: #e2e8f0; --text-secondary: #94a3b8; --accent-blue: #38bdf8;
             --accent-green: #4ade80; --accent-red: #f87171; --border-color: #4a5568;
+            --accent-yellow: #facc15; --accent-purple: #a78bfa;
+            --accent-orange: #f97316;
+
+            /* Hit Quality Colors - Toned Down */
+            --quality-wreck: var(--accent-red);      /* #f87171 */
+            --quality-smash: var(--accent-orange);   /* #f97316 */
+            --quality-penetrate: var(--accent-yellow); /* #facc15 */
+            --quality-hit: var(--accent-green);      /* #4ade80 */
+            --quality-graze: var(--accent-blue);     /* #38bdf8 */
+            --quality-glance: var(--text-secondary); /* #94a3b8 */
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 2rem; }
         .container { max-width: 1400px; margin: auto; }
@@ -21,27 +31,43 @@
         textarea { width: 100%; min-height: 250px; background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; font-family: monospace; font-size: 0.9rem; }
         button { padding: 0.75rem 1.5rem; border: none; border-radius: 0.375rem; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
         .btn-primary { background-color: var(--accent-blue); color: #fff; } .btn-primary:hover:not(:disabled) { background-color: #0ea5e9; }
+        .btn-secondary { background-color: var(--bg-tertiary); color: #fff; } .btn-secondary:hover { background-color: #55667d;}
         button:disabled { background-color: var(--bg-tertiary); cursor: not-allowed; }
         #results-section { display: none; }
         .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .summary-card { background-color: var(--bg-tertiary); padding: 1.5rem; border-radius: 0.5rem; text-align: center; }
         .summary-label { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase;}
         .summary-value { font-size: 2rem; font-weight: 700; color: #f8fafc; }
-        .charts-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+        .charts-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; margin-bottom: 2rem; }
         @media (min-width: 1024px) { .charts-grid { grid-template-columns: repeat(2, 1fr); } }
-        .chart-container { background-color: var(--bg-primary); padding: 1rem; border-radius: 0.5rem; }
+        .chart-container { background-color: var(--bg-primary); padding: 1.5rem; border-radius: 0.5rem; }
+        .full-width-chart { grid-column: 1 / -1; }
+        .dps-chart-wrapper { position: relative; height: 350px; } /* Constrain height */
+        .hit-quality-chart-wrapper { position: relative; height: 250px; } /* Constrain height for this specific chart */
         table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
         th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
         th { font-weight: 600; color: var(--text-secondary); }
         tbody tr:hover { background-color: var(--bg-tertiary); }
-        .damage-dealt { color: var(--accent-green); }
-        .damage-received { color: var(--accent-red); }
-        .repair-dealt { color: var(--accent-blue); }
-        .repair-received { color: #60a5fa; } /* Lighter blue */
+
+        .log-entry { font-family: monospace; font-size: 0.875rem; padding: 0.25rem 0.5rem; border-radius: 3px; margin-bottom: 2px; white-space: pre-wrap; word-break: break-all; }
+        .log-entry .timestamp { color: var(--text-secondary); margin-right: 0.5rem; }
+        .log-entry.damage-dealt { background-color: rgba(74, 222, 128, 0.1); border-left: 3px solid var(--accent-green); }
+        .log-entry.damage-received { background-color: rgba(248, 113, 113, 0.1); border-left: 3px solid var(--accent-red); }
+        .log-entry.remote-repair-dealt { background-color: rgba(56, 189, 248, 0.1); border-left: 3px solid var(--accent-blue); }
+        .log-entry.remote-repair-received { background-color: rgba(96, 165, 250, 0.1); border-left: 3px solid #60a5fa; }
+        .log-entry strong { color: #f8fafc; }
+        .detailed-log-container { max-height: 500px; overflow-y: auto; background-color: #1a202c; padding: 1rem; border-radius: 0.5rem; margin-top: 1rem; }
+        
+        .filter-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem; padding: 1rem; background-color: var(--bg-primary); border-radius: 0.5rem; }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { margin-bottom: 0.25rem; font-size: 0.8rem; color: var(--text-secondary); }
+        .filter-group select { background-color: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.5rem; border-radius: 4px; }
+        
         .loader { text-align: center; padding: 2rem; display: none; }
         .toast { position: fixed; top: 1.5rem; right: 1.5rem; padding: 1rem 1.5rem; border-radius: 0.5rem; z-index: 1001; opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.error { background-color: var(--accent-red); color: white; }
+        .toast.info { background-color: var(--accent-green); color: black; }
     </style>
 </head>
 <body>
@@ -58,10 +84,20 @@
         <div id="results-section" class="panel">
             <h2>Analysis Results</h2>
             <div id="summary-grid" class="summary-grid"></div>
+
             <div class="charts-grid">
-                <div class="chart-container"><canvas id="dps-chart"></canvas></div>
-                <div class="chart-container"><canvas id="damage-composition-chart"></canvas></div>
+                <div class="chart-container full-width-chart dps-chart-wrapper">
+                    <canvas id="dps-chart"></canvas>
+                    <button id="reset-zoom-btn" class="btn-secondary" style="display: none; position: absolute; top: 10px; right: 10px;">Reset Zoom</button>
+                </div>
             </div>
+
+            <div class="charts-grid">
+                 <div class="chart-container full-width-chart hit-quality-chart-wrapper">
+                    <canvas id="outgoing-hit-quality-chart"></canvas>
+                </div>
+            </div>
+            
             <div class="charts-grid">
                 <div class="chart-container">
                     <h2>Damage Dealt Breakdown</h2>
@@ -82,6 +118,16 @@
                     <table id="repair-received-table"></table>
                 </div>
             </div>
+
+            <div class="panel" style="background-color: var(--bg-secondary); margin-top: 2rem;">
+                <h2>Detailed Log</h2>
+                <div class="filter-panel" id="filter-panel">
+                    <!-- Filters will be generated here by JS -->
+                </div>
+                <div class="detailed-log-container" id="detailed-log-container">
+                    <!-- Log entries will be generated here by JS -->
+                </div>
+            </div>
         </div>
     </div>
     
@@ -89,34 +135,126 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const token = "<%= token %>";
         const processBtn = document.getElementById('process-btn');
         const logInput = document.getElementById('log-input');
         const loader = document.getElementById('loader');
         const resultsSection = document.getElementById('results-section');
+        const resetZoomBtn = document.getElementById('reset-zoom-btn');
         
-        let dpsChart, compositionChart;
+        let chartInstances = {};
+        let fullParsedLogs = [];
+        let computedQualityColors = {};
+        let zoomDebounceTimeout;
 
-        function showToast(message, type = 'error') {
+        function initializeColors() {
+            const rootStyles = getComputedStyle(document.documentElement);
+            computedQualityColors = {
+                'Wrecks': rootStyles.getPropertyValue('--quality-wreck').trim(),
+                'Smashes': rootStyles.getPropertyValue('--quality-smash').trim(),
+                'Penetrates': rootStyles.getPropertyValue('--quality-penetrate').trim(),
+                'Hits': rootStyles.getPropertyValue('--quality-hit').trim(),
+                'Grazes': rootStyles.getPropertyValue('--quality-graze').trim(),
+                'Glances off': rootStyles.getPropertyValue('--quality-glance').trim()
+            };
+        }
+        
+        function showToast(message, type = 'info') {
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = `toast show ${type}`;
             setTimeout(() => { toast.className = 'toast'; }, 4000);
         }
 
+        function analyzeLogEntries(logEntries) {
+            if (!logEntries || logEntries.length === 0) {
+                return null;
+            }
+
+            const damageDealtMap = new Map();
+            const damageReceivedMap = new Map();
+            const repairDealtMap = new Map();
+            const repairReceivedMap = new Map();
+            const allTimestamps = new Set();
+
+            logEntries.forEach(log => {
+                if (log.timestamp && !isNaN(new Date(log.timestamp).getTime())) {
+                    const ts = new Date(log.timestamp).toISOString();
+                    allTimestamps.add(ts);
+
+                    switch (log.type) {
+                        case 'damage_dealt':
+                            damageDealtMap.set(ts, (damageDealtMap.get(ts) || 0) + log.damage);
+                            break;
+                        case 'damage_received':
+                            damageReceivedMap.set(ts, (damageReceivedMap.get(ts) || 0) + log.damage);
+                            break;
+                        case 'remote_repair_dealt':
+                            repairDealtMap.set(ts, (repairDealtMap.get(ts) || 0) + log.amount);
+                            break;
+                        case 'remote_repair_received':
+                            repairReceivedMap.set(ts, (repairReceivedMap.get(ts) || 0) + log.amount);
+                            break;
+                    }
+                }
+            });
+
+            const sortedTimestamps = [...allTimestamps].sort();
+
+            const analysis = {
+                totalEntries: logEntries.length,
+                startTime: sortedTimestamps.length > 0 ? new Date(sortedTimestamps[0]) : null,
+                endTime: sortedTimestamps.length > 0 ? new Date(sortedTimestamps[sortedTimestamps.length - 1]) : null,
+                durationSeconds: sortedTimestamps.length > 1 ? (new Date(sortedTimestamps[sortedTimestamps.length - 1]) - new Date(sortedTimestamps[0])) / 1000 : 0,
+                damageDealt: { total: 0, byTarget: {}, byWeapon: {}, qualities: {}, timeline: [] },
+                damageReceived: { total: 0, byAttacker: {}, byWeapon: {}, qualities: {}, timeline: [] },
+                repairDealt: { total: 0, byTarget: {}, timeline: [] },
+                repairReceived: { total: 0, bySource: {}, timeline: [] },
+            };
+
+            sortedTimestamps.forEach(ts => {
+                analysis.damageDealt.timeline.push({ x: ts, y: damageDealtMap.get(ts) || 0 });
+                analysis.damageReceived.timeline.push({ x: ts, y: damageReceivedMap.get(ts) || 0 });
+                analysis.repairDealt.timeline.push({ x: ts, y: repairDealtMap.get(ts) || 0 });
+                analysis.repairReceived.timeline.push({ x: ts, y: repairReceivedMap.get(ts) || 0 });
+            });
+            
+            logEntries.forEach(log => {
+                 if (log.type === 'damage_dealt') {
+                    analysis.damageDealt.total += log.damage;
+                    analysis.damageDealt.byTarget[log.target] = (analysis.damageDealt.byTarget[log.target] || 0) + log.damage;
+                    analysis.damageDealt.byWeapon[log.weapon] = (analysis.damageDealt.byWeapon[log.weapon] || 0) + log.damage;
+                    if (log.quality && log.quality !== 'Unknown') analysis.damageDealt.qualities[log.quality] = (analysis.damageDealt.qualities[log.quality] || 0) + 1;
+                } else if (log.type === 'damage_received') {
+                    analysis.damageReceived.total += log.damage;
+                    analysis.damageReceived.byAttacker[log.attacker] = (analysis.damageReceived.byAttacker[log.attacker] || 0) + log.damage;
+                    analysis.damageReceived.byWeapon[log.weapon] = (analysis.damageReceived.byWeapon[log.weapon] || 0) + log.damage;
+                    if (log.quality && log.quality !== 'Unknown') analysis.damageReceived.qualities[log.quality] = (analysis.damageReceived.qualities[log.quality] || 0) + 1;
+                } else if (log.type === 'remote_repair_dealt') {
+                    analysis.repairDealt.total += log.amount;
+                    analysis.repairDealt.byTarget[log.target] = (analysis.repairDealt.byTarget[log.target] || 0) + log.amount;
+                } else if (log.type === 'remote_repair_received') {
+                    analysis.repairReceived.total += log.amount;
+                    analysis.repairReceived.bySource[log.source] = (analysis.repairReceived.bySource[log.source] || 0) + log.amount;
+                }
+            });
+
+            return analysis;
+        }
+
         processBtn.addEventListener('click', async () => {
             const rawLog = logInput.value;
             if (!rawLog.trim()) {
-                showToast('Please paste log data into the text area.');
+                showToast('Please paste log data into the text area.', 'error');
                 return;
             }
 
             processBtn.disabled = true;
             loader.style.display = 'block';
             resultsSection.style.display = 'none';
+            resetZoomBtn.style.display = 'none';
 
             try {
-                const response = await fetch(`/loganalysis/process/${token}`, {
+                const response = await fetch(`/loganalysis/process`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ rawLog })
@@ -127,11 +265,12 @@
                     throw new Error(result.message || 'Failed to process logs.');
                 }
                 
-                if (result.analysis) {
-                    displayResults(result.analysis);
+                if (result.parsedLogs && result.parsedLogs.length > 0) {
+                    fullParsedLogs = result.parsedLogs.map(log => ({ ...log, timestamp: new Date(log.timestamp) }));
+                    displayFullResults();
                     resultsSection.style.display = 'block';
                 } else {
-                    showToast(result.message || 'No data to display.', 'info');
+                    showToast('No combat log entries were found to display.', 'info');
                 }
 
             } catch (error) {
@@ -142,8 +281,54 @@
             }
         });
 
-        function displayResults(analysis) {
-            // 1. Summary Cards
+        resetZoomBtn.addEventListener('click', () => {
+            const dpsChart = chartInstances['dps-chart'];
+            if (dpsChart) {
+                dpsChart.resetZoom('none'); // Use 'none' to prevent animation loop
+            }
+            displayFullResults();
+            resetZoomBtn.style.display = 'none';
+        });
+
+        function displayFullResults() {
+            const analysis = analyzeLogEntries(fullParsedLogs);
+            if (analysis) {
+                populateFilters(fullParsedLogs);
+                displayResultsForRange(fullParsedLogs, true); 
+            }
+        }
+
+        function displayResultsForRange(logEntries, renderMainChart = false) {
+            const analysis = analyzeLogEntries(logEntries);
+            
+            if (!analysis) {
+                updateSummaryCards({ durationSeconds: 0, damageDealt: { total: 0 }, damageReceived: { total: 0 }, repairDealt: { total: 0 }, repairReceived: { total: 0 }});
+                renderTable('damage-dealt-table', {}, 0, ['Target', 'Damage', '%']);
+                renderTable('damage-received-table', {}, 0, ['Attacker', 'Damage', '%']);
+                renderTable('repair-dealt-table', {}, 0, ['Target', 'Amount', '%']);
+                renderTable('repair-received-table', {}, 0, ['Source', 'Amount', '%']);
+                renderHitQualityChart('outgoing-hit-quality-chart', {}, 'Outgoing Hit Quality');
+                applyFilters(); // This will render the detailed log
+                return;
+            }
+
+            if (renderMainChart) {
+                renderDpsChart(analysis);
+            }
+
+            updateSummaryCards(analysis);
+
+            renderTable('damage-dealt-table', analysis.damageDealt.byTarget, analysis.damageDealt.total, ['Target', 'Damage', '%']);
+            renderTable('damage-received-table', analysis.damageReceived.byAttacker, analysis.damageReceived.total, ['Attacker', 'Damage', '%']);
+            renderTable('repair-dealt-table', analysis.repairDealt.byTarget, analysis.repairDealt.total, ['Target', 'Amount', '%']);
+            renderTable('repair-received-table', analysis.repairReceived.bySource, analysis.repairReceived.total, ['Source', 'Amount', '%']);
+            
+            renderHitQualityChart('outgoing-hit-quality-chart', analysis.damageDealt.qualities, 'Outgoing Hit Quality');
+
+            applyFilters();
+        }
+
+        function updateSummaryCards(analysis) {
             const summaryGrid = document.getElementById('summary-grid');
             const dps = analysis.durationSeconds > 0 ? (analysis.damageDealt.total / analysis.durationSeconds) : 0;
             const incomingDps = analysis.durationSeconds > 0 ? (analysis.damageReceived.total / analysis.durationSeconds) : 0;
@@ -157,68 +342,80 @@
                 </div>
                 <div class="summary-card">
                     <div class="summary-label">Outgoing DPS</div>
-                    <div class="summary-value damage-dealt">${dps.toFixed(1)}</div>
+                    <div class="summary-value" style="color: var(--accent-green);">${dps.toFixed(1)}</div>
                 </div>
                 <div class="summary-card">
                     <div class="summary-label">Incoming DPS</div>
-                    <div class="summary-value damage-received">${incomingDps.toFixed(1)}</div>
+                    <div class="summary-value" style="color: var(--accent-red);">${incomingDps.toFixed(1)}</div>
                 </div>
                  <div class="summary-card">
                     <div class="summary-label">Outgoing RPS</div>
-                    <div class="summary-value repair-dealt">${outgoingRps.toFixed(1)}</div>
+                    <div class="summary-value" style="color: var(--accent-blue);">${outgoingRps.toFixed(1)}</div>
                 </div>
                 <div class="summary-card">
                     <div class="summary-label">Incoming RPS</div>
-                    <div class="summary-value repair-received">${incomingRps.toFixed(1)}</div>
+                    <div class="summary-value" style="color: #60a5fa;">${incomingRps.toFixed(1)}</div>
                 </div>
             `;
-
-            // 2. Data Tables
-            renderTable('damage-dealt-table', analysis.damageDealt.byTarget, analysis.damageDealt.total, ['Target', 'Damage', '%']);
-            renderTable('damage-received-table', analysis.damageReceived.byAttacker, analysis.damageReceived.total, ['Attacker', 'Damage', '%']);
-            renderTable('repair-dealt-table', analysis.repairDealt.byTarget, analysis.repairDealt.total, ['Target', 'Amount', '%']);
-            renderTable('repair-received-table', analysis.repairReceived.bySource, analysis.repairReceived.total, ['Source', 'Amount', '%']);
-
-            // 3. Charts
-            renderDpsChart(analysis);
-            renderCompositionChart(analysis);
         }
-
+        
         function renderTable(tableId, data, totalValue, headers) {
             const table = document.getElementById(tableId);
             const sortedData = Object.entries(data).sort(([, a], [, b]) => b - a);
             let tableHtml = `<thead><tr><th>${headers[0]}</th><th>${headers[1]}</th><th>${headers[2]}</th></tr></thead><tbody>`;
-            sortedData.forEach(([name, value]) => {
-                const percentage = totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : 0;
-                tableHtml += `<tr><td>${name}</td><td>${value.toLocaleString()}</td><td>${percentage}%</td></tr>`;
-            });
+            if (sortedData.length > 0) {
+                sortedData.forEach(([name, value]) => {
+                    const percentage = totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : 0;
+                    tableHtml += `<tr><td>${name}</td><td>${value.toLocaleString()}</td><td>${percentage}%</td></tr>`;
+                });
+            } else {
+                 tableHtml += `<tr><td colspan="3" style="text-align: center; color: var(--text-secondary);">No data</td></tr>`;
+            }
             tableHtml += '</tbody>';
             table.innerHTML = tableHtml;
         }
 
         function renderDpsChart(analysis) {
-            const ctx = document.getElementById('dps-chart').getContext('2d');
-            if (dpsChart) dpsChart.destroy();
+            const canvasId = 'dps-chart';
+            const ctx = document.getElementById(canvasId)?.getContext('2d');
+            if (!ctx) return;
+
+            if (chartInstances[canvasId]) {
+                chartInstances[canvasId].destroy();
+            }
             
-            dpsChart = new Chart(ctx, {
+            chartInstances[canvasId] = new Chart(ctx, {
                 type: 'line',
                 data: {
                     datasets: [
-                        { label: 'Damage Dealt', data: analysis.damageDealt.timeline, borderColor: 'rgba(74, 222, 128, 0.8)', backgroundColor: 'rgba(74, 222, 128, 0.2)', fill: true, tension: 0.1 },
-                        { label: 'Damage Received', data: analysis.damageReceived.timeline, borderColor: 'rgba(248, 113, 113, 0.8)', backgroundColor: 'rgba(248, 113, 113, 0.2)', fill: true, tension: 0.1 },
-                        { label: 'Repair Dealt', data: analysis.repairDealt.timeline, borderColor: 'rgba(56, 189, 248, 0.8)', backgroundColor: 'rgba(56, 189, 248, 0.2)', fill: true, tension: 0.1 },
-                        { label: 'Repair Received', data: analysis.repairReceived.timeline, borderColor: 'rgba(96, 165, 250, 0.8)', backgroundColor: 'rgba(96, 165, 250, 0.2)', fill: true, tension: 0.1 }
+                        { label: 'Damage Dealt', data: analysis.damageDealt.timeline, borderColor: 'rgba(74, 222, 128, 0.8)', backgroundColor: 'rgba(74, 222, 128, 0.2)', fill: true, tension: 0.1, pointRadius: 0 },
+                        { label: 'Damage Received', data: analysis.damageReceived.timeline, borderColor: 'rgba(248, 113, 113, 0.8)', backgroundColor: 'rgba(248, 113, 113, 0.2)', fill: true, tension: 0.1, pointRadius: 0 },
+                        { label: 'Repair Dealt', data: analysis.repairDealt.timeline, borderColor: 'rgba(56, 189, 248, 0.8)', backgroundColor: 'rgba(56, 189, 248, 0.2)', fill: true, tension: 0.1, pointRadius: 0 },
+                        { label: 'Repair Received', data: analysis.repairReceived.timeline, borderColor: 'rgba(96, 165, 250, 0.8)', backgroundColor: 'rgba(96, 165, 250, 0.2)', fill: true, tension: 0.1, pointRadius: 0 }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { 
-                        title: { display: true, text: 'Events Over Time', color: '#e2e8f0' },
+                        title: { display: true, text: 'Events Over Time (Click and drag to zoom)', color: '#e2e8f0', font: {size: 16} },
                         legend: { labels: { color: '#cbd5e1' } },
                         zoom: {
                             pan: { enabled: true, mode: 'x' },
-                            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }
+                            zoom: { 
+                                wheel: { enabled: true }, 
+                                pinch: { enabled: true }, 
+                                mode: 'x',
+                                onZoomComplete: ({chart}) => {
+                                    clearTimeout(zoomDebounceTimeout);
+                                    zoomDebounceTimeout = setTimeout(() => {
+                                        const { min, max } = chart.scales.x;
+                                        const filteredLogs = fullParsedLogs.filter(log => log.timestamp.getTime() >= min && log.timestamp.getTime() <= max);
+                                        displayResultsForRange(filteredLogs, false);
+                                        resetZoomBtn.style.display = 'inline-block';
+                                    }, 500);
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -229,47 +426,152 @@
             });
         }
         
-        function renderCompositionChart(analysis) {
-            const ctx = document.getElementById('damage-composition-chart').getContext('2d');
-            if (compositionChart) compositionChart.destroy();
+        function renderHitQualityChart(canvasId, qualitiesData, title) {
+            const qualities = qualitiesData || {};
+            const sortedQualities = Object.entries(qualities).sort(([, a], [, b]) => b - a);
+            
+            const labels = sortedQualities.map(([name]) => name);
+            const data = sortedQualities.map(([, count]) => count);
+            const backgroundColors = labels.map(label => computedQualityColors[label] || '#94a3b8');
 
-            const dealtData = Object.entries(analysis.damageDealt.byWeapon).sort(([,a],[,b]) => b-a).slice(0, 10);
-            const receivedData = Object.entries(analysis.damageReceived.byWeapon).sort(([,a],[,b]) => b-a).slice(0, 10);
+            const ctx = document.getElementById(canvasId)?.getContext('2d');
+            if (!ctx) return;
+            
+            if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
 
-            const labels = [...new Set([...dealtData.map(d => d[0]), ...receivedData.map(d => d[0])])];
-            const dealtDataset = {
-                label: 'Damage Dealt',
-                data: labels.map(label => dealtData.find(d => d[0] === label)?.[1] || 0),
-                backgroundColor: 'rgba(74, 222, 128, 0.7)'
-            };
-            const receivedDataset = {
-                label: 'Damage Received',
-                data: labels.map(label => receivedData.find(d => d[0] === label)?.[1] || 0),
-                backgroundColor: 'rgba(248, 113, 113, 0.7)'
-            };
-
-
-            compositionChart = new Chart(ctx, {
+            chartInstances[canvasId] = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
-                    datasets: [ dealtDataset, receivedDataset ]
+                    datasets: [{
+                        label: 'Hit Count',
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderColor: 'var(--border-color)',
+                        borderWidth: 1
+                    }]
                 },
                 options: {
+                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
-                    indexAxis: 'y',
-                    plugins: { 
-                        title: { display: true, text: 'Top 10 Weapons (Dealt vs Received)', color: '#e2e8f0' },
-                        legend: { labels: { color: '#cbd5e1' } }
+                    plugins: {
+                        title: { display: true, text: title, color: '#e2e8f0', font: {size: 16}, padding: { bottom: 20 } },
+                        legend: { display: false }
                     },
                     scales: {
-                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#475569' }, title: { display: true, text: 'Total Damage', color: '#94a3b8' }, stacked: true },
-                        y: { ticks: { color: '#cbd5e1' }, grid: { color: '#475569' }, stacked: true }
+                        x: { ticks: { color: '#94a3b8', beginAtZero: true, stepSize: 1 }, grid: { color: '#475569' } },
+                        y: { 
+                            ticks: { color: '#cbd5e1' }, 
+                            grid: { color: '#475569' },
+                            barThickness: 25 
+                        }
                     }
                 }
             });
         }
+        
+        // --- DETAILED LOG & FILTERING ---
+        const filterPanel = document.getElementById('filter-panel');
+        const detailedLogContainer = document.getElementById('detailed-log-container');
+
+        function populateFilters(logs) {
+            const eventTypes = new Set();
+            const qualities = new Set();
+            const actors = new Set();
+            const weapons = new Set();
+
+            logs.forEach(log => {
+                eventTypes.add(log.type);
+                if (log.quality && log.quality !== 'Unknown') qualities.add(log.quality);
+                if (log.attacker) actors.add(log.attacker);
+                if (log.target) actors.add(log.target);
+                if (log.source) actors.add(log.source);
+                if (log.weapon && log.weapon !== 'Unknown') weapons.add(log.weapon);
+            });
+            
+            filterPanel.innerHTML = ''; 
+            
+            const createFilter = (id, label, options) => {
+                if (options.size === 0) return;
+                const group = document.createElement('div');
+                group.className = 'filter-group';
+                group.innerHTML = `<label for="${id}">${label}</label>`;
+                const select = document.createElement('select');
+                select.id = id;
+                select.innerHTML = `<option value="all">All</option>` + [...options].sort().map(o => `<option value="${o}">${o}</option>`).join('');
+                select.addEventListener('change', applyFilters);
+                group.appendChild(select);
+                filterPanel.appendChild(group);
+            };
+
+            createFilter('filter-type', 'Event Type', eventTypes);
+            createFilter('filter-quality', 'Hit Quality', qualities);
+            createFilter('filter-actor', 'Actor', actors);
+            createFilter('filter-weapon', 'Weapon', weapons);
+        }
+
+        function applyFilters() {
+            const dpsChartInstance = chartInstances['dps-chart'];
+            const isZoomed = resetZoomBtn.style.display !== 'none' && dpsChartInstance && dpsChartInstance.isZoomedOrPanned();
+            
+            let logsToFilter = fullParsedLogs;
+
+            if(isZoomed){
+                const { min, max } = dpsChartInstance.scales.x;
+                logsToFilter = fullParsedLogs.filter(log => log.timestamp.getTime() >= min && log.timestamp.getTime() <= max);
+            }
+            
+            renderDetailedLog(logsToFilter);
+        }
+        
+        function renderDetailedLog(logs) {
+            const typeFilter = document.getElementById('filter-type')?.value || 'all';
+            const qualityFilter = document.getElementById('filter-quality')?.value || 'all';
+            const weaponFilter = document.getElementById('filter-weapon')?.value || 'all';
+            const actorFilter = document.getElementById('filter-actor')?.value || 'all';
+
+            let filteredLogs = logs.filter(log => {
+                if (typeFilter !== 'all' && log.type !== typeFilter) return false;
+                
+                if (qualityFilter !== 'all') {
+                    if (log.type !== 'damage_dealt' && log.type !== 'damage_received') return false;
+                    if (log.quality !== qualityFilter) return false;
+                }
+
+                if (weaponFilter !== 'all' && log.weapon !== weaponFilter) return false;
+
+                if (actorFilter !== 'all') {
+                    const actorsInLog = [log.attacker, log.target, log.source].filter(Boolean);
+                    if (!actorsInLog.includes(actorFilter)) return false;
+                }
+                return true;
+            });
+            
+            let content = '';
+            filteredLogs.forEach(log => {
+                const time = new Date(log.timestamp).toLocaleTimeString('en-GB');
+                let entryText = '';
+                switch (log.type) {
+                    case 'damage_dealt':
+                        entryText = `Dealt <strong>${log.damage.toLocaleString()}</strong> to <strong>${log.target}</strong> with <strong>${log.weapon}</strong> (${log.quality})`;
+                        break;
+                    case 'damage_received':
+                        entryText = `Received <strong>${log.damage.toLocaleString()}</strong> from <strong>${log.attacker}</strong> with <strong>${log.weapon}</strong> (${log.quality})`;
+                        break;
+                    case 'remote_repair_dealt':
+                        entryText = `Repaired <strong>${log.target}</strong> for <strong>${log.amount.toLocaleString()}</strong> with <strong>${log.weapon}</strong>`;
+                        break;
+                    case 'remote_repair_received':
+                        entryText = `Repaired by <strong>${log.source}</strong> for <strong>${log.amount.toLocaleString()}</strong> with <strong>${log.weapon}</strong>`;
+                        break;
+                }
+                content += `<div class="log-entry ${log.type.replace(/_/g, '-')}"><span class="timestamp">[${time}]</span> ${entryText}</div>`;
+            });
+            detailedLogContainer.innerHTML = content || '<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">No log entries match the current filters.</div>';
+        }
+
+        initializeColors();
     });
 </script>
 </body>

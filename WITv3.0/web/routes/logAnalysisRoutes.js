@@ -9,10 +9,10 @@ const logAnalysisController = require('@webControllers/logAnalysisController');
  */
 module.exports = (client) => {
     // Route to display the form
-    router.get('/loganalysis/:token', logAnalysisController.showLogAnalysisForm(client));
+    router.get('/loganalysis', logAnalysisController.showLogAnalysisForm(client));
 
     // API route to handle log processing and analysis
-    router.post('/loganalysis/process/:token', logAnalysisController.handleLogSubmission(client));
+    router.post('/loganalysis/process', logAnalysisController.handleLogSubmission(client));
 
     return router;
 };
