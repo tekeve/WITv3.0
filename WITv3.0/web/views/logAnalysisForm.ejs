@@ -560,10 +560,10 @@
                         entryText = `Received <strong>${log.damage.toLocaleString()}</strong> from <strong>${log.attacker}</strong> with <strong>${log.weapon}</strong> (${log.quality})`;
                         break;
                     case 'remote_repair_dealt':
-                        entryText = `Repaired <strong>${log.target}</strong> for <strong>${log.amount.toLocaleString()}</strong> with <strong>${log.weapon}</strong>`;
+                        entryText = `Repaired <strong>${log.target}</strong> for <strong>${log.amount.toLocaleString()}</strong> in <strong>${log.weapon}</strong>`;
                         break;
                     case 'remote_repair_received':
-                        entryText = `Repaired by <strong>${log.source}</strong> for <strong>${log.amount.toLocaleString()}</strong> with <strong>${log.weapon}</strong>`;
+                        entryText = `Repaired by <strong>${log.source}</strong> for <strong>${log.amount.toLocaleString()}</strong> in <strong>${log.weapon}</strong>`;
                         break;
                 }
                 content += `<div class="log-entry ${log.type.replace(/_/g, '-')}"><span class="timestamp">[${time}]</span> ${entryText}</div>`;

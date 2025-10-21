@@ -1,15 +1,15 @@
 -- --------------------------------------------------------
 -- Host:                         localhost
--- Server version:               MySQL 8.x / MariaDB 10.x
--- --------------------------------------------------------
--- This script handles both initial setup and database migrations.
--- It is safe to run on new or existing databases.
+-- Server version:               11.8.3-MariaDB - mariadb.org binary distribution
+-- Server OS:                    Win64
+-- HeidiSQL Version:             12.11.0.7065
 -- --------------------------------------------------------
 
-CREATE DATABASE IF NOT EXISTS `wit-db` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci */;
+-- Dumping database structure for wit-db
+CREATE DATABASE IF NOT EXISTS `wit-db` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
 USE `wit-db`;
 
--- Create tables in dependency order
+-- Dumping structure for table wit-db.action_log_settings
 CREATE TABLE IF NOT EXISTS `action_log_settings` (
   `id` int(11) NOT NULL DEFAULT 1,
   `log_message_delete` tinyint(1) DEFAULT 0,
@@ -36,8 +36,9 @@ CREATE TABLE IF NOT EXISTS `action_log_settings` (
   `ignored_channels` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
   `ignored_roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
+-- Dumping structure for table wit-db.bot_status
 CREATE TABLE IF NOT EXISTS `bot_status` (
   `id` int(11) NOT NULL DEFAULT 1,
   `activity` varchar(50) DEFAULT NULL,
@@ -45,8 +46,9 @@ CREATE TABLE IF NOT EXISTS `bot_status` (
   `url` varchar(255) DEFAULT NULL,
   `expiryTimestamp` bigint(20) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.commander_training
 CREATE TABLE IF NOT EXISTS `commander_training` (
   `pilot_id` int(11) NOT NULL AUTO_INCREMENT,
   `pilot_name` varchar(255) NOT NULL,
@@ -55,6 +57,10 @@ CREATE TABLE IF NOT EXISTS `commander_training` (
   `start_date` datetime DEFAULT NULL,
   `last_active` datetime DEFAULT NULL,
   `resident_orientation_by` varchar(255) DEFAULT NULL,
+  `quiz_scouting` tinyint(1) NOT NULL DEFAULT 0,
+  `quiz_fitting` tinyint(1) NOT NULL DEFAULT 0,
+  `quiz_fleet_roles` tinyint(1) NOT NULL DEFAULT 0,
+  `quiz_site_mechanics` tinyint(1) NOT NULL DEFAULT 0,
   `signoff_scouting` text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
   `signoff_trusted_logi` tinyint(1) NOT NULL DEFAULT 0,
   `signoff_bastion` tinyint(1) NOT NULL DEFAULT 0,
@@ -64,28 +70,32 @@ CREATE TABLE IF NOT EXISTS `commander_training` (
   `comments` text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
   PRIMARY KEY (`pilot_id`),
   UNIQUE KEY `discord_id` (`discord_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.config
 CREATE TABLE IF NOT EXISTS `config` (
   `key_name` varchar(255) NOT NULL,
   `value` longtext DEFAULT NULL,
   PRIMARY KEY (`key_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.google_docs
 CREATE TABLE IF NOT EXISTS `google_docs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `alias` varchar(50) NOT NULL,
   `doc_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.google_sheets
 CREATE TABLE IF NOT EXISTS `google_sheets` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `alias` varchar(50) NOT NULL,
   `sheet_id` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.incursion_state
 CREATE TABLE IF NOT EXISTS `incursion_state` (
   `id` int(11) NOT NULL DEFAULT 1,
   `lastIncursionState` varchar(50) DEFAULT NULL,
@@ -98,8 +108,9 @@ CREATE TABLE IF NOT EXISTS `incursion_state` (
   `lastIncursionStats` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`lastIncursionStats`)),
   `route_data` text DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.incursion_systems
 CREATE TABLE IF NOT EXISTS `incursion_systems` (
   `Constellation_id` int(11) NOT NULL,
   `Constellation` varchar(255) DEFAULT NULL,
@@ -113,8 +124,9 @@ CREATE TABLE IF NOT EXISTS `incursion_systems` (
   `region` varchar(255) DEFAULT NULL,
   `region_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`Constellation_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.isk_logs
 CREATE TABLE IF NOT EXISTS `isk_logs` (
   `log_id` int(11) NOT NULL AUTO_INCREMENT,
   `discord_id` varchar(50) NOT NULL,
@@ -128,8 +140,9 @@ CREATE TABLE IF NOT EXISTS `isk_logs` (
   `journal_data` text DEFAULT NULL,
   PRIMARY KEY (`log_id`),
   KEY `discord_id_idx` (`discord_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=158 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.logi_signoffs
 CREATE TABLE IF NOT EXISTS `logi_signoffs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `pilot_name` varchar(255) NOT NULL,
@@ -141,8 +154,9 @@ CREATE TABLE IF NOT EXISTS `logi_signoffs` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `pilot_name` (`pilot_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.mail_queue
 CREATE TABLE IF NOT EXISTS `mail_queue` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `sender_discord_id` varchar(50) NOT NULL,
@@ -151,8 +165,24 @@ CREATE TABLE IF NOT EXISTS `mail_queue` (
   `body` text NOT NULL,
   `failed_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.moderation_logs
+CREATE TABLE IF NOT EXISTS `moderation_logs` (
+  `case_id` int(11) NOT NULL AUTO_INCREMENT,
+  `guild_id` varchar(50) NOT NULL,
+  `moderator_id` varchar(50) NOT NULL,
+  `target_id` varchar(50) NOT NULL,
+  `action` enum('kick','ban','timeout','unban','untimeout') NOT NULL,
+  `reason` text DEFAULT NULL,
+  `duration_seconds` int(11) DEFAULT NULL,
+  `timestamp` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`case_id`),
+  KEY `guild_id_idx` (`guild_id`),
+  KEY `target_id_idx` (`target_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Dumping structure for table wit-db.quizzes
 CREATE TABLE IF NOT EXISTS `quizzes` (
   `quiz_id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
@@ -160,19 +190,9 @@ CREATE TABLE IF NOT EXISTS `quizzes` (
   `category` enum('resident','training_fc') NOT NULL DEFAULT 'resident',
   PRIMARY KEY (`quiz_id`),
   UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS `quiz_questions` (
-  `question_id` int(11) NOT NULL AUTO_INCREMENT,
-  `quiz_id` int(11) NOT NULL,
-  `question_text` text NOT NULL,
-  `question_type` varchar(20) NOT NULL DEFAULT 'single',
-  `order_index` int(11) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`question_id`),
-  KEY `quiz_id` (`quiz_id`),
-  CONSTRAINT `fk_quiz_questions_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
+-- Dumping structure for table wit-db.quiz_answers
 CREATE TABLE IF NOT EXISTS `quiz_answers` (
   `answer_id` int(11) NOT NULL AUTO_INCREMENT,
   `question_id` int(11) NOT NULL,
@@ -182,8 +202,9 @@ CREATE TABLE IF NOT EXISTS `quiz_answers` (
   PRIMARY KEY (`answer_id`),
   KEY `question_id` (`question_id`),
   CONSTRAINT `fk_quiz_answers_question` FOREIGN KEY (`question_id`) REFERENCES `quiz_questions` (`question_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=147 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.quiz_attempts
 CREATE TABLE IF NOT EXISTS `quiz_attempts` (
   `attempt_id` int(11) NOT NULL AUTO_INCREMENT,
   `discord_id` varchar(50) NOT NULL,
@@ -195,8 +216,9 @@ CREATE TABLE IF NOT EXISTS `quiz_attempts` (
   KEY `discord_id` (`discord_id`),
   KEY `quiz_id` (`quiz_id`),
   CONSTRAINT `fk_quiz_attempts_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.quiz_completions
 CREATE TABLE IF NOT EXISTS `quiz_completions` (
   `completion_id` int(11) NOT NULL AUTO_INCREMENT,
   `discord_id` varchar(50) NOT NULL,
@@ -206,8 +228,21 @@ CREATE TABLE IF NOT EXISTS `quiz_completions` (
   UNIQUE KEY `user_quiz` (`discord_id`,`quiz_id`),
   KEY `quiz_id` (`quiz_id`),
   CONSTRAINT `fk_completion_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.quiz_questions
+CREATE TABLE IF NOT EXISTS `quiz_questions` (
+  `question_id` int(11) NOT NULL AUTO_INCREMENT,
+  `quiz_id` int(11) NOT NULL,
+  `question_text` text NOT NULL,
+  `question_type` varchar(20) NOT NULL DEFAULT 'single',
+  `order_index` int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`question_id`),
+  KEY `quiz_id` (`quiz_id`),
+  CONSTRAINT `fk_quiz_questions_quiz` FOREIGN KEY (`quiz_id`) REFERENCES `quizzes` (`quiz_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8mb4;
+
+-- Dumping structure for table wit-db.reaction_roles
 CREATE TABLE IF NOT EXISTS `reaction_roles` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `guild_id` varchar(50) NOT NULL,
@@ -217,8 +252,9 @@ CREATE TABLE IF NOT EXISTS `reaction_roles` (
   `emoji` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `message_emoji_role` (`message_id`,`emoji`(100),`role_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.reminders
 CREATE TABLE IF NOT EXISTS `reminders` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `discord_id` varchar(50) NOT NULL,
@@ -229,8 +265,9 @@ CREATE TABLE IF NOT EXISTS `reminders` (
   PRIMARY KEY (`id`),
   KEY `discord_id` (`discord_id`),
   KEY `remind_at` (`remind_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.resident_applications
 CREATE TABLE IF NOT EXISTS `resident_applications` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `character_name` varchar(255) NOT NULL,
@@ -247,17 +284,18 @@ CREATE TABLE IF NOT EXISTS `resident_applications` (
   `discord_id` varchar(50) NOT NULL,
   `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.role_hierarchy
 CREATE TABLE IF NOT EXISTS `role_hierarchy` (
   `roleName` varchar(50) NOT NULL,
   `hierarchy_level` int(11) NOT NULL DEFAULT 0,
   `promote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`promote`)),
   `demote` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`demote`)),
-  `history` longtext DEFAULT NULL,
   PRIMARY KEY (`roleName`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.saved_embeds
 CREATE TABLE IF NOT EXISTS `saved_embeds` (
   `embed_name` varchar(100) NOT NULL,
   `guild_id` varchar(50) NOT NULL,
@@ -274,6 +312,7 @@ CREATE TABLE IF NOT EXISTS `saved_embeds` (
   PRIMARY KEY (`embed_name`,`guild_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- Dumping structure for table wit-db.srp_history
 CREATE TABLE IF NOT EXISTS `srp_history` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `pilot_name` varchar(255) NOT NULL,
@@ -287,8 +326,9 @@ CREATE TABLE IF NOT EXISTS `srp_history` (
   `loss_description` text NOT NULL,
   `loot_status` text NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=30 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.training_fc_tracker
 CREATE TABLE IF NOT EXISTS `training_fc_tracker` (
   `pilot_id` int(11) NOT NULL,
   `t1_tagging` varchar(255) DEFAULT NULL,
@@ -304,8 +344,9 @@ CREATE TABLE IF NOT EXISTS `training_fc_tracker` (
   `special_notes` text DEFAULT NULL,
   PRIMARY KEY (`pilot_id`),
   CONSTRAINT `fk_tfc_pilot` FOREIGN KEY (`pilot_id`) REFERENCES `commander_training` (`pilot_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.trusted_pilots
 CREATE TABLE IF NOT EXISTS `trusted_pilots` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `pilot_name` varchar(255) NOT NULL,
@@ -317,8 +358,9 @@ CREATE TABLE IF NOT EXISTS `trusted_pilots` (
   `history` longtext DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `pilot_name` (`pilot_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=28 DEFAULT CHARSET=utf8mb4;
 
+-- Dumping structure for table wit-db.users
 CREATE TABLE IF NOT EXISTS `users` (
   `character_id` int(11) NOT NULL,
   `discord_id` varchar(50) NOT NULL,
@@ -332,4 +374,5 @@ CREATE TABLE IF NOT EXISTS `users` (
   PRIMARY KEY (`character_id`),
   KEY `discord_id` (`discord_id`),
   CONSTRAINT `roles` CHECK (json_valid(`roles`))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

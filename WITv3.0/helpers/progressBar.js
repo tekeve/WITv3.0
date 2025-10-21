@@ -42,7 +42,7 @@ function createProgressBar(value, maxValue, options = {}) {
     const emptyBlocks = size - filledBlocks;
     const percentageText = `${Math.round(textPercentage * 100)}%`;
 
-    const filledChar = '█';
+    const filledChar = '░';
     const emptyChar = '░';
 
     let filledStr, emptyStr;

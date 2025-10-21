@@ -32,9 +32,9 @@ function parseLog(rawLogText) {
         dealt_pet_hits: /^Your (.+?) hits (.+?) - .* for ([\d,]+)/,
         dealt_pet_inflicts: /^Your (.+?) inflicts ([\d,]+) (.+?) damage to (.+)/,
 
-        repair_dealt_armor: /^([\d,]+) remote armor repaired to (.+?) by you - (.+)/,
+        repair_dealt_armor: /^([\d,]+) remote armor repaired to (.+?)(?: by you)? - (.+)/,
         repair_received_armor: /^([\d,]+) remote armor repaired by (.+?) - (.+)/,
-        repair_dealt_shield: /^([\d,]+) remote shield boosted to (.+?) by you - (.+)/,
+        repair_dealt_shield: /^([\d,]+) remote shield boosted to (.+?)(?: by you)? - (.+)/,
         repair_received_shield: /^([\d,]+) remote shield boosted by (.+?) - (.+)/
     };
 
