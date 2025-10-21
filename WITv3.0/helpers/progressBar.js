@@ -24,7 +24,7 @@ function createProgressBar(value, maxValue, options = {}) {
     const {
         size = 30,
         invertBar = false,
-        invertText = false,
+        invertText = true,
         useAnsi = true,
         filledColor = 'blue',
         emptyColor = 'red'
