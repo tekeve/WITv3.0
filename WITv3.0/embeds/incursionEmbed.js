@@ -95,14 +95,14 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
     const influencePercentage = highSecIncursion.influence * 100;
     const progressBarString = createProgressBar(influencePercentage, 100, {
         size: 30,
-        invertBar: true,      // Bar fullness = 100% - influence%
+        invertBar: false,      // Bar fullness = 100% - influence%
         useAnsi: true,        // Enable colors
-        filledColor: 'blue',  // Filled part (pilot progress) is now blue
-        emptyColor: 'red'     // Empty part (remaining Sansha control) is now red
+        filledColor: 'blue',  // Filled part (player progress) is blue
+        emptyColor: 'red'     // Empty part (remaining Sansha control) is red
     });
 
     // The entire string needs to be wrapped in an `ansi` code block for the colors to render.
-    embed.addFields({ name: 'Sansha Control', value: '```ansi\n' + progressBarString + '\n```' });
+    embed.addFields({ name: 'Incursion Control Penalties', value: '```ansi\n' + progressBarString + '\n```' });
 
 
     embed.setFooter({ text: 'WIT v3.0 Incursion Tracker | Data from ESI' }).setTimestamp();
@@ -156,7 +156,4 @@ function buildNoIncursionEmbed(state) {
 }
 
 module.exports = { buildActiveIncursionEmbed, buildNoIncursionEmbed, formatDuration };
-
-
-
 
