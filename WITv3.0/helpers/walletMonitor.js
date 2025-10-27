@@ -366,7 +366,8 @@ async function getTransactions(filters = {}) {
 
     const numLimit = limit; // Already validated in controller
     const numPage = page; // Already validated in controller
-    const offset = (numPage - 1) * numLimit;
+    // Ensure offset is an integer
+    const offset = Math.max(0, (numPage - 1) * numLimit); // Ensure non-negative
 
     let whereClauses = [];
     let params = [];
@@ -421,7 +422,7 @@ async function getTransactions(filters = {}) {
     if (partySearch) { whereClauses.push('(first_party_name LIKE ? OR second_party_name LIKE ?)'); params.push(`%${partySearch}%`, `%${partySearch}%`); }
     // Ensure amountExact is treated as a number
     const exactAmount = Number(amountExact);
-    if (!isNaN(exactAmount)) { // Check if it's a valid number
+    if (amountExact !== null && amountExact !== undefined && !isNaN(exactAmount)) { // Check if it's a valid number and not null/undefined explicitly
         whereClauses.push('(amount = ? OR amount = ?)'); params.push(exactAmount, -exactAmount);
     }
     if (reasonSearch) { whereClauses.push('(reason LIKE ? OR description LIKE ?)'); params.push(`%${reasonSearch}%`, `%${reasonSearch}%`); }
@@ -430,32 +431,43 @@ async function getTransactions(filters = {}) {
 
     try {
         const countSql = `SELECT COUNT(*) as total FROM corp_wallet_transactions ${whereString}`;
+        // --- Pass only the WHERE clause params to the count query ---
         const [countResult] = await db.query(countSql, params);
         const total = countResult ? countResult.total : 0;
 
-        // Assign to the outer scope variable
+        // --- FIX: Build LIMIT and OFFSET directly into the SQL string ---
+        // Ensure numLimit and offset are integers before embedding
+        const limitInt = parseInt(numLimit, 10);
+        const offsetInt = parseInt(offset, 10);
+
+        if (isNaN(limitInt) || isNaN(offsetInt) || limitInt < 0 || offsetInt < 0) {
+            throw new Error(`Invalid LIMIT (${numLimit}) or OFFSET (${offset}) value.`);
+        }
+
         dataSql = `
             SELECT * FROM corp_wallet_transactions ${whereString}
-            ORDER BY date DESC, transaction_id DESC LIMIT ? OFFSET ?`;
+            ORDER BY date DESC, transaction_id DESC LIMIT ${limitInt} OFFSET ${offsetInt}`; // <-- Embed values here
+        // --- END FIX ---
 
         // --- Logging added before query execution ---
         logger.info(`[WalletMonitor Web] Executing transaction query: ${dataSql}`);
-        const finalParams = [...params, numLimit, offset];
-        // --- Log finalParams *before* the query ---
+        // --- FIX: Remove limit/offset from finalParams ---
+        const finalParams = [...params]; // <-- Only WHERE clause params
+        // --- END FIX ---
         logger.info(`[WalletMonitor Web] Parameters: ${JSON.stringify(finalParams)}`);
-        logger.info(`[WalletMonitor Web] numLimit=${numLimit} (Type: ${typeof numLimit}), offset=${offset} (Type: ${typeof offset})`);
         // --- End Logging ---
 
-        const transactions = await db.query(dataSql, finalParams); // Use finalParams
+        const transactions = await db.query(dataSql, finalParams); // Pass only WHERE params
 
         return { transactions, total, currentPage: numPage, totalPages: Math.ceil(total / numLimit) };
 
     } catch (error) {
         // Log the failed query and params for easier debugging
-        // --- Now dataSql should be accessible here ---
-        const finalParamsForError = [...params, numLimit, offset]; // Reconstruct params for logging
-        logger.error(`[WalletMonitor Web] Error fetching transactions. Query: ${dataSql}`); // Log dataSql here
-        logger.error(`[WalletMonitor Web] Parameters: ${JSON.stringify(finalParamsForError)}`); // Log params again
+        // --- FIX: Use only WHERE params for error logging ---
+        const finalParamsForError = [...params]; // <-- Only WHERE clause params
+        // --- END FIX ---
+        logger.error(`[WalletMonitor Web] Error fetching transactions. Query: ${dataSql}`);
+        logger.error(`[WalletMonitor Web] Parameters: ${JSON.stringify(finalParamsForError)}`);
         logger.error(error); // Log the full error object (this will include the original DB error)
         throw error; // Re-throw error to be caught by the controller
     }
