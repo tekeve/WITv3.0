@@ -179,7 +179,11 @@
             <% headers.forEach(header => { %>
                 <td>
                     <% const isPrimaryKey = header === primaryKey; %>
-                     <textarea name="newRows[__INDEX__][<%= header %>]" <%= isPrimaryKey ? '' : '' %>></textarea>
+                    <% if (isPrimaryKey) { %>
+                        <input type="text" name="newRows[__INDEX__][<%= header %>]" placeholder="Enter Primary Key..." required>
+                    <% } else { %>
+                        <textarea name="newRows[__INDEX__][<%= header %>]"></textarea>
+                    <% } %>
                 </td>
             <% }); %>
             <td>
@@ -257,3 +261,4 @@
     </script>
 </body>
 </html>
+

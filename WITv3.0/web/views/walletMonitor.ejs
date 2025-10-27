@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corporation Wallet Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569;
+            --text-primary: #e2e8f0; --text-secondary: #94a3b8; --accent-blue: #38bdf8;
+            --accent-green: #4ade80; --accent-red: #f87171; --border-color: #4a5568;
+            --accent-yellow: #facc15; --accent-purple: #a78bfa; --accent-orange: #f97316;
+            /* Category Colors */
+            --srp-in: #22c55e; --srp-out: #ef4444; --giveaway: #eab308;
+            --structure: #8b5cf6; --office: #3b82f6; --tax: #6b7280; --other: #a1a1aa;
+            --uncategorized: #475569;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 2rem; font-size: 14px; }
+        .container { max-width: 95%; margin: auto; }
+        h1, h2 { color: #f8fafc; text-align: center; }
+        h1 { margin-bottom: 2rem; }
+        h2 { font-size: 1.25rem; margin-top: 2rem; margin-bottom: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+        .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; border: 1px solid var(--border-color); margin-bottom: 2rem; }
+
+        /* Filters */
+        .primary-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: end; }
+        .form-group { margin-bottom: 0; }
+        label { display: block; margin-bottom: 0.3rem; font-size: 0.8rem; font-weight: 500; color: var(--text-secondary); }
+        input[type="date"], input[type="text"], input[type="number"], select { width: 100%; padding: 0.6rem; border-radius: 0.375rem; background-color: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.9rem; box-sizing: border-box; }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+        
+        select[multiple] { height: auto; min-height: 80px; }
+        button { padding: 0.6rem 1.2rem; border: none; border-radius: 0.375rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        .btn-primary { background-color: var(--accent-blue); color: white; } .btn-primary:hover { background-color: #0ea5e9; }
+
+        /* Summary */
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+        .summary-card { background-color: var(--bg-tertiary); padding: 1rem; border-radius: 0.5rem; text-align: center; }
+        .summary-label { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem; text-transform: uppercase; }
+        .summary-value { font-size: 1.5rem; font-weight: 700; color: #f8fafc; }
+        .summary-value.positive { color: var(--accent-green); }
+        .summary-value.negative { color: var(--accent-red); }
+
+        /* Charts */
+        .charts-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+        @media (min-width: 1024px) { .charts-grid { grid-template-columns: 1fr 1fr; } }
+        .chart-container { background-color: var(--bg-tertiary); padding: 1rem; border-radius: 0.5rem; height: 350px; /* Fixed height for charts */ display: flex; justify-content: center; align-items: center;}
+        .chart-container canvas { max-width: 100%; max-height: 100%; }
+
+        /* Transactions Table */
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; table-layout: fixed; }
+        th, td { padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border-color); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        th { background-color: var(--bg-tertiary); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
+        tbody tr:hover { background-color: #4a5568; }
+        
+        /* Filter row styles */
+        tr.filter-row th {
+            padding: 0.5rem;
+            background-color: var(--bg-secondary);
+            border-bottom: 2px solid var(--border-color);
+            overflow: visible; /* Allow input to be seen */
+            vertical-align: top;
+        }
+        tr.filter-row input, tr.filter-row select {
+            font-size: 0.8rem;
+            padding: 0.4rem;
+            width: 100%;
+            box-sizing: border-box; /* Ensure padding doesn't break layout */
+        }
+
+        td.amount { font-weight: 600; text-align: right; }
+        td.amount.positive { color: var(--accent-green); }
+        td.amount.negative { color: var(--accent-red); }
+        td.reason-cell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; /* Truncate long reasons */ }
+        .category-select { background-color: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 2px 4px; font-size: 0.8rem; }
+        .category-select:disabled { opacity: 0.7; cursor: not-allowed; }
+        /* Style select based on category */
+        .category-srp_in { background-color: var(--srp-in) !important; color: black !important; }
+        .category-srp_out { background-color: var(--srp-out) !important; color: white !important; }
+        .category-giveaway { background-color: var(--giveaway) !important; color: black !important; }
+        .category-structure { background-color: var(--structure) !important; color: white !important; }
+        .category-office { background-color: var(--office) !important; color: white !important; }
+        .category-tax { background-color: var(--tax) !important; color: white !important; }
+        .category-other { background-color: var(--other) !important; color: black !important; }
+        .category-uncategorized { background-color: var(--uncategorized) !important; color: var(--text-primary) !important; }
+        /* Style spans similarly */
+        span[class^="category-"] { padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; display: inline-block; /* Make span behave like select for consistent look */ }
+
+        /* Pagination */
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; }
+        .page-btn { background-color: var(--bg-tertiary); color: var(--text-primary); }
+        .page-btn:hover:not(:disabled) { background-color: #55667d; }
+        .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        #page-info { font-size: 0.9rem; color: var(--text-secondary); }
+
+        /* Loading Overlay */
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 1001; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        #loading-overlay.visible { opacity: 1; pointer-events: auto; }
+        .spinner { width: 50px; height: 50px; border: 5px solid var(--bg-tertiary); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Tooltip */
+        .tooltip { position: relative; cursor: help; }
+        .tooltip .tooltiptext { visibility: hidden; width: 250px; background-color: #555; color: #fff; text-align: left; border-radius: 6px; padding: 8px; position: absolute; z-index: 1; bottom: 125%; left: 50%; margin-left: -125px; opacity: 0; transition: opacity 0.3s; white-space: pre-wrap; font-size: 0.8rem; }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+
+         /* Toast Styles */
+        #toast-container { position: fixed; top: 1.5rem; right: 1.5rem; z-index: 2000; display: flex; flex-direction: column; gap: 0.5rem; }
+        .toast { padding: 1rem 1.5rem; border-radius: 0.5rem; opacity: 0; transform: translateX(100%); transition: opacity 0.3s, transform 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .toast.show { opacity: 1; transform: translateX(0); }
+        .toast.success { background-color: var(--accent-green); color: black; }
+        .toast.error { background-color: var(--accent-red); color: white; }
+        .toast.info { background-color: var(--accent-blue); color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Corporation Wallet Monitor</h1>
+
+        <div class="panel primary-filters">
+            <div class="form-group">
+                <label for="filter-start-date">Start Date</label>
+                <input type="date" id="filter-start-date">
+            </div>
+            <div class="form-group">
+                <label for="filter-end-date">End Date</label>
+                <input type="date" id="filter-end-date">
+            </div>
+            <div class="form-group">
+                <label for="filter-divisions">Divisions</label>
+                <select id="filter-divisions" multiple>
+                    <option value="1">1 - Master Wallet</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7 - SRP Wallet</option>
+                </select>
+            </div>
+             <button id="apply-filters-btn" class="btn-primary" style="margin-top: 1.4rem;">Apply Filters</button>
+        </div>
+
+        <div class="panel summary">
+            <h2>Summary (Filtered Period)</h2>
+            <div class="summary-grid" id="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-label">Total Income</div>
+                    <div class="summary-value positive" id="summary-income">...</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Total Outcome</div>
+                    <div class="summary-value negative" id="summary-outcome">...</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Net Change</div>
+                    <div class="summary-value" id="summary-net">...</div>
+                </div>
+                <!-- Balance cards will be added here dynamically -->
+            </div>
+        </div>
+
+        <div class="panel charts">
+            <h2>Charts (Filtered Period)</h2>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <canvas id="monthly-flow-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="category-totals-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel transactions">
+            <h2>Transactions (Filtered Period)</h2>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">Date (UTC)</th>
+                            <th style="width: 5%;">Div</th>
+                            <th style="width: 15%; text-align: right;">Amount</th>
+                            <th style="width: 20%;">From / To</th>
+                            <th style="width: 15%;">Category</th>
+                            <th style="width: 15%;">Type</th>
+                            <th style="width: 15%;">Reason / Desc</th>
+                        </tr>
+                        <!-- NEW FILTER ROW -->
+                        <tr class="filter-row">
+                            <th><!-- Date (filtered above) --></th>
+                            <th><!-- Div (filtered above) --></th>
+                            <th>
+                                <div class="form-group">
+                                    <input type="number" id="filter-amount-exact" placeholder="Filter Exact Amount...">
+                                </div>
+                            </th>
+                            <th>
+                                <div class="form-group">
+                                    <input type="text" id="filter-party" placeholder="Filter From/To...">
+                                </div>
+                            </th>
+                            <th>
+                                <!-- NEW CATEGORY TEXT FILTER -->
+                                <div class="form-group">
+                                     <input type="text" id="filter-category-text" placeholder="Filter Category...">
+                                </div>
+                            </th>
+                            <th>
+                                <div class="form-group">
+                                    <input type="text" id="filter-type" placeholder="Filter Type...">
+                                </div>
+                            </th>
+                            <th>
+                                <div class="form-group">
+                                    <input type="text" id="filter-reason" placeholder="Filter Reason/Desc...">
+                                </div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactions-tbody">
+                        <tr><td colspan="7" style="text-align: center; padding: 2rem;">Loading transactions...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <button id="prev-page-btn" class="page-btn" disabled>&laquo; Prev</button>
+                <span id="page-info">Page 1 of 1 (0 items)</span>
+                <button id="next-page-btn" class="page-btn" disabled>Next &raquo;</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+    <div id="toast-container"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = "<%= token %>";
+            const canEdit = <%- canEdit %>;
+            let currentPage = 1;
+            let totalPages = 1;
+            const itemsPerPage = 50; // Items per page for transactions
+            let currentFilters = {}; // Store current filter values
+            let chartInstances = {};
+            let debounceTimeout; // For debouncing text input
+
+            // --- Read CSS Variables into JS Variables ---
+            let computedStyles, categoryColorsJs, categoryLabels, chartColors;
+
+            function initializeJsColors() {
+                computedStyles = getComputedStyle(document.documentElement);
+                categoryColorsJs = {
+                    srp_in: computedStyles.getPropertyValue('--srp-in').trim(),
+                    srp_out: computedStyles.getPropertyValue('--srp-out').trim(),
+                    giveaway: computedStyles.getPropertyValue('--giveaway').trim(),
+                    structure: computedStyles.getPropertyValue('--structure').trim(),
+                    office: computedStyles.getPropertyValue('--office').trim(),
+                    tax: computedStyles.getPropertyValue('--tax').trim(),
+                    other: computedStyles.getPropertyValue('--other').trim(),
+                    uncategorized: computedStyles.getPropertyValue('--uncategorized').trim() || computedStyles.getPropertyValue('--bg-tertiary').trim(), // Fallback for uncategorized
+                };
+                 chartColors = {
+                     textPrimary: computedStyles.getPropertyValue('--text-primary').trim(),
+                     textSecondary: computedStyles.getPropertyValue('--text-secondary').trim(),
+                     borderColor: computedStyles.getPropertyValue('--border-color').trim(),
+                     accentGreen: computedStyles.getPropertyValue('--accent-green').trim(),
+                     accentRed: computedStyles.getPropertyValue('--accent-red').trim(),
+                };
+                console.log("Initialized JS Colors:", categoryColorsJs, chartColors); // Debug log
+            }
+            // --- END CSS Variable Reading ---
+
+
+            // User-friendly labels for categories
+            categoryLabels = { // Keep this definition
+                srp_in: 'SRP In', srp_out: 'SRP Out', giveaway: 'Giveaway',
+                structure: 'Structure/Upkeep', office: 'Office Rental', tax: 'Tax',
+                other: 'Other', uncategorized: 'Uncategorized'
+            };
+
+            // --- DOM Elements ---
+            const transactionsTbody = document.getElementById('transactions-tbody');
+            const prevPageBtn = document.getElementById('prev-page-btn');
+            const nextPageBtn = document.getElementById('next-page-btn');
+            const pageInfoEl = document.getElementById('page-info');
+            // Primary Filters
+            const filterStartDate = document.getElementById('filter-start-date');
+            const filterEndDate = document.getElementById('filter-end-date');
+            const filterDivisions = document.getElementById('filter-divisions');
+            // const filterCategories = document.getElementById('filter-categories'); // This is removed from primary
+            const applyFiltersBtn = document.getElementById('apply-filters-btn');
+            // Secondary Filters (in transaction panel)
+            const filterType = document.getElementById('filter-type');
+            const filterParty = document.getElementById('filter-party');
+            const filterAmountExact = document.getElementById('filter-amount-exact');
+            const filterReason = document.getElementById('filter-reason');
+            const filterCategoryText = document.getElementById('filter-category-text'); // New category text filter
+            // ---
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const summaryGrid = document.getElementById('summary-grid');
+            const summaryIncomeEl = document.getElementById('summary-income');
+            const summaryOutcomeEl = document.getElementById('summary-outcome');
+            const summaryNetEl = document.getElementById('summary-net');
+
+
+            // --- Utility Functions ---
+            function formatIsk(value, showSign = false) {
+                if (value === null || value === undefined || isNaN(value)) return '0';
+                const num = Number(value);
+                const sign = showSign && num > 0 ? '+' : '';
+                // Use maximumFractionDigits: 0 for ISK which has no decimals
+                return sign + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+            }
+
+            function formatDate(dateString) {
+                if (!dateString) return 'N/A';
+                try {
+                    // EJS might pass a Date object or string, handle both
+                    const date = new Date(dateString);
+                    if (isNaN(date.getTime())) return 'Invalid Date';
+                    return date.toLocaleString('en-GB', { // Example using British English format (DD/MM/YYYY, HH:MM)
+                        year: 'numeric', month: 'short', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', timeZone: 'UTC' // Display in UTC
+                    });
+                } catch (e) {
+                    console.error("Error formatting date:", dateString, e);
+                    return 'Invalid Date';
+                }
+            }
+
+            function showLoading(show = true) {
+                loadingOverlay.classList.toggle('visible', show);
+            }
+
+            function showToast(message, type = 'info') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                container.appendChild(toast);
+                toast.offsetHeight; // Trigger reflow
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
+
+            // --- API Call Function ---
+            async function fetchData(endpoint, body = null, method = 'GET') {
+                showLoading(true);
+                try {
+                    const options = {
+                        method: method.toUpperCase(), // Ensure method is uppercase
+                        headers: { 'Content-Type': 'application/json' },
+                    };
+                    // For POST, data goes in the body
+                    if (body && method.toUpperCase() === 'POST') {
+                        options.body = JSON.stringify(body);
+                    }
+
+                    let url = `/wallet/api/${endpoint}/${token}`;
+                    // For GET, data goes in the query string
+                    if (body && method.toUpperCase() === 'GET') {
+                        // Filter out null/empty values before creating query string
+                        const queryParams = Object.fromEntries(
+                            Object.entries(body).filter(([_, v]) => v !== null && v !== '' && v !== undefined && (!Array.isArray(v) || v.length > 0)) // Also filter undefined
+                        );
+                        if (Object.keys(queryParams).length > 0) {
+                            url += '?' + new URLSearchParams(queryParams).toString();
+                        }
+                    }
+
+                    console.log(`[FetchData] Requesting URL: ${url}`, options); // Log request details
+
+                    const response = await fetch(url, options);
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.message || `HTTP error! Status: ${response.status}`);
+                    }
+                    console.log(`[${endpoint}] Data received:`, data); // Add logging
+                    return data;
+                } catch (error) {
+                    showToast(`Error fetching data: ${error.message}`, 'error');
+                    console.error('API Call Failed:', error);
+                    return null; // Return null on error
+                } finally {
+                    showLoading(false);
+                }
+            }
+
+
+            // --- Data Rendering ---
+            function renderTransactions(transactions) {
+                transactionsTbody.innerHTML = ''; // Clear existing rows
+                if (!transactions || transactions.length === 0) {
+                    transactionsTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--text-secondary);">No transactions found matching filters.</td></tr>`;
+                    return;
+                }
+
+                transactions.forEach(t => {
+                    const tr = document.createElement('tr');
+                    const amountClass = t.amount > 0 ? 'positive' : (t.amount < 0 ? 'negative' : '');
+                    // Use 'uncategorized' if custom_category is null or undefined
+                    const categoryKey = t.custom_category || 'uncategorized';
+                    const categoryClass = `category-${categoryKey}`;
+
+                    // Determine From/To based on amount sign and use names if available
+                    let partyName = 'N/A';
+                    let partyId = null;
+                    if (t.amount > 0) {
+                        partyName = t.first_party_name || (t.first_party_id ? `ID: ${t.first_party_id}` : 'N/A');
+                        partyId = t.first_party_id;
+                    } else if (t.amount < 0) {
+                        partyName = t.second_party_name || (t.second_party_id ? `ID: ${t.second_party_id}` : 'N/A');
+                        partyId = t.second_party_id;
+                    }
+                    const direction = t.amount > 0 ? 'From' : (t.amount < 0 ? 'To' : '');
+
+
+                    // Build tooltip content
+                    let tooltipText = `ID: ${t.transaction_id}\nBalance: ${formatIsk(t.balance)} ISK`;
+                    if (t.tax_receiver_id) tooltipText += `\nTax To: ${t.tax_receiver_id}`; // Fetch name later if needed
+                    if (t.tax_amount) tooltipText += `\nTax Amt: ${formatIsk(t.tax_amount)} ISK`;
+                    if (t.context_id) tooltipText += `\nContext ID: ${t.context_id}`;
+                    if (t.context_type) tooltipText += `\nContext Type: ${t.context_type}`;
+
+                    // Create category dropdown (only if user can edit)
+                    let categoryCellContent = `<span class="${categoryClass}">${categoryLabels[categoryKey] || 'Uncategorized'}</span>`;
+                    if (canEdit) {
+                        // Store the original value to allow reverting on error
+                        const originalValue = t.custom_category === null ? 'null' : t.custom_category;
+                        categoryCellContent = `
+                            <select class="category-select ${categoryClass}" data-tx-id="${t.transaction_id}" data-original-value="${originalValue}">
+                                <option value="null" ${!t.custom_category ? 'selected' : ''}>-- Uncategorized --</option>
+                                ${Object.entries(categoryLabels)
+                                // Exclude 'uncategorized' from the options list itself
+                                .filter(([key, _]) => key !== 'uncategorized')
+                                .map(([key, label]) =>
+                                    `<option value="${key}" ${t.custom_category === key ? 'selected' : ''}>${label}</option>`
+                                ).join('')}
+                            </select>
+                        `;
+                    }
+
+                    tr.innerHTML = `
+                        <td class="tooltip">${formatDate(t.date)}<span class="tooltiptext">${tooltipText}</span></td>
+                        <td>${t.division}</td>
+                        <td class="amount ${amountClass}">${formatIsk(t.amount, true)}</td>
+                        <td class="tooltip">${direction} ${partyName}<span class="tooltiptext">${partyId ? `Party ID: ${partyId}` : 'No Party ID'}</span></td>
+                        <td>${categoryCellContent}</td>
+                        <td>${t.ref_type || ''}</td>
+                        <td class="reason-cell tooltip">${t.reason || t.description || ''}<span class="tooltiptext">${t.reason || t.description || 'No reason/description'}</span></td>
+                    `;
+                    transactionsTbody.appendChild(tr);
+                });
+
+                // Add event listeners for category selects if editing is enabled
+                if (canEdit) {
+                    transactionsTbody.querySelectorAll('.category-select').forEach(select => {
+                        // Add the listener
+                        select.addEventListener('change', handleCategoryChange);
+                    });
+                }
+            }
+
+            function renderPagination(currentPage, totalPages, totalItems) {
+                pageInfoEl.textContent = `Page ${currentPage} of ${totalPages} (${totalItems} items)`;
+                prevPageBtn.disabled = currentPage <= 1;
+                nextPageBtn.disabled = currentPage >= totalPages;
+            }
+
+            function updateSummaryCards(aggregatedData) {
+                console.log("Updating summary cards with data:", aggregatedData); // Log received data
+                let totalIncome = 0;
+                let totalOutcome = 0;
+
+                // Ensure aggregatedData and aggregatedData.categories exist and are arrays
+                if (aggregatedData && Array.isArray(aggregatedData.categories)) {
+                    aggregatedData.categories.forEach(cat => {
+                        // Add null/undefined checks before summing
+                        totalIncome += Number(cat.total_income) || 0;
+                        totalOutcome += Number(cat.total_outcome) || 0; // Outcome is already negative
+                    });
+                    console.log("Calculated Totals:", { totalIncome, totalOutcome }); // Log calculated totals
+                } else {
+                    console.log("Aggregated categories data is missing or not an array.");
+                }
+                const netChange = totalIncome + totalOutcome;
+
+                summaryIncomeEl.textContent = `${formatIsk(totalIncome)} ISK`;
+                summaryOutcomeEl.textContent = `${formatIsk(Math.abs(totalOutcome))} ISK`; // Display as positive number
+                summaryNetEl.textContent = `${formatIsk(netChange, true)} ISK`;
+                summaryNetEl.className = `summary-value ${netChange >= 0 ? 'positive' : 'negative'}`;
+
+                // --- Dynamic Balance Card Rendering ---
+                // Get the divisions that are *currently* selected in the filter
+                let expectedDivisions = new Set(Array.from(filterDivisions.selectedOptions).map(opt => opt.value));
+
+                // If no divisions are selected, default to showing balances for all divisions
+                if (expectedDivisions.size === 0) {
+                    expectedDivisions = new Set(['1', '2', '3', '4', '5', '6', '7']);
+                }
+                
+                const displayedDivisions = new Set();
+
+
+                // Remove existing dynamic balance cards first
+                summaryGrid.querySelectorAll('.summary-card[id^="summary-balance-"]').forEach(card => card.remove());
+
+                // Render balance cards based on fetched data
+                if (aggregatedData && Array.isArray(aggregatedData.balances)) {
+                    aggregatedData.balances.forEach(bal => {
+                        const divisionStr = String(bal.division);
+                        // Only display the card if this division was expected based on filters
+                        if (expectedDivisions.has(divisionStr)) {
+                            displayedDivisions.add(divisionStr); // Mark this division as displayed
+                            const balanceCardId = `summary-balance-${bal.division}`;
+                            const card = document.createElement('div');
+                            card.className = 'summary-card';
+                            card.id = balanceCardId;
+                            card.innerHTML = `
+                                <div class="summary-label">Balance (Div ${bal.division})</div>
+                                <div class="summary-value">${formatIsk(bal.balance)} ISK</div>
+                            `;
+                            summaryGrid.appendChild(card);
+                        }
+                    });
+                }
+
+                // Add placeholder cards for expected divisions that had no balance data
+                expectedDivisions.forEach(divStr => {
+                    if (!displayedDivisions.has(divStr)) {
+                        const balanceCardId = `summary-balance-${divStr}`;
+                        const card = document.createElement('div');
+                        card.className = 'summary-card';
+                        card.id = balanceCardId;
+                        card.innerHTML = `
+                            <div class="summary-label">Balance (Div ${divStr})</div>
+                            <div class="summary-value">N/A</div>
+                        `;
+                        summaryGrid.appendChild(card);
+                    }
+                });
+                // --- End Dynamic Balance Card Rendering ---
+            }
+
+            // --- Chart Rendering ---
+            function renderMonthlyFlowChart(monthlyData = []) { // Default to empty array
+                const canvasId = 'monthly-flow-chart';
+                const ctx = document.getElementById(canvasId)?.getContext('2d');
+                if (!ctx) return;
+                if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+
+                // Handle empty data case
+                if (!monthlyData || monthlyData.length === 0) {
+                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    ctx.save(); // Save context state
+                    ctx.fillStyle = chartColors.textSecondary;
+                    ctx.textAlign = 'center';
+                    ctx.font = '14px Inter, sans-serif'; // Use the body font
+                    ctx.fillText('No Monthly Data Available for Selected Filters', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                    ctx.restore(); // Restore context state
+                    return; // Don't create a Chart.js instance
+                }
+
+
+                const labels = [...new Set(monthlyData.map(d => d.month))].sort();
+                const categories = [...new Set(monthlyData.map(d => d.category))];
+
+                const datasets = categories.map(category => {
+                    const incomeData = labels.map(month => {
+                        const entry = monthlyData.find(d => d.month === month && d.category === category);
+                        return entry ? entry.income : 0;
+                    });
+                    const outcomeData = labels.map(month => {
+                        const entry = monthlyData.find(d => d.month === month && d.category === category);
+                        return entry ? entry.outcome : 0; // Keep outcome negative for actual data value
+                    });
+
+                    return [
+                        {
+                            label: `${categoryLabels[category] || category} - Income`,
+                            data: incomeData,
+                            backgroundColor: categoryColorsJs[category] || categoryColorsJs.other, // Use JS vars
+                            stack: 'Income', // Group all income bars
+                        },
+                        {
+                            label: `${categoryLabels[category] || category} - Outcome`,
+                            // Chart.js needs positive values for the bar size for stacking, tooltip will show negative
+                            data: outcomeData.map(o => Math.abs(o)),
+                            backgroundColor: categoryColorsJs[category] || categoryColorsJs.other, // Use JS vars
+                            stack: 'Outcome', // Group all outcome bars
+                        }
+                    ];
+
+                }).flat();
+
+                chartInstances[canvasId] = new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels, datasets },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: {
+                            title: { display: true, text: 'Monthly Income vs. Outcome by Category', color: chartColors.textPrimary, font: { size: 16 } },
+                            legend: { display: false }, // Hide legend as tooltip shows details
+                            tooltip: {
+                                mode: 'index', // Show tooltip for all items at that index (month)
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        const value = context.parsed.y;
+                                        const isOutcome = context.dataset.stack === 'Outcome';
+                                        // Find the category key
+                                        const categoryName = Object.keys(categoryLabels).find(key => 
+                                            label.startsWith(categoryLabels[key])
+                                        ) || 'uncategorized';
+
+                                        if (label && value !== null && value !== 0) { // Only show non-zero values
+                                            label = label.replace(' - Income', '').replace(' - Outcome', ''); // Clean label
+
+                                            // Find the original data point value (which might be negative)
+                                            const originalDataPoint = monthlyData.find(d => d.month === context.label && d.category === categoryName);
+                                            const actualValue = isOutcome ? originalDataPoint?.outcome : originalDataPoint?.income;
+
+                                            // Ensure actualValue is a number before formatting
+                                            if (typeof actualValue === 'number' && !isNaN(actualValue)) {
+                                                label += ': ' + formatIsk(actualValue, true) + ' ISK';
+                                                return label;
+                                            }
+                                        }
+                                        return null; // Hide label if value is zero or not found
+                                    },
+                                    title: function(context) { // Format month title
+                                        if (context.length > 0) {
+                                            // Parse YYYY-MM label
+                                            const [year, month] = context[0].label.split('-');
+                                            const date = new Date(Date.UTC(year, month - 1, 1)); // Use UTC to avoid timezone issues
+                                            return date.toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+                                        }
+                                        return '';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            // Use category scale for X axis
+                            x: { stacked: true, ticks: { color: chartColors.textSecondary }, grid: { color: chartColors.borderColor } },
+                            y: {
+                                stacked: true, // Stack Income and Outcome separately
+                                ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) },
+                                grid: { color: chartColors.borderColor },
+                                title: {display: true, text:'ISK Amount', color: chartColors.textSecondary}
+                            }
+                        },
+                        interaction: { // Improve hover/tooltip behavior
+                            mode: 'index',
+                            intersect: false,
+                        },
+                    }
+                });
+            }
+
+
+            function renderCategoryTotalsChart(categoryData = []) { // Default to empty array
+                const canvasId = 'category-totals-chart';
+                const ctx = document.getElementById(canvasId)?.getContext('2d');
+                if (!ctx) return;
+                if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+
+                // Handle empty data case
+                if (!categoryData || categoryData.length === 0) {
+                    // Display a placeholder message
+                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    ctx.save();
+                    ctx.fillStyle = chartColors.textSecondary;
+                    ctx.textAlign = 'center';
+                    ctx.font = '14px Inter, sans-serif';
+                    ctx.fillText('No Category Data Available for Selected Filters', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                    ctx.restore();
+                    return;
+                }
+
+                const labels = categoryData.map(d => categoryLabels[d.category] || d.category);
+                const incomeValues = categoryData.map(d => d.total_income || 0);
+                const outcomeValues = categoryData.map(d => Math.abs(d.total_outcome || 0)); // Use absolute value
+
+                chartInstances[canvasId] = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Total Income', data: incomeValues, backgroundColor: 'rgba(74, 222, 128, 0.6)', borderColor: chartColors.accentGreen, borderWidth: 1 },
+                            { label: 'Total Outcome', data: outcomeValues, backgroundColor: 'rgba(248, 113, 113, 0.6)', borderColor: chartColors.accentRed, borderWidth: 1 }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                        plugins: {
+                            title: { display: true, text: 'Total Income/Outcome by Category (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
+                            legend: { position: 'top', labels: { color: chartColors.textSecondary } },
+                            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatIsk(ctx.raw)} ISK` } }
+                        },
+                        scales: {
+                            x: { ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Total ISK', color: chartColors.textSecondary} },
+                            y: { ticks: { color: chartColors.textPrimary }, grid: { color: chartColors.borderColor } }
+                        }
+                    }
+                });
+            }
+
+            // --- Event Handlers ---
+            async function loadData(page = 1) {
+                // Read ALL filters every time
+                const startDate = filterStartDate.value || null;
+                const endDate = filterEndDate.value || null;
+                const divisions = Array.from(filterDivisions.selectedOptions).map(opt => opt.value);
+                const categorySearch = filterCategoryText.value.trim() || null; // Read from new text input
+                const refType = filterType.value.trim() || null;
+                const partySearch = filterParty.value.trim() || null;
+                const amountExact = filterAmountExact.value ? parseFloat(filterAmountExact.value) : null;
+                const reasonSearch = filterReason.value.trim() || null;
+
+                // Update global filters state including new filters
+                currentFilters = { startDate, endDate, divisions, categorySearch, refType, partySearch, amountExact, reasonSearch }; // Updated
+
+                console.log("Fetching data with filters:", currentFilters, "Page:", page); // Log filters being used
+
+                // Fetch both sets of data concurrently
+                const [transactionsResult, aggregatedResult] = await Promise.all([
+                    fetchData('transactions', { ...currentFilters, page: page, limit: itemsPerPage }, 'POST'),
+                    // Aggregated data for charts/summary depends on primary filters + categorySearch
+                    fetchData('aggregated', { startDate, endDate, divisions, categorySearch }, 'POST')
+                ]);
+
+                console.log("Transaction Result:", transactionsResult);
+                console.log("Aggregated Result:", aggregatedResult);
+
+
+                if (transactionsResult && transactionsResult.success) {
+                    renderTransactions(transactionsResult.transactions);
+                    currentPage = transactionsResult.currentPage;
+                    totalPages = transactionsResult.totalPages;
+                    renderPagination(currentPage, totalPages, transactionsResult.total);
+                } else {
+                    renderTransactions([]); // Clear table on error
+                    renderPagination(1, 1, 0);
+                    console.error("Failed to render transactions:", transactionsResult?.message);
+                }
+
+                if (aggregatedResult && aggregatedResult.success && aggregatedResult.data) {
+                    updateSummaryCards(aggregatedResult.data);
+                    renderMonthlyFlowChart(aggregatedResult.data.monthly || []);
+                    renderCategoryTotalsChart(aggregatedResult.data.categories || []);
+                } else {
+                    // Handle error or empty state for aggregated data
+                    updateSummaryCards({});
+                    renderMonthlyFlowChart([]);
+                    renderCategoryTotalsChart([]);
+                    console.error("Failed to render aggregated data:", aggregatedResult?.message);
+                }
+            }
+
+
+            async function handleCategoryChange(event) {
+                const selectElement = event.target;
+                const transactionId = selectElement.dataset.txId;
+                const newCategory = selectElement.value === 'null' ? null : selectElement.value; // Handle 'uncategorized' selection
+                const originalValue = selectElement.dataset.originalValue; // Get original value for revert
+
+                selectElement.disabled = true; // Disable during processing
+
+                const result = await fetchData('update-category', { transactionId, category: newCategory }, 'POST');
+
+                if (result && result.success) {
+                    showToast(result.message, 'success');
+                    // Update successful, refresh aggregated data for accuracy
+                    fetchData('aggregated', { // Re-fetch aggregated data only
+                        startDate: currentFilters.startDate,
+                        endDate: currentFilters.endDate,
+                        divisions: currentFilters.divisions,
+                        categorySearch: currentFilters.categorySearch // Pass current category filter
+                    }, 'POST').then(aggResult => {
+                        if (aggResult && aggResult.success && aggResult.data) {
+                            updateSummaryCards(aggResult.data);
+                            renderMonthlyFlowChart(aggResult.data.monthly || []);
+                            renderCategoryTotalsChart(aggResult.data.categories || []);
+                        }
+                    });
+                    // Update the visual style and original value attribute
+                    const categoryKey = newCategory || 'uncategorized';
+                    const categoryClass = `category-${categoryKey}`;
+                    selectElement.className = `category-select ${categoryClass}`; // Update class directly
+                    selectElement.dataset.originalValue = selectElement.value; // Update original value attr
+
+                } else {
+                    showToast(result?.message || 'Failed to update category.', 'error');
+                    // Revert UI on failure
+                    selectElement.value = originalValue || 'null'; // Revert to original value
+                    const revertedKey = selectElement.value === 'null' ? 'uncategorized' : selectElement.value;
+                    const revertedClass = `category-${revertedKey}`;
+                    selectElement.className = `category-select ${revertedClass}`;
+                }
+                selectElement.disabled = false; // Re-enable select
+            }
+
+            // Debounce function
+            function debounce(func, delay) {
+                let timeout;
+                return function(...args) {
+                    const context = this;
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(context, args), delay);
+                };
+            }
+
+            // Debounced load function for text inputs
+            const debouncedLoadData = debounce(() => loadData(1), 500); // 500ms delay
+
+            // --- Event Listeners ---
+            
+            // Apply button handles primary filters
+            applyFiltersBtn.addEventListener('click', () => loadData(1));
+            
+            // Listeners for primary filters (Date, Selects) trigger on 'change' and reload data
+            [filterStartDate, filterEndDate, filterDivisions].forEach(el => {
+                el.addEventListener('change', () => loadData(1));
+            });
+
+            // Debounced listeners for secondary, text-based filters
+            [filterType, filterParty, filterAmountExact, filterReason, filterCategoryText].forEach(el => {
+                el.addEventListener('input', debouncedLoadData);
+            });
+
+            // Pagination buttons
+            prevPageBtn.addEventListener('click', () => { if (currentPage > 1) loadData(currentPage - 1); });
+            nextPageBtn.addEventListener('click', () => { if (currentPage < totalPages) loadData(currentPage + 1); });
+
+            // WebSocket Listener
+            const socket = io();
+            socket.on('connect', () => console.log('Wallet Monitor connected to WebSocket.'));
+            socket.on('wallet-update', () => {
+                console.log('Received wallet-update event. Reloading data.');
+                showToast('Wallet data updated, reloading...', 'info');
+                loadData(currentPage); // Reload current page and charts
+            });
+            socket.on('disconnect', () => console.log('Wallet Monitor disconnected from WebSocket.'));
+
+            // --- Initial Load ---
+            
+            initializeJsColors(); // Initialize colors after DOM is ready
+
+            // --- Default Date Filter Logic ---
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth(); // 0-indexed month
+
+            // First day of current month
+            const firstDayOfMonth = new Date(year, month, 1);
+            const startDateStr = firstDayOfMonth.toISOString().split('T')[0]; // Format YYYY-MM-DD
+
+            // Last day of current month
+            const lastDayOfMonth = new Date(year, month + 1, 0); // Day 0 of next month is last day of current
+            const endDateStr = lastDayOfMonth.toISOString().split('T')[0]; // Format YYYY-MM-DD
+
+            filterStartDate.value = startDateStr;
+            filterEndDate.value = endDateStr;
+            // --- End Default Date Filter Logic ---
+
+            // --- Default Division & Category Selection Logic ---
+            // Select all divisions
+            Array.from(filterDivisions.options).forEach(option => {
+                option.selected = true;
+            });
+            // Categories are now a text filter, so no pre-selection is needed.
+             // --- End Default Selection Logic ---
+
+            loadData(1); // Load initial data using the default filters
+        
+        });
+    </script>
+</body>
+</html>
+

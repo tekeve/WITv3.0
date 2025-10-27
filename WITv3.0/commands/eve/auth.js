@@ -4,6 +4,7 @@ const authManager = require('@helpers/authManager.js');
 const logger = require('@helpers/logger');
 
 module.exports = {
+    // Keep permissions as they are, but users needing wallet access will need specific roles.
     permissions: ['assault_line_commander', 'training_fc', 'fleet_commander', 'training_ct', 'certified_trainer', 'council'],
     data: new SlashCommandBuilder()
         .setName('auth')
@@ -37,18 +38,26 @@ module.exports = {
                 });
             }
 
-            // --- FIX START ---
-            // Ensure the required scope for authenticated search is always included.
-            const requiredScope = 'esi-search.search_structures.v1';
-            const scopes = new Set(ESI_SCOPES.split(' '));
-            scopes.add(requiredScope);
-            const finalScopes = Array.from(scopes).join(' ');
-            // --- FIX END ---
+            // --- SCOPE UPDATE START ---
+            // Define all required scopes, including the new wallet scope
+            const requiredScopes = [
+                'esi-mail.send_mail.v1',
+                'esi-mail.read_mail.v1',
+                'esi-search.search_structures.v1',
+                'esi-wallet.read_corporation_wallets.v1' // <-- New Scope Added
+            ];
+            // Combine configured scopes with required scopes, ensuring uniqueness
+            const configuredScopes = ESI_SCOPES.split(' ').filter(Boolean); // Filter out empty strings
+            const finalScopesSet = new Set([...configuredScopes, ...requiredScopes]);
+            const finalScopesString = Array.from(finalScopesSet).join(' ');
+            // --- SCOPE UPDATE END ---
+
 
             const state = crypto.randomBytes(16).toString('hex');
             interaction.client.esiStateMap.set(state, interaction.user.id);
 
-            const encodedScopes = finalScopes.split(' ').map(scope => encodeURIComponent(scope)).join('%20');
+            // Encode the final combined scopes string
+            const encodedScopes = finalScopesString.split(' ').map(scope => encodeURIComponent(scope)).join('%20');
             const authUrl = `https://login.eveonline.com/v2/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(ESI_CALLBACK_URL)}&client_id=${ESI_CLIENT_ID}&scope=${encodedScopes}&state=${state}`;
 
             const row = new ActionRowBuilder()
@@ -60,7 +69,7 @@ module.exports = {
                 );
 
             await interaction.reply({
-                content: 'Click the button below to authorize your character. This will only grant the bot permissions to send mail on your behalf and view your mailing lists. **Important:** You must authenticate with a character already registered to your profile.',
+                content: 'Click the button below to authorize your character. This grants permissions for mail, search, and potentially corporation wallet reading (if you have corp roles). **Important:** Authenticate with a character registered to your profile. If you manage corp wallets, use that character.',
                 components: [row],
                 flags: [MessageFlags.Ephemeral]
             });
@@ -74,6 +83,32 @@ module.exports = {
                     ? 'Active (Automatically refreshed on use)'
                     : 'Inactive (Please re-authenticate)';
 
+                // Fetch scopes associated with the current token for display (optional but helpful)
+                let currentScopes = 'Could not verify scopes.'; // Default message
+                if (authData.access_token) {
+                    try {
+                        const verifyResponse = await esiService.get({
+                            endpoint: 'https://login.eveonline.com/oauth/verify',
+                            headers: { 'Authorization': `Bearer ${authData.access_token}` },
+                            caller: __filename // Pass caller info
+                        });
+                        // Check if verifyResponse and its data exist before accessing Scopes
+                        if (verifyResponse && verifyResponse.data && verifyResponse.data.Scopes) {
+                            currentScopes = verifyResponse.data.Scopes;
+                        } else {
+                            logger.warn(`ESI verify endpoint did not return expected Scopes for ${authData.character_name}`);
+                            // Keep the default message "Could not verify scopes."
+                        }
+                    } catch (verifyError) {
+                        logger.error(`Error verifying ESI token scopes for ${authData.character_name}: ${verifyError.message}`);
+                        // Keep the default message "Could not verify scopes."
+                        if (verifyError.response && verifyError.response.status === 401) {
+                            currentScopes = 'Token likely expired or invalid. Please re-authenticate.';
+                        }
+                    }
+                }
+
+
                 const embed = new EmbedBuilder()
                     .setColor(0x3BA55D)
                     .setTitle('Authentication Status: Connected')
@@ -81,6 +116,7 @@ module.exports = {
                         { name: 'Authenticated Character', value: authData.character_name, inline: true },
                         { name: 'Access Token Expires', value: `<t:${expiryTimestamp}:R>`, inline: true },
                         { name: 'Refresh Token Status', value: refreshTokenStatus, inline: false },
+                        { name: 'Granted Scopes', value: `\`\`\`${currentScopes}\`\`\`` }, // Display scopes
                         { name: 'Manage Access', value: '[Revoke on EVE Online\'s Website](https://community.eveonline.com/support/third-party-applications/)' }
                     )
                     .setFooter({ text: 'Note: If unused for an extended period, you may need to re-authenticate.' });
@@ -99,4 +135,3 @@ module.exports = {
         }
     },
 };
-

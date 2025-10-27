@@ -20,6 +20,8 @@ const editableTables = [
     'role_hierarchy',
     'saved_embeds',
     'srp_history',
+    'trusted_pilots', // Added trusted_pilots table
+    'unsafe_systems', // Added unsafe_systems table
     'users'
 ];
 
@@ -42,6 +44,8 @@ const tableKeyMap = {
     role_hierarchy: 'roleName',
     saved_embeds: 'embed_name',
     srp_history: 'id',
+    trusted_pilots: 'id', // Added key for trusted_pilots
+    unsafe_systems: 'system_id', // Added key for unsafe_systems
     users: 'character_id',
 };
 

@@ -23,7 +23,13 @@ exports.showEditor = (client) => async (req, res) => {
 
     try {
         const tableData = await db.query(`SELECT * FROM \`${tableName}\``);
-        const headers = tableData.length > 0 ? Object.keys(tableData[0]) : [];
+        
+        // Fetch headers from INFORMATION_SCHEMA to handle empty tables correctly
+        const headerRows = await db.query(
+            `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`,
+            [process.env.MYSQL_DATABASE, tableName]
+        );
+        const headers = headerRows.map(row => row.COLUMN_NAME);
 
         res.render('webEditForm', {
             tableName,

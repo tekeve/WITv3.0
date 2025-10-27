@@ -376,3 +376,30 @@ CREATE TABLE IF NOT EXISTS `users` (
   CONSTRAINT `roles` CHECK (json_valid(`roles`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- *** ADD NEW TABLE FOR CORP WALLET TRANSACTIONS ***
+CREATE TABLE IF NOT EXISTS `corp_wallet_transactions` (
+  `transaction_id` BIGINT UNSIGNED NOT NULL,
+  `corporation_id` INT UNSIGNED NOT NULL,
+  `division` TINYINT UNSIGNED NOT NULL,
+  `date` DATETIME NOT NULL,
+  `ref_type` VARCHAR(255) NOT NULL,
+  `first_party_id` INT UNSIGNED NULL,
+  `first_party_name` VARCHAR(255) NULL,
+  `second_party_id` INT UNSIGNED NULL,
+  `second_party_name` VARCHAR(255) NULL,
+  `amount` DECIMAL(20, 2) NOT NULL,
+  `balance` DECIMAL(20, 2) NOT NULL,
+  `reason` VARCHAR(1024) NULL,
+  `tax_receiver_id` INT UNSIGNED NULL,
+  `tax_amount` DECIMAL(20, 2) NULL,
+  `context_id` BIGINT NULL,
+  `context_type` VARCHAR(255) NULL,
+  `description` VARCHAR(255) NOT NULL,
+  `custom_category` ENUM('srp_in', 'srp_out', 'giveaway', 'structure', 'office', 'tax', 'other') NULL DEFAULT NULL,
+  `last_updated` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`transaction_id`),
+  INDEX `idx_corp_division_date` (`corporation_id`, `division`, `date`),
+  INDEX `idx_date` (`date`),
+  INDEX `idx_ref_type` (`ref_type`),
+  INDEX `idx_custom_category` (`custom_category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

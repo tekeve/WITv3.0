@@ -124,6 +124,18 @@
                 <label for="logiSignoffChannelId">Logi Signoff Channel ID</label>
                 <input type="text" id="logiSignoffChannelId" name="logiSignoffChannelId" required value="<%= currentConfig.logiSignoffChannelId || '' %>">
             </div>
+            <!-- Wallet Monitor Configuration Fields -->
+            <div class="form-group">
+                <label for="srpCorporationId">SRP Corporation ID</label>
+                <input type="text" id="srpCorporationId" name="srpCorporationId" value="<%= currentConfig.srpCorporationId || '' %>">
+                <small>The EVE Corporation ID whose wallets to monitor.</small>
+            </div>
+            <div class="form-group">
+                <label for="srpWalletDivisions">SRP Wallet Divisions</label>
+                <input type="text" id="srpWalletDivisions" name="srpWalletDivisions" value="<%= currentConfig.srpWalletDivisions || '' %>">
+                <small>Comma-separated list of division numbers (1-7) to monitor.</small>
+            </div>
+            <!-- End Wallet Monitor Fields -->
         </div>
 
         <h2>GitHub Integration</h2>

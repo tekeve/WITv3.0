@@ -1,7 +1,8 @@
-const { MessageFlags } = require('discord.js');
+﻿const { MessageFlags } = require('discord.js');
 const logger = require('@helpers/logger');
 const configManager = require('@helpers/configManager');
 const db = require('@helpers/database'); // Import database helper for direct queries
+const roleManager = require('@helpers/roleManager'); // Import roleManager for isAdmin check
 
 /**
  * Renders the Setup form, pre-filling it with existing data if available.
@@ -10,8 +11,9 @@ const db = require('@helpers/database'); // Import database helper for direct qu
  */
 exports.showSetupForm = (activeSetupTokens) => async (req, res) => {
     const { token } = req.params;
+    const tokenData = activeSetupTokens.get(token); // Fetch token data
 
-    if (!activeSetupTokens.has(token)) {
+    if (!tokenData) {
         logger.warn(`Invalid or expired setup token used: ${token}`);
         return res.status(404).render('error', {
             title: 'Link Invalid or Expired',
@@ -19,18 +21,40 @@ exports.showSetupForm = (activeSetupTokens) => async (req, res) => {
         });
     }
 
+    // --- Permission Check ---
+    const config = configManager.get(); // Get current config to check setupLocked
+    const isSetupComplete = config && config.setupLocked && config.setupLocked.includes("true");
+    const member = await tokenData.interaction.guild.members.fetch(tokenData.user.id); // Fetch member object
+
+    // After the first setup, only a bot admin (owner or from user list) can access the form again.
+    if (isSetupComplete && !roleManager.isAdmin(member)) {
+        activeSetupTokens.delete(token); // Invalidate token as it shouldn't have been generated
+        return res.status(403).render('error', {
+            title: 'Permission Denied',
+            message: 'The initial setup has been completed. Only a bot admin can edit the configuration.',
+        });
+    }
+    // --- End Permission Check ---
+
+
     try {
         const dbConfig = await db.query('SELECT key_name, value FROM config');
         const currentConfig = {};
 
         // Process the database rows to pre-fill the form
         for (const row of dbConfig) {
+            // Skip the setupLocked key, it shouldn't be user-editable here
+            if (row.key_name === 'setupLocked') continue;
+
             try {
                 // Values are stored as JSON arrays, e.g., '["123", "456"]'
                 const parsedValue = JSON.parse(row.value);
                 // Join array elements to create a comma-separated string for the form input
                 if (Array.isArray(parsedValue)) {
                     currentConfig[row.key_name] = parsedValue.join(', ');
+                } else {
+                    // Handle non-array values if necessary (though most should be arrays)
+                    currentConfig[row.key_name] = parsedValue;
                 }
             } catch (e) {
                 // If it's not valid JSON (or an empty array string), just use the raw value.
@@ -71,6 +95,21 @@ exports.handleSetupSubmission = (client, activeSetupTokens) => async (req, res) 
         });
     }
 
+    // --- Permission Check (repeated for submission security) ---
+    const config = configManager.get();
+    const isSetupComplete = config && config.setupLocked && config.setupLocked.includes("true");
+    const member = await setupData.interaction.guild.members.fetch(setupData.user.id);
+
+    if (isSetupComplete && !roleManager.isAdmin(member)) {
+        activeSetupTokens.delete(token); // Invalidate token
+        return res.status(403).render('error', {
+            title: 'Permission Denied',
+            message: 'Only a bot admin can submit changes after initial setup.',
+        });
+    }
+    // --- End Permission Check ---
+
+
     // Invalidate the token immediately to prevent double submissions
     activeSetupTokens.delete(token);
 
@@ -83,7 +122,8 @@ exports.handleSetupSubmission = (client, activeSetupTokens) => async (req, res) 
         // Save each piece of configuration to the database
         for (const [key, value] of Object.entries(formData)) {
             // Treat all incoming values as potentially comma-separated and store as a JSON array string.
-            const arrayValue = value.split(',').map(item => item.trim()).filter(Boolean);
+            // Split by comma, trim whitespace, and filter out any empty strings that might result.
+            const arrayValue = value.split(',').map(item => item.trim()).filter(item => item !== '');
             const valueToStore = JSON.stringify(arrayValue);
 
             // Using ON DUPLICATE KEY UPDATE handles both initial setup and subsequent edits.
@@ -93,6 +133,7 @@ exports.handleSetupSubmission = (client, activeSetupTokens) => async (req, res) 
 
         // Mark the setup as complete (or re-affirm it)
         const lockSql = 'INSERT INTO config (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?';
+        // Ensure the value stored for setupLocked is a JSON array containing the string "true"
         await db.query(lockSql, ['setupLocked', JSON.stringify(["true"]), JSON.stringify(["true"])]);
 
 
@@ -102,10 +143,25 @@ exports.handleSetupSubmission = (client, activeSetupTokens) => async (req, res) 
         await configManager.reloadConfig();
         logger.success('Live configuration has been reloaded.');
 
-        await interaction.followUp({
-            content: 'Your setup has been successfully submitted and applied!',
-            flags: [MessageFlags.Ephemeral]
-        });
+        // Attempt to reply to the original interaction that generated the link
+        try {
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({
+                    content: '✅ Setup/Configuration has been successfully updated!',
+                    flags: [MessageFlags.Ephemeral]
+                });
+            } else {
+                // This case should be rare since the command replies before sending the link
+                await interaction.reply({
+                    content: '✅ Setup/Configuration has been successfully updated!',
+                    flags: [MessageFlags.Ephemeral]
+                });
+            }
+        } catch (replyError) {
+            logger.error('Failed to send confirmation message to Discord after setup:', replyError);
+            // Don't fail the whole request if the Discord reply fails
+        }
+
 
         // Show a success page to the user
         res.render('success', {

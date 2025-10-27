@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+﻿const { EmbedBuilder } = require('discord.js');
 const esiService = require('@helpers/esiService');
 const logger = require('@helpers/logger');
 const incursionManager = require('@helpers/incursionManager');
@@ -44,6 +44,7 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
     // Use pre-calculated route data from the state object.
     const tradeHubJumpsString = state.routeData?.tradeHubRoutes || 'Calculating...';
     const routeFromLastHqString = state.routeData?.lastHqRoute;
+    const dangerousSystems = state.routeData?.dangerousSystems || [];
 
     const formatSystemLinks = (systemString) => !systemString ? 'None' : systemString.split(',').map(name => `[${name.trim()}](https://evemaps.dotlan.net/system/${encodeURIComponent(name.trim())})`).join(', ');
 
@@ -86,6 +87,17 @@ async function buildActiveIncursionEmbed(highSecIncursion, state, config, isUsin
 
     if (routeFromLastHqString) {
         fields.push({ name: 'Route from Last HQ', value: routeFromLastHqString, inline: true });
+    }
+
+    // Add a spacer field if there's a route from last HQ to align the next row
+    if (routeFromLastHqString) {
+        fields.push({ name: '\u200B', value: '\u200B', inline: true });
+    }
+
+    // Add the dangerous systems field if any were found
+    if (dangerousSystems.length > 0) {
+        const dangerousSystemsString = dangerousSystems.map(name => `\`${name}\``).join(', ');
+        fields.push({ name: '⚠️ Dangerous Systems on Shortest Route', value: dangerousSystemsString, inline: false });
     }
 
     embed.addFields(fields);
@@ -156,4 +168,3 @@ function buildNoIncursionEmbed(state) {
 }
 
 module.exports = { buildActiveIncursionEmbed, buildNoIncursionEmbed, formatDuration };
-

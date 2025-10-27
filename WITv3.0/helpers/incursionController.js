@@ -97,8 +97,10 @@ async function calculateRoutes(highSecIncursion, state, config) {
     const jumpCounts = await Promise.all(jumpPromises);
     const tradeHubJumpsString = jumpCounts.map(hub => `**${hub.name}**:\n${hub.jumps}`).join('\n');
 
-    // 2. Calculate route from last HQ
+    // 2. Calculate route from last HQ and check for dangerous systems
     let routeFromLastHqString = null;
+    let dangerousSystems = [];
+
     if (state.lastHqSystemId && state.lastHqSystemId !== currentHqId) {
         let routeString = 'N/A';
         const lastHqNameData = incursionSystems.find(sys => Number(sys.dock_up_system_id) === state.lastHqSystemId);
@@ -118,9 +120,35 @@ async function calculateRoutes(highSecIncursion, state, config) {
 
                 const secureRes = results[0].status === 'fulfilled' ? results[0].value.data : null;
                 const shortestRes = results[1].status === 'fulfilled' ? results[1].value.data : null;
+                const shortestRouteSystemIds = Array.isArray(shortestRes) ? shortestRes : null;
+
+                // Check for dangerous systems along the shortest route
+                if (shortestRouteSystemIds && shortestRouteSystemIds.length > 0) {
+                    const allUnsafeSystems = await db.query('SELECT system_id, system_name, group_name, is_primary FROM unsafe_systems');
+                    if (allUnsafeSystems.length > 0) {
+                        const unsafeSystemsOnRoute = allUnsafeSystems.filter(unsafeSys => shortestRouteSystemIds.includes(unsafeSys.system_id));
+
+                        if (unsafeSystemsOnRoute.length > 0) {
+                            const uniqueGroupNames = [...new Set(unsafeSystemsOnRoute.map(s => s.group_name))];
+                            const displayNames = [];
+                            uniqueGroupNames.forEach(groupName => {
+                                const primarySystem = allUnsafeSystems.find(s => s.group_name === groupName && s.is_primary);
+                                if (primarySystem) {
+                                    displayNames.push(primarySystem.system_name);
+                                } else {
+                                    const firstOfGroupOnRoute = unsafeSystemsOnRoute.find(s => s.group_name === groupName);
+                                    if (firstOfGroupOnRoute) {
+                                        displayNames.push(firstOfGroupOnRoute.system_name);
+                                    }
+                                }
+                            });
+                            dangerousSystems = [...new Set(displayNames)]; // Ensure unique names
+                        }
+                    }
+                }
 
                 const secureJumps = Array.isArray(secureRes) ? secureRes.length - 1 : null;
-                const shortestJumps = Array.isArray(shortestRes) ? shortestRes.length - 1 : null;
+                const shortestJumps = shortestRouteSystemIds ? shortestRouteSystemIds.length - 1 : null;
 
                 if (secureJumps !== null && secureJumps === shortestJumps) {
                     routeString = `**${lastHqName}**: [${secureJumps}j (safest)](${secureGatecheckUrl})`;
@@ -141,7 +169,8 @@ async function calculateRoutes(highSecIncursion, state, config) {
 
     return {
         tradeHubRoutes: tradeHubJumpsString,
-        lastHqRoute: routeFromLastHqString
+        lastHqRoute: routeFromLastHqString,
+        dangerousSystems: dangerousSystems,
     };
 }
 
@@ -489,4 +518,3 @@ async function updateIncursions(client, options = {}) {
 }
 
 module.exports = { updateIncursions };
-
