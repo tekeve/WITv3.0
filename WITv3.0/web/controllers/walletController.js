@@ -56,7 +56,8 @@ const validateWalletToken = (client, requiredPermissions = VIEW_PERMISSION) => a
     if (!roleManager.hasPermission(tokenData.member, permissionsToCheck)) {
         logger.warn(`[WalletController] Permission denied for ${tokenData.member.user.tag}. Required: ${permissionsToCheck.join(' or ')}`);
         if (req.path.includes('/api/')) {
-            return res.status(402).json({ success: false, message: 'You do not have permission for this action.' });
+            // Corrected status code for Permission Denied
+            return res.status(403).json({ success: false, message: 'You do not have permission for this action.' });
         }
         return res.status(403).render('error', { title: 'Permission Denied', message: `You do not have the required role to access this page.` });
     }
@@ -131,14 +132,44 @@ exports.getTransactionsData = (client) => [
         try {
             // Filters from POST body (preferred for complex/many filters)
             const {
-                startDate, endDate, divisions, page = 1, limit = 50,
+                startDate, endDate, divisions,
                 refType, partySearch, amountExact, reasonSearch,
                 categorySearch // Added categorySearch
             } = req.body;
-            logger.info(`[WalletController] Fetching transactions for ${member.user.tag} with filters:`, req.body);
+
+            // --- Robust Page/Limit Parsing ---
+            let page = 1;
+            let limit = 50; // Default limit
+
+            // Try parsing page from body, default to 1 if invalid
+            const rawPage = req.body.page;
+            if (rawPage !== undefined && rawPage !== null) {
+                const parsedPage = parseInt(rawPage, 10);
+                if (!isNaN(parsedPage) && parsedPage > 0) {
+                    page = parsedPage;
+                } else {
+                    logger.warn(`[WalletController] Invalid 'page' value received: ${rawPage}. Defaulting to 1.`);
+                }
+            }
+
+            // Try parsing limit from body, default to 50 if invalid
+            const rawLimit = req.body.limit;
+            if (rawLimit !== undefined && rawLimit !== null) {
+                const parsedLimit = parseInt(rawLimit, 10);
+                // Allow a reasonable range for limit, e.g., 10 to 200
+                if (!isNaN(parsedLimit) && parsedLimit >= 10 && parsedLimit <= 200) {
+                    limit = parsedLimit;
+                } else {
+                    logger.warn(`[WalletController] Invalid 'limit' value received: ${rawLimit}. Defaulting to 50.`);
+                }
+            }
+            // --- End Robust Parsing ---
+
+
+            logger.info(`[WalletController] Fetching transactions for ${member.user.tag} with filters:`, req.body, `Parsed Page: ${page}, Limit: ${limit}`);
 
             const filters = {
-                startDate, endDate, divisions, page, limit,
+                startDate, endDate, divisions, page, limit, // Use parsed page/limit
                 refType, partySearch, amountExact, reasonSearch,
                 categorySearch // Pass new filter
             };
@@ -215,4 +246,3 @@ exports.updateCategory = (client) => [
         }
     }
 ];
-

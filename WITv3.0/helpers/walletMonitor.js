@@ -360,12 +360,12 @@ async function syncWalletTransactions() {
 async function getTransactions(filters = {}) {
     const {
         startDate, endDate, divisions = [], categorySearch,
-        page = 1, limit = 50,
+        page = 1, limit = 50, // These now come validated from controller
         refType, partySearch, amountExact, reasonSearch
     } = filters;
 
-    const numLimit = Number(limit);
-    const numPage = Number(page);
+    const numLimit = limit; // Already validated in controller
+    const numPage = page; // Already validated in controller
     const offset = (numPage - 1) * numLimit;
 
     let whereClauses = [];
@@ -382,8 +382,7 @@ async function getTransactions(filters = {}) {
     if (endDate) {
         const inclusiveEndDate = new Date(endDate);
         inclusiveEndDate.setDate(inclusiveEndDate.getDate() + 1);
-        whereClauses.push('date < ?');
-        params.push(inclusiveEndDate);
+        whereClauses.push('date < ?'); params.push(inclusiveEndDate);
     }
 
     if (Array.isArray(divisions) && divisions.length > 0) {
@@ -419,8 +418,10 @@ async function getTransactions(filters = {}) {
 
     if (refType) { whereClauses.push('ref_type LIKE ?'); params.push(`%${refType}%`); }
     if (partySearch) { whereClauses.push('(first_party_name LIKE ? OR second_party_name LIKE ?)'); params.push(`%${partySearch}%`, `%${partySearch}%`); }
-    if (amountExact !== null && amountExact !== undefined && !isNaN(amountExact)) {
-        whereClauses.push('(amount = ? OR amount = ?)'); params.push(amountExact, -amountExact);
+    // Ensure amountExact is treated as a number
+    const exactAmount = Number(amountExact);
+    if (!isNaN(exactAmount)) { // Check if it's a valid number
+        whereClauses.push('(amount = ? OR amount = ?)'); params.push(exactAmount, -exactAmount);
     }
     if (reasonSearch) { whereClauses.push('(reason LIKE ? OR description LIKE ?)'); params.push(`%${reasonSearch}%`, `%${reasonSearch}%`); }
 
@@ -434,13 +435,23 @@ async function getTransactions(filters = {}) {
         const dataSql = `
             SELECT * FROM corp_wallet_transactions ${whereString}
             ORDER BY date DESC, transaction_id DESC LIMIT ? OFFSET ?`;
-        const transactions = await db.query(dataSql, [...params, numLimit, offset]);
+
+        // --- Logging added before query execution ---
+        logger.info(`[WalletMonitor Web] Executing transaction query: ${dataSql}`);
+        const finalParams = [...params, numLimit, offset];
+        logger.info(`[WalletMonitor Web] Parameters: ${JSON.stringify(finalParams)}`);
+        logger.info(`[WalletMonitor Web] numLimit=${numLimit} (Type: ${typeof numLimit}), offset=${offset} (Type: ${typeof offset})`);
+        // --- End Logging ---
+
+        const transactions = await db.query(dataSql, finalParams); // Use finalParams
 
         return { transactions, total, currentPage: numPage, totalPages: Math.ceil(total / numLimit) };
 
     } catch (error) {
-        logger.error('[WalletMonitor Web] Error fetching transactions:', error);
-        throw error;
+        // Log the failed query and params for easier debugging
+        logger.error(`[WalletMonitor Web] Error fetching transactions. Query: ${dataSql}, Params: ${JSON.stringify([...params, numLimit, offset])}`);
+        logger.error(error); // Log the full error object
+        throw error; // Re-throw error to be caught by the controller
     }
 }
 
@@ -635,4 +646,3 @@ module.exports = {
     getAggregatedData,
     updateTransactionCategory,
 };
-
