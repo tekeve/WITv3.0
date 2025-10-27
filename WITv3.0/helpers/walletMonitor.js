@@ -4,6 +4,7 @@ const esiService = require('@helpers/esiService');
 const authManager = require('@helpers/authManager');
 const configManager = require('@helpers/configManager');
 const charManager = require('@helpers/characterManager'); // To potentially get member names
+const scheduler = require('@helpers/scheduler'); // Import scheduler for rescheduling
 
 // In-memory cache to store the last processed transaction ID for each corp/division
 // Key: `${corporationId}-${division}`
@@ -12,26 +13,40 @@ const lastTransactionIdCache = new Map();
 
 /**
  * Loads the last processed transaction IDs from the database on startup.
+ * Now an explicitly exported async function.
+ * @returns {Promise<void>}
  */
 async function initializeLastTransactionIds() {
+    logger.info('[WalletMonitor InitCache] Starting initialization...');
     try {
-        // Fetch the maximum transaction_id for each combination of corporation_id and division
         const rows = await db.query(`
             SELECT corporation_id, division, MAX(transaction_id) as max_id
             FROM corp_wallet_transactions
             GROUP BY corporation_id, division
         `);
+        logger.info(`[WalletMonitor InitCache] Fetched ${rows.length} rows from DB.`);
+        lastTransactionIdCache.clear(); // Clear cache before repopulating
         rows.forEach(row => {
             const key = `${row.corporation_id}-${row.division}`;
-            // Store the max_id as a BigInt in the cache
-            lastTransactionIdCache.set(key, BigInt(row.max_id));
+            // Ensure max_id is treated as BigInt
+            if (row.max_id !== null && row.max_id !== undefined) {
+                try {
+                    lastTransactionIdCache.set(key, BigInt(row.max_id));
+                    logger.info(`[WalletMonitor InitCache] Cached: ${key} -> ${row.max_id}`);
+                } catch (e) {
+                    logger.error(`[WalletMonitor InitCache] Failed to parse max_id '${row.max_id}' as BigInt for ${key}.`);
+                }
+            } else {
+                logger.warn(`[WalletMonitor InitCache] max_id is null for ${key}. Skipping.`);
+            }
         });
-        logger.info(`[WalletMonitor] Initialized last transaction ID cache from DB. Cache size: ${lastTransactionIdCache.size}`);
+        logger.success(`[WalletMonitor InitCache] Initialization complete. Cache size: ${lastTransactionIdCache.size}`);
     } catch (error) {
-        logger.error('[WalletMonitor] Failed to initialize last transaction ID cache:', error);
-        // If initialization fails, the cache remains empty, and the sync will fetch more data initially.
+        logger.error('[WalletMonitor InitCache] Failed:', error);
+        // Do not re-throw, allow the application to continue but log the failure.
     }
 }
+
 
 /**
  * Attempts to automatically categorize a transaction based on its details.
@@ -84,32 +99,21 @@ function autoCategorizeTransaction(transaction) {
  * @returns {Promise<Map<number, string>>} A map of ID to Name.
  */
 async function fetchNamesForIds(ids) {
-    // Filter out potential 0 or null IDs before processing
     const idArray = Array.from(ids).filter(id => id && id > 0);
     const namesMap = new Map();
-
-    // If no valid IDs remain after filtering, return an empty map
-    if (idArray.length === 0) {
-        return namesMap;
-    }
+    if (idArray.length === 0) return namesMap;
 
     try {
-        // ESI /universe/names/ endpoint can take up to 1000 IDs per request
         const chunkSize = 1000;
         for (let i = 0; i < idArray.length; i += chunkSize) {
             const chunk = idArray.slice(i, i + chunkSize);
-            // Make the POST request to ESI to resolve IDs to names
             const response = await esiService.post({ endpoint: '/universe/names/', data: chunk, caller: __filename });
-            // If the response is valid and is an array, populate the namesMap
             if (response && Array.isArray(response)) {
-                response.forEach(item => {
-                    namesMap.set(item.id, item.name);
-                });
+                response.forEach(item => namesMap.set(item.id, item.name));
             }
         }
     } catch (error) {
-        logger.error('[WalletMonitor] Failed to fetch names for IDs:', error);
-        // Log the error but continue; names will be null in the DB for failed lookups.
+        logger.error('[WalletMonitor NameFetch] Failed:', error);
     }
     return namesMap;
 }
@@ -117,147 +121,150 @@ async function fetchNamesForIds(ids) {
 
 /**
  * Fetches new wallet journal entries for a specific corporation division from ESI.
- * It handles pagination automatically and filters based on the `fromId`.
  * @param {number} corporationId - The EVE corporation ID.
  * @param {number} division - The wallet division number (1-7).
- * @param {string} accessToken - A valid ESI access token for a character with corp wallet access.
+ * @param {string} accessToken - A valid ESI access token.
  * @param {bigint|null} [fromId=null] - Optional: Fetch transactions starting strictly after this ID.
- * @returns {Promise<Array>} A list of new transaction objects from ESI, sorted oldest first.
+ * @returns {Promise<{transactions: Array, earliestExpiry: number|null}>} Transactions and expiry time.
  */
 async function fetchWalletJournalPage(corporationId, division, accessToken, fromId = null) {
     let allNewTransactions = [];
+    let earliestExpiry = null;
     let page = 1;
-    const maxPagesToFetch = 10; // Safety limit: fetch a maximum of 10 pages (~25000 entries) per sync cycle
+    const maxPagesToFetch = 10; // Safety limit
 
     try {
         while (page <= maxPagesToFetch) {
+            const endpoint = `/corporations/${corporationId}/wallets/${division}/journal/`;
             const response = await esiService.get({
-                endpoint: `/corporations/${corporationId}/wallets/${division}/journal/`,
+                endpoint: endpoint,
                 headers: { 'Authorization': `Bearer ${accessToken}` },
-                params: { page }, // ESI pagination starts at page 1
+                params: { page },
                 caller: __filename
             });
 
-            // Check if the response or data is invalid or empty
+            // Update earliest expiry time
+            if (response.expires) {
+                if (earliestExpiry === null || response.expires < earliestExpiry) {
+                    earliestExpiry = response.expires;
+                }
+            }
+
             if (!response || !Array.isArray(response.data) || response.data.length === 0) {
-                break; // Stop if no data is returned or response is invalid
+                logger.info(`[WalletMonitor Fetch] Corp ${corporationId} Div ${division}: Reached last page (${page}/${response.headers ? (response.headers['x-pages'] || 1) : 1}).`);
+                break;
             }
 
             const transactionsOnPage = response.data;
             let reachedLastKnownId = false;
 
-            // Filter transactions: only include those with an ID greater than fromId
             const newTransactionsOnPage = transactionsOnPage.filter(t => {
                 const currentId = BigInt(t.id);
+                // --- ORIGINAL CODE RESTORED ---
                 if (fromId !== null && currentId <= fromId) {
-                    reachedLastKnownId = true; // Mark that we've encountered an older or known transaction
-                    return false; // Exclude this transaction
+                    reachedLastKnownId = true;
+                    return false;
                 }
-                return true; // Include this new transaction
+                // --- END ORIGINAL CODE ---
+                return true;
             });
+
 
             allNewTransactions.push(...newTransactionsOnPage);
 
-            // If we found an older transaction on this page, we don't need to fetch further pages
             if (reachedLastKnownId) {
+                logger.info(`[WalletMonitor Fetch] Corp ${corporationId} Div ${division}: Reached last known ID (${fromId}) on page ${page}. Stopping fetch.`);
                 break;
             }
 
-            // Check ESI's x-pages header to see if there are more pages
             const pagesHeader = response.headers ? response.headers['x-pages'] : null;
             const totalPages = pagesHeader ? parseInt(pagesHeader, 10) : 1;
-
-            // Stop if we have fetched the last available page
             if (page >= totalPages) {
+                logger.info(`[WalletMonitor Fetch] Corp ${corporationId} Div ${division}: Reached last page (${page}/${totalPages}).`);
                 break;
             }
 
-            page++; // Move to the next page
+            page++;
         }
     } catch (error) {
-        // Log the specific error during fetching
-        logger.error(`[WalletMonitor] Failed fetching journal page ${page} for Corp ${corporationId}, Div ${division}:`, error.message);
-        // Re-throw the error to be handled by the syncWalletTransactions function
-        throw error;
+        logger.error(`[WalletMonitor Fetch] Failed fetching journal page ${page} for Corp ${corporationId}, Div ${division}:`, error.message);
+        throw error; // Re-throw to be handled by syncWalletTransactions
     }
 
-    // ESI returns journal entries newest first, so reverse the array
-    // to process them chronologically (oldest first).
-    return allNewTransactions.reverse();
+    return { transactions: allNewTransactions.reverse(), earliestExpiry };
 }
 
+
 /**
- * Fetches, processes, and stores new wallet transactions for configured corporations/divisions.
- * This is the main function called by the scheduler.
+ * Fetches, processes, and stores new wallet transactions. Called by the scheduler.
+ * @returns {Promise<number>} The minimum delay in milliseconds until the next check.
  */
 async function syncWalletTransactions() {
-    logger.info('[WalletMonitor] Starting wallet transaction sync...');
+    logger.info('[WalletMonitor Sync] Starting wallet transaction sync...');
     const config = configManager.get();
+    let overallEarliestExpiry = null; // Track the earliest expiry across all divisions
 
-    // Retrieve Corporation ID and Wallet Divisions from config, providing defaults if necessary
-    // Assumes config values are stored as arrays, takes the first element.
     const corporationIdStr = config.srpCorporationId?.[0];
-    const divisionsToMonitorStr = config.srpWalletDivisions || []; // Default to empty array if not set
+    const divisionsToMonitorStr = config.srpWalletDivisions || [];
 
-    // Validate Corporation ID
     if (!corporationIdStr) {
-        logger.warn('[WalletMonitor] srpCorporationId not configured in the database. Skipping wallet sync.');
-        return;
+        logger.warn('[WalletMonitor Sync] srpCorporationId not configured. Skipping.');
+        return 60 * 60 * 1000; // 1 hour delay
     }
     const corporationId = parseInt(corporationIdStr, 10);
     if (isNaN(corporationId)) {
-        logger.warn(`[WalletMonitor] Invalid srpCorporationId found in config: "${corporationIdStr}". Skipping wallet sync.`);
-        return;
+        logger.warn(`[WalletMonitor Sync] Invalid srpCorporationId: "${corporationIdStr}". Skipping.`);
+        return 60 * 60 * 1000;
     }
 
-    // Validate and filter Wallet Divisions (must be between 1 and 7)
     const divisionsToMonitor = divisionsToMonitorStr
         .map(d => parseInt(d, 10))
         .filter(d => !isNaN(d) && d >= 1 && d <= 7);
 
+    logger.info(`[WalletMonitor Sync] Configured divisions: ${divisionsToMonitor.join(', ')}`);
+
     if (divisionsToMonitor.length === 0) {
-        logger.warn('[WalletMonitor] No valid srpWalletDivisions (1-7) configured in the database. Skipping wallet sync.');
-        return;
+        logger.warn('[WalletMonitor Sync] No valid srpWalletDivisions configured. Skipping.');
+        return 60 * 60 * 1000;
     }
 
-    // Identify an authenticated admin user to perform ESI calls
-    // TODO: Implement a more robust way to select/manage the ESI token character,
-    // perhaps using a dedicated config key or fetching a user with specific roles.
     const adminUsers = config.adminUsers || [];
     if (adminUsers.length === 0) {
-        logger.error('[WalletMonitor] No adminUsers configured. Cannot authenticate for wallet access. Skipping sync.');
-        return;
+        logger.error('[WalletMonitor Sync] No adminUsers configured. Cannot authenticate. Skipping.');
+        return 60 * 60 * 1000;
     }
-    const authDiscordId = adminUsers[0]; // Using the first admin user for now
+    const authDiscordId = adminUsers[0];
 
-    // Obtain a valid ESI access token
     const accessToken = await authManager.getAccessToken(authDiscordId);
     if (!accessToken) {
-        logger.error(`[WalletMonitor] Could not get a valid ESI token for admin user ${authDiscordId}. Skipping sync. Ensure an admin has authenticated with the required scopes.`);
-        return;
+        logger.error(`[WalletMonitor Sync] Could not get ESI token for admin ${authDiscordId}. Skipping.`);
+        return 5 * 60 * 1000; // Retry sooner
     }
 
     let totalNewTransactionsProcessed = 0;
 
-    // Iterate through each configured division
     for (const division of divisionsToMonitor) {
         const cacheKey = `${corporationId}-${division}`;
-        const lastKnownId = lastTransactionIdCache.get(cacheKey) || null; // Get last processed ID from cache
+        const lastKnownId = lastTransactionIdCache.get(cacheKey) || null;
         let highestProcessedIdThisSync = lastKnownId; // Track the newest ID found in this run
+        let divisionEarliestExpiry = null;
 
         try {
-            logger.info(`[WalletMonitor] Fetching journal - Corp: ${corporationId}, Div: ${division}, After ID: ${lastKnownId || 'None'}`);
-            // Fetch new transactions since the last known ID
-            const newTransactions = await fetchWalletJournalPage(corporationId, division, accessToken, lastKnownId);
+            logger.info(`[WalletMonitor Sync Div ${division}] Starting sync. Last known ID from cache: ${lastKnownId || 'None'}.`);
+            const { transactions: newTransactions, earliestExpiry } = await fetchWalletJournalPage(corporationId, division, accessToken, lastKnownId);
 
-            if (newTransactions.length === 0) {
-                logger.info(`[WalletMonitor] No new transactions for division ${division}.`);
-                continue; // Skip to the next division if no new transactions
+            divisionEarliestExpiry = earliestExpiry;
+            if (divisionEarliestExpiry !== null) {
+                logger.info(`[WalletMonitor Sync Div ${division}] Fetched ${newTransactions.length} new txs. ESI cache expires: ${new Date(divisionEarliestExpiry).toLocaleTimeString()}`);
+                if (overallEarliestExpiry === null || divisionEarliestExpiry < overallEarliestExpiry) {
+                    overallEarliestExpiry = divisionEarliestExpiry;
+                }
+            } else {
+                logger.info(`[WalletMonitor Sync Div ${division}] Fetched ${newTransactions.length} new txs. No ESI expiry header received.`);
             }
 
-            logger.info(`[WalletMonitor] Found ${newTransactions.length} new transactions for division ${division}. Processing...`);
+            if (newTransactions.length === 0) continue;
 
-            // Collect all unique IDs for name resolution
             const idsToFetchNamesFor = new Set();
             newTransactions.forEach(t => {
                 if (t.first_party_id) idsToFetchNamesFor.add(t.first_party_id);
@@ -265,55 +272,34 @@ async function syncWalletTransactions() {
                 if (t.tax_receiver_id) idsToFetchNamesFor.add(t.tax_receiver_id);
             });
 
-            // Fetch names for all collected IDs
             const namesMap = await fetchNamesForIds(idsToFetchNamesFor);
-
             const valuesToInsert = [];
-            // Process each new transaction
+
             for (const t of newTransactions) {
                 const currentId = BigInt(t.id);
-
-                // This check should technically be redundant due to filtering in fetchWalletJournalPage, but acts as a safeguard.
                 if (lastKnownId !== null && currentId <= lastKnownId) {
+                    logger.warn(`[WalletMonitor Sync Div ${division}] Safeguard: Skipped tx ${currentId} <= ${lastKnownId}.`);
                     continue;
                 }
 
-                // Retrieve names from the map, defaulting to null if not found
                 const firstPartyName = namesMap.get(t.first_party_id) || null;
                 const secondPartyName = namesMap.get(t.second_party_id) || null;
-                // Automatically categorize the transaction
                 const customCategory = autoCategorizeTransaction(t);
 
-                // Prepare the data row for database insertion
                 valuesToInsert.push([
-                    t.id.toString(), // Store large IDs as strings or ensure DECIMAL/BIGINT column type
-                    corporationId,
-                    division,
-                    new Date(t.date), // Convert ESI date string to Date object
-                    t.ref_type,
-                    t.first_party_id || null,
-                    firstPartyName,
-                    t.second_party_id || null,
-                    secondPartyName,
-                    t.amount,
-                    t.balance,
-                    t.reason || null,
-                    t.tax_receiver_id || null,
-                    t.tax_amount || null,
-                    t.context_id || null,
-                    t.context_type || null,
-                    t.description,
-                    customCategory
+                    t.id.toString(), corporationId, division, new Date(t.date), t.ref_type,
+                    t.first_party_id || null, firstPartyName, t.second_party_id || null, secondPartyName,
+                    t.amount, t.balance, t.reason || null, t.tax_receiver_id || null, t.tax_amount || null,
+                    t.context_id || null, t.context_type || null, t.description, customCategory
                 ]);
 
-                // Update the highest ID processed in this sync run
                 if (highestProcessedIdThisSync === null || currentId > highestProcessedIdThisSync) {
                     highestProcessedIdThisSync = currentId;
                 }
             }
 
-            // Perform bulk insert if there are new transactions to add
             if (valuesToInsert.length > 0) {
+                logger.info(`[WalletMonitor Sync Div ${division}] Preparing to insert ${valuesToInsert.length} new transactions...`);
                 const sql = `
                     INSERT IGNORE INTO corp_wallet_transactions (
                         transaction_id, corporation_id, division, date, ref_type,
@@ -322,29 +308,49 @@ async function syncWalletTransactions() {
                         context_id, context_type, description, custom_category
                     ) VALUES ?
                 `;
-                // Using pool.query for bulk insert syntax with an array of value arrays
                 const [result] = await db.pool.query(sql, [valuesToInsert]);
 
                 totalNewTransactionsProcessed += result.affectedRows;
-                logger.info(`[WalletMonitor] Inserted ${result.affectedRows} transactions for division ${division}. (${valuesToInsert.length - result.affectedRows} duplicates ignored)`);
+                logger.info(`[WalletMonitor Sync Div ${division}] Insert result: Affected=${result.affectedRows}, Duplicates=${valuesToInsert.length - result.affectedRows}`);
 
-                // Update the cache with the highest ID processed in this run
-                if (highestProcessedIdThisSync !== null) {
+                // --- Cache Update Logic FIX ---
+                if (highestProcessedIdThisSync !== null && (lastKnownId === null || highestProcessedIdThisSync > lastKnownId)) {
                     lastTransactionIdCache.set(cacheKey, highestProcessedIdThisSync);
+                    logger.info(`[WalletMonitor Sync Div ${division}] Cache updated. New last ID: ${highestProcessedIdThisSync}.`);
+                } else if (result.affectedRows === 0 && highestProcessedIdThisSync !== null) {
+                    // Check if highest ID seen IS newer than cache, even if insert was duplicate
+                    if (lastKnownId === null || highestProcessedIdThisSync > lastKnownId) {
+                        lastTransactionIdCache.set(cacheKey, highestProcessedIdThisSync);
+                        logger.info(`[WalletMonitor Sync Div ${division}] No rows inserted (likely duplicates), but updated cache as highest ID seen (${highestProcessedIdThisSync}) is newer than cached (${lastKnownId}).`);
+                    } else {
+                        logger.info(`[WalletMonitor Sync Div ${division}] No new rows inserted (likely duplicates). Highest ID seen: ${highestProcessedIdThisSync}. Cache remains: ${lastKnownId}.`);
+                    }
                 }
+                // --- End Cache Update Logic FIX ---
+
             } else {
-                logger.info(`[WalletMonitor] No transactions newer than ID ${lastKnownId} were found for division ${division} after processing.`);
+                logger.info(`[WalletMonitor Sync Div ${division}] No valid new transactions to insert after processing.`);
             }
 
         } catch (error) {
-            // Log errors encountered during the sync for a specific division
-            logger.error(`[WalletMonitor] Failed to sync division ${division}:`, error.message);
-            // Continue processing the next division
+            logger.error(`[WalletMonitor Sync Div ${division}] Failed:`, error.message);
         }
     }
 
-    logger.success(`[WalletMonitor] Wallet sync finished. ${totalNewTransactionsProcessed} total new transactions processed across ${divisionsToMonitor.length} divisions.`);
+    // Calculate delay for next run
+    let nextCheckDelayMs = 60 * 60 * 1000; // Default: 1 hour
+    if (overallEarliestExpiry !== null) {
+        const timeUntilExpiry = overallEarliestExpiry - Date.now();
+        nextCheckDelayMs = Math.max(10000, Math.min(timeUntilExpiry + 1000, 60 * 60 * 1000));
+        logger.info(`[WalletMonitor Sync] Earliest ESI cache expiry: ${new Date(overallEarliestExpiry).toLocaleTimeString()}.`);
+    } else {
+        logger.info(`[WalletMonitor Sync] No ESI expiry headers received, using default delay.`);
+    }
+
+    logger.success(`[WalletMonitor Sync] Finished. ${totalNewTransactionsProcessed} total inserted. Next check delay: ${Math.round(nextCheckDelayMs / 1000)}s.`);
+    return nextCheckDelayMs; // Return the calculated delay
 }
+
 
 /**
  * Fetches transaction data based on filters for the web UI.
@@ -353,8 +359,7 @@ async function syncWalletTransactions() {
  */
 async function getTransactions(filters = {}) {
     const {
-        startDate, endDate, divisions = [],
-        categorySearch, // Changed from categories
+        startDate, endDate, divisions = [], categorySearch,
         page = 1, limit = 50,
         refType, partySearch, amountExact, reasonSearch
     } = filters;
@@ -376,7 +381,7 @@ async function getTransactions(filters = {}) {
     if (startDate) { whereClauses.push('date >= ?'); params.push(new Date(startDate)); }
     if (endDate) {
         const inclusiveEndDate = new Date(endDate);
-        inclusiveEndDate.setDate(inclusiveEndDate.getDate() + 1); // Go to the start of the next day
+        inclusiveEndDate.setDate(inclusiveEndDate.getDate() + 1);
         whereClauses.push('date < ?');
         params.push(inclusiveEndDate);
     }
@@ -389,46 +394,35 @@ async function getTransactions(filters = {}) {
         }
     }
 
-    // --- NEW CATEGORY SEARCH LOGIC ---
     if (categorySearch) {
         if (categorySearch.toLowerCase() === 'uncategorized') {
             whereClauses.push('custom_category IS NULL');
         } else {
-            // Map friendly name back to key if possible
+            // Mapping from LABEL back to KEY
             const categoryLabels = {
-                'srp in': 'srp_in', 'srp out': 'srp_out', 'giveaway': 'giveaway',
-                'structure/upkeep': 'structure', 'office rental': 'office', 'tax': 'tax',
-                'other': 'other'
+                'SRP In': 'srp_in', 'SRP Out': 'srp_out', 'Giveaway': 'giveaway',
+                'Structure/Upkeep': 'structure', 'Office Rental': 'office', 'Tax': 'tax',
+                'Other': 'other'
             };
             const searchLower = categorySearch.toLowerCase();
-            const matchingKey = categoryLabels[searchLower];
+            // Find the key whose label matches the search term (case-insensitive)
+            const matchingKey = Object.keys(categoryLabels).find(key => categoryLabels[key].toLowerCase() === searchLower);
 
             if (matchingKey) {
-                whereClauses.push('custom_category = ?');
-                params.push(matchingKey);
-            } else {
-                // Fallback to LIKE search on the string
-                whereClauses.push('custom_category LIKE ?');
-                params.push(`%${categorySearch}%`);
+                whereClauses.push('custom_category = ?'); params.push(matchingKey);
+            } else { // Fallback if no exact label match (or user typed key directly)
+                whereClauses.push('custom_category LIKE ?'); params.push(`%${categorySearch}%`);
             }
         }
     }
-    // --- END NEW CATEGORY SEARCH LOGIC ---
 
-    // Add new filter conditions
+
     if (refType) { whereClauses.push('ref_type LIKE ?'); params.push(`%${refType}%`); }
     if (partySearch) { whereClauses.push('(first_party_name LIKE ? OR second_party_name LIKE ?)'); params.push(`%${partySearch}%`, `%${partySearch}%`); }
-
-    // --- UPDATED AMOUNT LOGIC ---
     if (amountExact !== null && amountExact !== undefined && !isNaN(amountExact)) {
-        // We'll check for amount = value OR amount = -value
-        whereClauses.push('(amount = ? OR amount = ?)');
-        params.push(amountExact, -amountExact);
+        whereClauses.push('(amount = ? OR amount = ?)'); params.push(amountExact, -amountExact);
     }
-    // --- END UPDATED AMOUNT LOGIC ---
-
     if (reasonSearch) { whereClauses.push('(reason LIKE ? OR description LIKE ?)'); params.push(`%${reasonSearch}%`, `%${reasonSearch}%`); }
-
 
     const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
@@ -438,198 +432,198 @@ async function getTransactions(filters = {}) {
         const total = countResult ? countResult.total : 0;
 
         const dataSql = `
-            SELECT * FROM corp_wallet_transactions
-            ${whereString}
-            ORDER BY date DESC, transaction_id DESC
-            LIMIT ? OFFSET ?
-        `;
+            SELECT * FROM corp_wallet_transactions ${whereString}
+            ORDER BY date DESC, transaction_id DESC LIMIT ? OFFSET ?`;
         const transactions = await db.query(dataSql, [...params, numLimit, offset]);
 
         return { transactions, total, currentPage: numPage, totalPages: Math.ceil(total / numLimit) };
 
     } catch (error) {
-        logger.error('[WalletMonitor] Error fetching transactions for web UI:', error);
+        logger.error('[WalletMonitor Web] Error fetching transactions:', error);
         throw error;
     }
 }
 
 /**
 * Fetches aggregated wallet data for charts/summaries based on filters.
-* @param {object} filters - Filtering options (startDate, endDate, divisions, categorySearch).
-* @returns {Promise<object>} Aggregated data including monthly trends, balances, and category totals.
+* @param {object} filters - Filtering options.
+* @returns {Promise<object>} Aggregated data.
 */
 async function getAggregatedData(filters = {}) {
-    const {
-        startDate,
-        endDate,
-        divisions = [], // Expecting an array of numbers
-        categorySearch   // Changed from categories array to string
-    } = filters;
+    const { startDate, endDate, divisions = [], categorySearch } = filters;
+    let baseWhereClauses = [];
+    let baseParams = [];
+    // --- PAYER QUERY MODIFICATION ---
+    // Start with income filter AND the srp_in category filter for payer queries
+    let payerBaseWhereClauses = ['amount > 0', 'custom_category = ?'];
+    let payerBaseParams = ['srp_in'];
+    // --- END PAYER QUERY MODIFICATION ---
 
-    let whereClauses = [];
-    let params = [];
-
-    // Add corporation ID filter (required)
     const config = configManager.get();
     const corporationIdStr = config.srpCorporationId?.[0];
-    if (!corporationIdStr) return {}; // Cannot aggregate without corp ID
+    if (!corporationIdStr) return {};
     const corporationId = parseInt(corporationIdStr, 10);
-    whereClauses.push('corporation_id = ?');
-    params.push(corporationId);
 
-    // Add date range filters
+    baseWhereClauses.push('corporation_id = ?'); baseParams.push(corporationId);
+    payerBaseWhereClauses.push('corporation_id = ?'); payerBaseParams.push(corporationId);
+
     if (startDate) {
-        whereClauses.push('date >= ?');
-        params.push(new Date(startDate));
+        const start = new Date(startDate);
+        baseWhereClauses.push('date >= ?'); baseParams.push(start);
+        payerBaseWhereClauses.push('date >= ?'); payerBaseParams.push(start);
     }
     if (endDate) {
-        const inclusiveEndDate = new Date(endDate);
-        inclusiveEndDate.setDate(inclusiveEndDate.getDate() + 1);
-        whereClauses.push('date < ?');
-        params.push(inclusiveEndDate);
+        const end = new Date(endDate); end.setDate(end.getDate() + 1);
+        baseWhereClauses.push('date < ?'); baseParams.push(end);
+        payerBaseWhereClauses.push('date < ?'); payerBaseParams.push(end);
     }
 
-    // Add division filter (only if divisions are provided)
     let divisionFilterParams = [];
-    let divisionWhereClause = ''; // Clause specifically for balance query
     if (Array.isArray(divisions) && divisions.length > 0) {
         const validDivisions = divisions.map(Number).filter(d => !isNaN(d));
         if (validDivisions.length > 0) {
-            const divisionPlaceholders = validDivisions.map(() => '?').join(',');
-            whereClauses.push(`division IN (${divisionPlaceholders})`);
-            params.push(...validDivisions);
-            divisionFilterParams = validDivisions; // Store valid divisions for balance query
-            divisionWhereClause = `AND division IN (${divisionPlaceholders})`; // For balance query
+            const placeholders = validDivisions.map(() => '?').join(',');
+            baseWhereClauses.push(`division IN (${placeholders})`); baseParams.push(...validDivisions);
+            payerBaseWhereClauses.push(`division IN (${placeholders})`); payerBaseParams.push(...validDivisions);
+            divisionFilterParams = validDivisions;
         }
     }
 
-    // --- NEW CATEGORY SEARCH LOGIC ---
     if (categorySearch) {
+        let categoryClause = '', categoryParam = '';
         if (categorySearch.toLowerCase() === 'uncategorized') {
-            whereClauses.push('custom_category IS NULL');
+            categoryClause = 'custom_category IS NULL';
         } else {
-            // Map friendly name back to key if possible
+            // Mapping from LABEL back to KEY
             const categoryLabels = {
-                'srp in': 'srp_in', 'srp out': 'srp_out', 'giveaway': 'giveaway',
-                'structure/upkeep': 'structure', 'office rental': 'office', 'tax': 'tax',
-                'other': 'other'
+                'SRP In': 'srp_in', 'SRP Out': 'srp_out', 'Giveaway': 'giveaway',
+                'Structure/Upkeep': 'structure', 'Office Rental': 'office', 'Tax': 'tax',
+                'Other': 'other'
             };
             const searchLower = categorySearch.toLowerCase();
-            const matchingKey = categoryLabels[searchLower];
+            const matchingKey = Object.keys(categoryLabels).find(key => categoryLabels[key].toLowerCase() === searchLower);
 
             if (matchingKey) {
-                whereClauses.push('custom_category = ?');
-                params.push(matchingKey);
+                categoryClause = 'custom_category = ?'; categoryParam = matchingKey;
             } else {
-                // Fallback to LIKE search on the string
-                whereClauses.push('custom_category LIKE ?');
-                params.push(`%${categorySearch}%`);
+                categoryClause = 'custom_category LIKE ?'; categoryParam = `%${categorySearch}%`;
             }
         }
+        if (categoryClause) {
+            baseWhereClauses.push(categoryClause); if (categoryParam) baseParams.push(categoryParam);
+            // --- PAYER QUERY MODIFICATION ---
+            // Don't add the general category filter to payer queries if it's not 'srp_in'
+            // because payer queries are *already* filtered to 'srp_in'
+            if (categoryParam !== 'srp_in' && categorySearch.toLowerCase() !== 'uncategorized') {
+                // If the main filter is something *other* than SRP In, the payer results should be empty
+                payerBaseWhereClauses.push('1=0'); // Add a condition that's always false
+            }
+            // --- END PAYER QUERY MODIFICATION ---
+        }
     }
-    // --- END CATEGORY SEARCH LOGIC ---
 
 
-    const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const whereString = baseWhereClauses.length > 0 ? `WHERE ${baseWhereClauses.join(' AND ')}` : '';
+    const payerWhereString = payerBaseWhereClauses.length > 0 ? `WHERE ${payerBaseWhereClauses.join(' AND ')}` : '';
 
     try {
-        // Aggregation: Monthly Income/Outcome by Category
-        const monthlySql = `
-            SELECT
-                DATE_FORMAT(date, '%Y-%m') AS month,
-                COALESCE(custom_category, 'uncategorized') AS category, -- Handle NULL categories
-                SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
-                SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS outcome -- Outcome will be negative or zero
-            FROM corp_wallet_transactions
-            ${whereString}
-            GROUP BY month, category
-            ORDER BY month ASC;
-        `;
-        const monthlyData = await db.query(monthlySql, params);
+        const monthlySql = `SELECT DATE_FORMAT(date, '%Y-%m') AS month, COALESCE(custom_category, 'uncategorized') AS category, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income, SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS outcome FROM corp_wallet_transactions ${whereString} GROUP BY month, category ORDER BY month ASC;`;
 
-        // Aggregation: Current Balance per Division
-        // This query should *not* be filtered by date or category, it should always show the *latest* balance.
-        // It *should* be filtered by division if a division filter is active.
-        const balanceWhereClauses = ['corporation_id = ?'];
-        const balanceParams = [corporationId];
+        const balanceWhereClausesForQuery = ['corporation_id = ?'];
+        const balanceParamsForQuery = [corporationId];
         if (divisionFilterParams.length > 0) {
-            balanceWhereClauses.push(`division IN (${divisionFilterParams.map(() => '?').join(',')})`);
-            balanceParams.push(...divisionFilterParams);
+            balanceWhereClausesForQuery.push(`division IN (${divisionFilterParams.map(() => '?').join(',')})`);
+            balanceParamsForQuery.push(...divisionFilterParams);
         }
-
+        // Balance query - NO CAST
         const balanceSql = `
            SELECT t1.division, t1.balance
            FROM corp_wallet_transactions t1
            INNER JOIN (
                SELECT division, MAX(transaction_id) AS max_tx_id
                FROM corp_wallet_transactions
-               WHERE ${balanceWhereClauses.join(' AND ')}
+               WHERE ${balanceWhereClausesForQuery.join(' AND ')}
                GROUP BY division
-           ) t2 ON t1.division = t2.division AND t1.transaction_id = t2.max_tx_id;
-        `;
-        const balanceData = await db.query(balanceSql, balanceParams);
+           ) t2 ON t1.division = t2.division AND t1.transaction_id = t2.max_tx_id;`;
 
+        logger.info(`[WalletMonitor Web] Executing balance query with params: [${balanceParamsForQuery.join(',')}]`);
 
-        // Aggregation: Totals by Category (Respects all filters)
-        const categorySql = `
-            SELECT
-                COALESCE(custom_category, 'uncategorized') AS category,
-                SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS total_income,
-                SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS total_outcome
-            FROM corp_wallet_transactions
-             ${whereString}
-            GROUP BY category;
-        `;
-        const categoryData = await db.query(categorySql, params);
+        const categorySql = `SELECT COALESCE(custom_category, 'uncategorized') AS category, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS total_income, SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS total_outcome FROM corp_wallet_transactions ${whereString} GROUP BY category;`;
+
+        // --- PAYER QUERIES NOW INCLUDE THE srp_in FILTER VIA payerWhereString ---
+        const topPayersByCountSql = `SELECT first_party_name, COUNT(*) AS transaction_count FROM corp_wallet_transactions ${payerWhereString} AND first_party_name IS NOT NULL GROUP BY first_party_name ORDER BY transaction_count DESC LIMIT 5;`;
+        const topPayersByAmountSql = `SELECT first_party_name, SUM(amount) AS total_amount FROM corp_wallet_transactions ${payerWhereString} AND first_party_name IS NOT NULL GROUP BY first_party_name ORDER BY total_amount DESC LIMIT 5;`;
+        // --- END PAYER QUERY UPDATE ---
+
+        // --- Fetch Top Payers for Historical Chart ---
+        // This query also now implicitly uses the srp_in filter via payerBaseParams
+        const top5PayersForHistory = await db.query(topPayersByAmountSql, payerBaseParams);
+        const topPayerNames = top5PayersForHistory.map(p => p.first_party_name).filter(Boolean);
+
+        let payerIncomeOverTimeSql = 'SELECT CURDATE() as date, "No Payers Found" as first_party_name, 0 as daily_total_income';
+        let payerIncomeParams = [];
+        if (topPayerNames.length > 0) {
+            const namePlaceholders = topPayerNames.map(() => '?').join(',');
+            // Build WHERE clause *without* general category filter, keep date/division, add srp_in filter
+            const historyWhereClauses = ['corporation_id = ?', 'amount > 0', 'custom_category = ?', `first_party_name IN (${namePlaceholders})`];
+            const historyParams = [corporationId, 'srp_in', ...topPayerNames]; // Added 'srp_in' here
+            if (startDate) { historyWhereClauses.push('date >= ?'); historyParams.push(new Date(startDate)); }
+            if (endDate) { const endHist = new Date(endDate); endHist.setDate(endHist.getDate() + 1); historyWhereClauses.push('date < ?'); historyParams.push(endHist); }
+            if (divisionFilterParams.length > 0) { historyWhereClauses.push(`division IN (${divisionFilterParams.map(() => '?').join(',')})`); historyParams.push(...divisionFilterParams); }
+            payerIncomeOverTimeSql = `SELECT DATE(date) as date, first_party_name, SUM(amount) AS daily_total_income FROM corp_wallet_transactions WHERE ${historyWhereClauses.join(' AND ')} GROUP BY DATE(date), first_party_name ORDER BY date ASC;`;
+            payerIncomeParams = historyParams;
+        }
+        // --- End Historical Fetch Logic ---
+
+        const [monthlyData, balanceResult, categoryData, topPayersByCount, topPayersByAmount, payerIncomeOverTime] = await Promise.all([
+            db.query(monthlySql, baseParams),
+            db.query(balanceSql, balanceParamsForQuery), // Use specific params for balance
+            db.query(categorySql, baseParams),
+            db.query(topPayersByCountSql, payerBaseParams), // Use payer-specific params
+            db.query(topPayersByAmountSql, payerBaseParams), // Use payer-specific params
+            db.query(payerIncomeOverTimeSql, payerIncomeParams) // Use history params
+        ]);
+        logger.info(`[WalletMonitor Web] Balance query returned ${balanceResult.length} rows:`, JSON.stringify(balanceResult)); // Log raw result
+
 
         return {
-            monthly: monthlyData,
-            balances: balanceData,
-            categories: categoryData
+            monthly: monthlyData, balances: balanceResult, categories: categoryData,
+            topPayersByCount: topPayersByCount, topPayersByAmount: topPayersByAmount,
+            payerIncomeOverTime: (payerIncomeOverTime[0]?.first_party_name === "No Payers Found") ? [] : payerIncomeOverTime
         };
 
     } catch (error) {
-        logger.error('[WalletMonitor] Error fetching aggregated wallet data:', error);
-        throw error; // Re-throw to be handled by the controller
+        logger.error('[WalletMonitor Web] Error fetching aggregated data:', error);
+        throw error;
     }
 }
 
 
 /**
  * Updates the custom category for a specific transaction.
- * @param {string} transactionIdStr - The transaction ID (as a string, potentially large).
- * @param {string|null} category - The new category ('srp_in', 'srp_out', etc.) or null to clear.
+ * @param {string} transactionIdStr - The transaction ID.
+ * @param {string|null} category - The new category or null.
  * @returns {Promise<boolean>} Success status.
  */
 async function updateTransactionCategory(transactionIdStr, category) {
-    // List of valid categories, including null for clearing
     const validCategories = ['srp_in', 'srp_out', 'giveaway', 'structure', 'office', 'tax', 'other', null];
-
-    // Validate the provided category
     if (!validCategories.includes(category)) {
-        logger.warn(`[WalletMonitor] Invalid category provided for update: "${category}" for transaction ID: ${transactionIdStr}`);
-        return false; // Return false if the category is not valid
+        logger.warn(`[WalletMonitor UpdateCat] Invalid category: "${category}" for tx ${transactionIdStr}`);
+        return false;
     }
-
     try {
-        // SQL query to update the custom_category field
         const sql = 'UPDATE corp_wallet_transactions SET custom_category = ? WHERE transaction_id = ?';
-        // Execute the query using the pool for safety (prevents SQL injection)
         const [result] = await db.pool.query(sql, [category, transactionIdStr]);
-
-        // Check if any row was actually updated
         const success = result.affectedRows > 0;
         if (success) {
-            logger.info(`[WalletMonitor] Updated category for transaction ${transactionIdStr} to "${category || 'NULL'}".`);
+            logger.info(`[WalletMonitor UpdateCat] Tx ${transactionIdStr} category updated to "${category || 'NULL'}".`);
         } else {
-            logger.warn(`[WalletMonitor] No transaction found with ID ${transactionIdStr} to update category.`);
+            logger.warn(`[WalletMonitor UpdateCat] Tx ${transactionIdStr} not found for update.`);
         }
-        return success; // Return true if update was successful, false otherwise
-
+        return success;
     } catch (error) {
-        // Log any database errors encountered during the update
-        logger.error(`[WalletMonitor] Error updating category for transaction ${transactionIdStr}:`, error);
-        return false; // Return false on error
+        logger.error(`[WalletMonitor UpdateCat] Error for tx ${transactionIdStr}:`, error);
+        return false;
     }
 }
 

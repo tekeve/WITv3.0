@@ -9,6 +9,7 @@ const trainingSyncManager = require('@helpers/trainingSyncManager'); // Import t
 module.exports = {
 	name: Events.ClientReady,
 	once: true,
+	// Make this handler async
 	async execute(client) {
 		logger.success(`Ready! Logged in as ${client.user.tag}`);
 
@@ -21,8 +22,8 @@ module.exports = {
 		// Initial call to update incursions, which will then schedule the next call itself.
 		client.updateIncursions();
 
-		// Initialize scheduled tasks, including the commander list and token refresh tasks.
-		scheduler.initialize(client);
+		// Await the scheduler initialization to ensure wallet cache loads first
+		await scheduler.initialize(client);
 
 		// Initialize the new training data sync manager.
 		// This needs the `io` instance from the webserver, which we attached to the client.

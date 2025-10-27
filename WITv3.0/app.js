@@ -13,6 +13,8 @@ const { startServer } = require('./web/server.js');
 const roleHierarchyManager = require('@helpers/roleHierarchyManager');
 const reactionRoleManager = require('@helpers/reactionRoleManager');
 const scheduler = require('@helpers/scheduler'); // Added for scheduled tasks
+const trainingSyncManager = require('@helpers/trainingSyncManager'); // Import the training sync manager
+
 
 async function deployCommands() {
     const commandsToDeploy = [];
@@ -101,6 +103,7 @@ async function initializeApp() {
     client.activeQuizTokens = new Map(); // Added for the new quiz system
     client.activeIskTokens = new Map();
     client.activeLogAnalysisTokens = new Map();
+    client.activeWalletTokens = new Map(); // Add map for wallet monitor tokens
     client.esiStateMap = new Map();
     client.mailSubjects = new Map();
     client.mockOverride = null;
@@ -137,10 +140,10 @@ async function initializeApp() {
     const { registerActionLogEvents } = require('./events/actionLogHandler');
     const { registerReactionEvents } = require('./events/reactionHandler'); // Added for reaction roles
 
-    client.once(clientReadyHandler.name, (...args) => {
-        clientReadyHandler.execute(...args, client);
-        // Initialize scheduled tasks once the client is ready
-        scheduler.initialize(client);
+    // --- Make clientReady handler async ---
+    client.once(clientReadyHandler.name, async (...args) => {
+        // --- Await handler execution ---
+        await clientReadyHandler.execute(...args, client);
     });
     client.on(interactionCreateHandler.name, (...args) => interactionCreateHandler.execute(...args, client));
     client.on(srpSubmissionHandler.name, (...args) => srpSubmissionHandler.execute(...args, client));
@@ -159,3 +162,4 @@ async function initializeApp() {
 }
 
 initializeApp();
+

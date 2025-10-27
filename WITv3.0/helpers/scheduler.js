@@ -1,17 +1,16 @@
 const logger = require('@helpers/logger');
-// Dynamically import the command file to avoid circular dependencies
-const { runCommanderListUpdate } = require('../commands/utility/commanderlist');
+// Dynamically import the command file to avoid circular dependencies if needed elsewhere
+// const { runCommanderListUpdate } = require('../commands/utility/commanderlist');
 const authManager = require('@helpers/authManager'); // For ESI token refresh
-const walletMonitor = require('@helpers/walletMonitor'); // Import the wallet monitor
+// REMOVED walletMonitor import from the top level
 
 const MONDAY_UTC = 1; // 1 for Monday
-const HOUR_UTC = 1;   // 1 AM
+const HOUR_UTC = 1;   // 1 AM UTC
 const TOKEN_REFRESH_INTERVAL_DAYS = 7; // Refresh ESI tokens every 7 days
-const WALLET_SYNC_INTERVAL_MINUTES = 10; // Sync wallet transactions every 10 minutes
 
 let commanderListTimeout = null;
 let tokenRefreshTimeout = null;
-let walletSyncInterval = null; // Use Interval for wallet sync
+let walletSyncTimeout = null; // Changed from interval to timeout
 
 /**
  * Schedules the next weekly update for the commander list.
@@ -41,6 +40,8 @@ function scheduleNextMondayUpdate(client) {
 
     commanderListTimeout = setTimeout(async () => {
         logger.info('[Scheduler] Running scheduled commander list update...');
+        // Dynamically require here if needed, or ensure it's loaded elsewhere
+        const { runCommanderListUpdate } = require('../commands/utility/commanderlist');
         try {
             const { success, changes } = await runCommanderListUpdate(client);
             if (success) {
@@ -85,48 +86,94 @@ function scheduleTokenRefresh(client) {
 }
 
 /**
- * Initializes and schedules the periodic wallet transaction synchronization.
+ * Executes the wallet sync and schedules the next run based on the returned delay.
  * @param {import('discord.js').Client} client
  */
-function scheduleWalletSync(client) {
-    if (walletSyncInterval) clearInterval(walletSyncInterval); // Clear existing interval if any
+async function runWalletSyncNow(client) {
+    if (walletSyncTimeout) clearTimeout(walletSyncTimeout); // Clear any pending timeout
 
-    const syncIntervalMs = WALLET_SYNC_INTERVAL_MINUTES * 60 * 1000;
+    // Require syncWalletTransactions right before using it
+    const walletMonitor = require('@helpers/walletMonitor'); // Require the full module here
+    let nextDelay = 15 * 60 * 1000; // Default to 15 mins if sync fails badly
 
-    // Run immediately on startup, then schedule interval
-    logger.info(`[Scheduler] Running initial wallet sync...`);
-    walletMonitor.syncWalletTransactions().catch(error => {
-        logger.error('[Scheduler] Error during initial wallet sync:', error);
-    });
-
-    walletSyncInterval = setInterval(async () => {
-        logger.info(`[Scheduler] Running scheduled wallet sync (every ${WALLET_SYNC_INTERVAL_MINUTES} mins)...`);
-        try {
-            await walletMonitor.syncWalletTransactions();
-        } catch (error) {
-            logger.error('[Scheduler] Error during scheduled wallet sync:', error);
+    try {
+        // Run the sync and get the delay for the next run
+        // Check if the function exists before calling
+        if (typeof walletMonitor.syncWalletTransactions === 'function') {
+            nextDelay = await walletMonitor.syncWalletTransactions();
+        } else {
+            logger.error('[Scheduler] CRITICAL: walletMonitor.syncWalletTransactions is not available!');
+            throw new Error('syncWalletTransactions function not found in walletMonitor module.'); // Throw error to trigger retry scheduling
         }
-    }, syncIntervalMs);
-
-    logger.info(`[Scheduler] Wallet transaction sync scheduled every ${WALLET_SYNC_INTERVAL_MINUTES} minutes.`);
+    } catch (error) {
+        // Catch critical errors during the sync itself (e.g., DB connection issue)
+        logger.error('[Scheduler] Uncaught error during wallet sync execution:', error);
+    } finally {
+        // Always schedule the next run
+        scheduleNextWalletSync(client, nextDelay);
+    }
 }
 
 /**
+ * Schedules the next wallet sync using setTimeout.
+ * @param {import('discord.js').Client} client
+ * @param {number} delayMs - Delay in milliseconds.
+ */
+function scheduleNextWalletSync(client, delayMs) {
+    if (walletSyncTimeout) clearTimeout(walletSyncTimeout); // Clear previous timeout
+
+    const safeDelay = Math.max(10000, delayMs); // Ensure minimum 10 seconds delay
+    const nextRunTime = new Date(Date.now() + safeDelay);
+
+    logger.info(`[Scheduler] Next wallet sync scheduled for ${nextRunTime.toLocaleTimeString()} (in ${Math.round(safeDelay / 1000)}s).`);
+
+    walletSyncTimeout = setTimeout(() => runWalletSyncNow(client), safeDelay);
+}
+
+
+/**
  * Initializes all scheduled tasks for the bot.
+ * Now marked as async.
  * @param {import('discord.js').Client} client
  */
 async function initialize(client) {
     logger.info('[Scheduler] Initializing scheduled tasks...');
 
-    // Initialize wallet monitor cache first
-    await walletMonitor.initializeLastTransactionIds();
+    // Require walletMonitor *inside* initialize, right before use
+    const walletMonitor = require('@helpers/walletMonitor');
 
-    // Then schedule the tasks
+    // Await the wallet cache initialization *before* proceeding
+    try {
+        // Check if the function exists before calling
+        if (typeof walletMonitor.initializeLastTransactionIds === 'function') {
+            await walletMonitor.initializeLastTransactionIds();
+            logger.success('[Scheduler] Wallet transaction ID cache initialized.');
+        } else {
+            logger.error('[Scheduler] CRITICAL: walletMonitor.initializeLastTransactionIds is not available during init!');
+            throw new Error('initializeLastTransactionIds function not found in walletMonitor module during init.'); // Throw to indicate critical failure
+        }
+    } catch (error) {
+        // Log critical failure, but proceed with other tasks
+        logger.error('[Scheduler] CRITICAL: Failed to initialize wallet transaction ID cache!', error);
+    }
+
+    // Schedule other tasks
     scheduleNextMondayUpdate(client);
     scheduleTokenRefresh(client);
-    scheduleWalletSync(client); // Add the wallet sync task
+
+    // Run the wallet sync immediately after initialization, which will then schedule its next run
+    logger.info('[Scheduler] Running initial wallet sync...');
+    // Run async but don't block the rest of the bot startup
+    runWalletSyncNow(client).catch(error => {
+        logger.error('[Scheduler] Error during initial wallet sync execution:', error);
+        // Still schedule a retry even if the initial run fails immediately
+        scheduleNextWalletSync(client, 5 * 60 * 1000); // Retry in 5 mins
+    });
+
 }
 
 module.exports = {
     initialize,
+    scheduleNextWalletSync, // Export this so walletMonitor can call it (if needed)
 };
+

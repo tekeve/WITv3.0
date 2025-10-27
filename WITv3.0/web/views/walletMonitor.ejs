@@ -35,7 +35,37 @@
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
-        
+
+        /* Checkbox Group Styling */
+        .checkbox-group {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            padding: 0.6rem;
+            max-height: 100px; /* Adjust height as needed */
+            overflow-y: auto;
+            display: grid; /* Use grid for better alignment */
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* Responsive columns */
+            gap: 0.5rem; /* Space between checkboxes */
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+        }
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 0.5rem;
+            width: 1rem;
+            height: 1rem;
+            accent-color: var(--accent-blue); /* Style checkbox color */
+        }
+        .checkbox-item label {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            margin-bottom: 0; /* Override default label margin */
+            cursor: pointer;
+        }
+        /* End Checkbox Styling */
+
         select[multiple] { height: auto; min-height: 80px; }
         button { padding: 0.6rem 1.2rem; border: none; border-radius: 0.375rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
         .btn-primary { background-color: var(--accent-blue); color: white; } .btn-primary:hover { background-color: #0ea5e9; }
@@ -49,10 +79,36 @@
         .summary-value.negative { color: var(--accent-red); }
 
         /* Charts */
-        .charts-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
-        @media (min-width: 1024px) { .charts-grid { grid-template-columns: 1fr 1fr; } }
-        .chart-container { background-color: var(--bg-tertiary); padding: 1rem; border-radius: 0.5rem; height: 350px; /* Fixed height for charts */ display: flex; justify-content: center; align-items: center;}
-        .chart-container canvas { max-width: 100%; max-height: 100%; }
+        /* Updated charts-grid for 5 charts - Now using Flexbox for wrapping */
+        .charts-grid {
+            display: flex; /* Changed to flex */
+            flex-wrap: wrap; /* Allow wrapping */
+            gap: 1.5rem;
+            margin-bottom: 2rem; /* Added margin for spacing */
+        }
+        .chart-container {
+            background-color: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            height: 350px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 1 1 calc(50% - 1.5rem); /* Default: 2 columns */
+            min-width: 300px; /* Prevent charts from becoming too small */
+            box-sizing: border-box;
+        }
+        /* Make the last chart take full width if there's an odd number */
+        .chart-container:last-child:nth-child(odd) {
+            flex-basis: 100%;
+        }
+
+        .chart-container canvas {
+            max-width: 100%;
+            max-height: 100%;
+            cursor: pointer; /* Add pointer cursor to indicate clickability */
+        }
+
 
         /* Transactions Table */
         .table-container { overflow-x: auto; }
@@ -60,7 +116,7 @@
         th, td { padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border-color); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         th { background-color: var(--bg-tertiary); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
         tbody tr:hover { background-color: #4a5568; }
-        
+
         /* Filter row styles */
         tr.filter-row th {
             padding: 0.5rem;
@@ -136,17 +192,18 @@
             </div>
             <div class="form-group">
                 <label for="filter-divisions">Divisions</label>
-                <select id="filter-divisions" multiple>
-                    <option value="1">1 - Master Wallet</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                    <option value="7">7 - SRP Wallet</option>
-                </select>
+                <div id="filter-divisions" class="checkbox-group">
+                    <div class="checkbox-item"><input type="checkbox" id="div-all" value="all" checked><label for="div-all">All</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-1" value="1"><label for="div-1">1 - Master</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-2" value="2"><label for="div-2">2</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-3" value="3"><label for="div-3">3</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-4" value="4"><label for="div-4">4</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-5" value="5"><label for="div-5">5</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-6" value="6"><label for="div-6">6</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-7" value="7"><label for="div-7">7 - SRP</label></div>
+                </div>
             </div>
-             <button id="apply-filters-btn" class="btn-primary" style="margin-top: 1.4rem;">Apply Filters</button>
+             <!-- Apply Filters Button REMOVED -->
         </div>
 
         <div class="panel summary">
@@ -177,12 +234,23 @@
                 <div class="chart-container">
                     <canvas id="category-totals-chart"></canvas>
                 </div>
+                <div class="chart-container">
+                    <canvas id="top-payers-count-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="top-payers-amount-chart"></canvas>
+                </div>
+                 <!-- ADDED: New chart container for historical payer income -->
+                <div class="chart-container">
+                    <canvas id="payer-income-over-time-chart"></canvas>
+                </div>
+                <!-- END ADDED -->
             </div>
         </div>
 
         <div class="panel transactions">
             <h2>Transactions (Filtered Period)</h2>
-            
+
             <div class="table-container">
                 <table>
                     <thead>
@@ -278,6 +346,12 @@
                      borderColor: computedStyles.getPropertyValue('--border-color').trim(),
                      accentGreen: computedStyles.getPropertyValue('--accent-green').trim(),
                      accentRed: computedStyles.getPropertyValue('--accent-red').trim(),
+                     // Added more accents for new charts
+                     accentBlue: computedStyles.getPropertyValue('--accent-blue').trim(),
+                     accentPurple: computedStyles.getPropertyValue('--accent-purple').trim(),
+                     accentYellow: computedStyles.getPropertyValue('--accent-yellow').trim(),
+                     accentOrange: computedStyles.getPropertyValue('--accent-orange').trim(),
+
                 };
                 console.log("Initialized JS Colors:", categoryColorsJs, chartColors); // Debug log
             }
@@ -291,6 +365,12 @@
                 other: 'Other', uncategorized: 'Uncategorized'
             };
 
+            // --- Reverse lookup for labels to keys (for chart clicks) ---
+            const categoryKeysByLabel = Object.fromEntries(
+                Object.entries(categoryLabels).map(([key, label]) => [label, key])
+            );
+
+
             // --- DOM Elements ---
             const transactionsTbody = document.getElementById('transactions-tbody');
             const prevPageBtn = document.getElementById('prev-page-btn');
@@ -299,9 +379,8 @@
             // Primary Filters
             const filterStartDate = document.getElementById('filter-start-date');
             const filterEndDate = document.getElementById('filter-end-date');
-            const filterDivisions = document.getElementById('filter-divisions');
-            // const filterCategories = document.getElementById('filter-categories'); // This is removed from primary
-            const applyFiltersBtn = document.getElementById('apply-filters-btn');
+            const filterDivisionsContainer = document.getElementById('filter-divisions'); // Container for checkboxes
+            // const applyFiltersBtn = document.getElementById('apply-filters-btn'); // REMOVED
             // Secondary Filters (in transaction panel)
             const filterType = document.getElementById('filter-type');
             const filterParty = document.getElementById('filter-party');
@@ -508,13 +587,16 @@
 
                 // --- Dynamic Balance Card Rendering ---
                 // Get the divisions that are *currently* selected in the filter
-                let expectedDivisions = new Set(Array.from(filterDivisions.selectedOptions).map(opt => opt.value));
+                let expectedDivisions = new Set(
+                    Array.from(filterDivisionsContainer.querySelectorAll('input[type="checkbox"]:not(#div-all):checked'))
+                    .map(cb => cb.value)
+                );
 
-                // If no divisions are selected, default to showing balances for all divisions
-                if (expectedDivisions.size === 0) {
+                // If 'All' is checked or no specific divisions are checked, expect all.
+                if (filterDivisionsContainer.querySelector('#div-all').checked || expectedDivisions.size === 0) {
                     expectedDivisions = new Set(['1', '2', '3', '4', '5', '6', '7']);
                 }
-                
+
                 const displayedDivisions = new Set();
 
 
@@ -559,218 +641,262 @@
             }
 
             // --- Chart Rendering ---
-            function renderMonthlyFlowChart(monthlyData = []) { // Default to empty array
-                const canvasId = 'monthly-flow-chart';
+             function renderChart(canvasId, type, data, options) {
                 const ctx = document.getElementById(canvasId)?.getContext('2d');
                 if (!ctx) return;
                 if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
 
-                // Handle empty data case
-                if (!monthlyData || monthlyData.length === 0) {
-                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-                    ctx.save(); // Save context state
-                    ctx.fillStyle = chartColors.textSecondary;
-                    ctx.textAlign = 'center';
-                    ctx.font = '14px Inter, sans-serif'; // Use the body font
-                    ctx.fillText('No Monthly Data Available for Selected Filters', ctx.canvas.width / 2, ctx.canvas.height / 2);
-                    ctx.restore(); // Restore context state
-                    return; // Don't create a Chart.js instance
-                }
-
-
-                const labels = [...new Set(monthlyData.map(d => d.month))].sort();
-                const categories = [...new Set(monthlyData.map(d => d.category))];
-
-                const datasets = categories.map(category => {
-                    const incomeData = labels.map(month => {
-                        const entry = monthlyData.find(d => d.month === month && d.category === category);
-                        return entry ? entry.income : 0;
-                    });
-                    const outcomeData = labels.map(month => {
-                        const entry = monthlyData.find(d => d.month === month && d.category === category);
-                        return entry ? entry.outcome : 0; // Keep outcome negative for actual data value
-                    });
-
-                    return [
-                        {
-                            label: `${categoryLabels[category] || category} - Income`,
-                            data: incomeData,
-                            backgroundColor: categoryColorsJs[category] || categoryColorsJs.other, // Use JS vars
-                            stack: 'Income', // Group all income bars
-                        },
-                        {
-                            label: `${categoryLabels[category] || category} - Outcome`,
-                            // Chart.js needs positive values for the bar size for stacking, tooltip will show negative
-                            data: outcomeData.map(o => Math.abs(o)),
-                            backgroundColor: categoryColorsJs[category] || categoryColorsJs.other, // Use JS vars
-                            stack: 'Outcome', // Group all outcome bars
-                        }
-                    ];
-
-                }).flat();
-
-                chartInstances[canvasId] = new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels, datasets },
-                    options: {
-                        responsive: true, maintainAspectRatio: false,
-                        plugins: {
-                            title: { display: true, text: 'Monthly Income vs. Outcome by Category', color: chartColors.textPrimary, font: { size: 16 } },
-                            legend: { display: false }, // Hide legend as tooltip shows details
-                            tooltip: {
-                                mode: 'index', // Show tooltip for all items at that index (month)
-                                intersect: false,
-                                callbacks: {
-                                    label: function(context) {
-                                        let label = context.dataset.label || '';
-                                        const value = context.parsed.y;
-                                        const isOutcome = context.dataset.stack === 'Outcome';
-                                        // Find the category key
-                                        const categoryName = Object.keys(categoryLabels).find(key => 
-                                            label.startsWith(categoryLabels[key])
-                                        ) || 'uncategorized';
-
-                                        if (label && value !== null && value !== 0) { // Only show non-zero values
-                                            label = label.replace(' - Income', '').replace(' - Outcome', ''); // Clean label
-
-                                            // Find the original data point value (which might be negative)
-                                            const originalDataPoint = monthlyData.find(d => d.month === context.label && d.category === categoryName);
-                                            const actualValue = isOutcome ? originalDataPoint?.outcome : originalDataPoint?.income;
-
-                                            // Ensure actualValue is a number before formatting
-                                            if (typeof actualValue === 'number' && !isNaN(actualValue)) {
-                                                label += ': ' + formatIsk(actualValue, true) + ' ISK';
-                                                return label;
-                                            }
-                                        }
-                                        return null; // Hide label if value is zero or not found
-                                    },
-                                    title: function(context) { // Format month title
-                                        if (context.length > 0) {
-                                            // Parse YYYY-MM label
-                                            const [year, month] = context[0].label.split('-');
-                                            const date = new Date(Date.UTC(year, month - 1, 1)); // Use UTC to avoid timezone issues
-                                            return date.toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-                                        }
-                                        return '';
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            // Use category scale for X axis
-                            x: { stacked: true, ticks: { color: chartColors.textSecondary }, grid: { color: chartColors.borderColor } },
-                            y: {
-                                stacked: true, // Stack Income and Outcome separately
-                                ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) },
-                                grid: { color: chartColors.borderColor },
-                                title: {display: true, text:'ISK Amount', color: chartColors.textSecondary}
-                            }
-                        },
-                        interaction: { // Improve hover/tooltip behavior
-                            mode: 'index',
-                            intersect: false,
-                        },
-                    }
-                });
-            }
-
-
-            function renderCategoryTotalsChart(categoryData = []) { // Default to empty array
-                const canvasId = 'category-totals-chart';
-                const ctx = document.getElementById(canvasId)?.getContext('2d');
-                if (!ctx) return;
-                if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
-
-                // Handle empty data case
-                if (!categoryData || categoryData.length === 0) {
-                    // Display a placeholder message
+                // Handle empty data case by showing a message
+                const isEmpty = !data || !data.labels || data.labels.length === 0 || !data.datasets || data.datasets.every(ds => !ds.data || ds.data.length === 0);
+                if (isEmpty) {
                     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
                     ctx.save();
                     ctx.fillStyle = chartColors.textSecondary;
                     ctx.textAlign = 'center';
                     ctx.font = '14px Inter, sans-serif';
-                    ctx.fillText('No Category Data Available for Selected Filters', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                    ctx.fillText('No Data Available for Selected Filters', ctx.canvas.width / 2, ctx.canvas.height / 2);
                     ctx.restore();
-                    return;
+                    return; // Don't create Chart.js instance for empty data
                 }
 
-                const labels = categoryData.map(d => categoryLabels[d.category] || d.category);
-                const incomeValues = categoryData.map(d => d.total_income || 0);
-                const outcomeValues = categoryData.map(d => Math.abs(d.total_outcome || 0)); // Use absolute value
+                chartInstances[canvasId] = new Chart(ctx, { type, data, options });
+             }
 
-                chartInstances[canvasId] = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            { label: 'Total Income', data: incomeValues, backgroundColor: 'rgba(74, 222, 128, 0.6)', borderColor: chartColors.accentGreen, borderWidth: 1 },
-                            { label: 'Total Outcome', data: outcomeValues, backgroundColor: 'rgba(248, 113, 113, 0.6)', borderColor: chartColors.accentRed, borderWidth: 1 }
-                        ]
-                    },
-                    options: {
-                        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-                        plugins: {
-                            title: { display: true, text: 'Total Income/Outcome by Category (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
-                            legend: { position: 'top', labels: { color: chartColors.textSecondary } },
-                            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatIsk(ctx.raw)} ISK` } }
-                        },
-                        scales: {
-                            x: { ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Total ISK', color: chartColors.textSecondary} },
-                            y: { ticks: { color: chartColors.textPrimary }, grid: { color: chartColors.borderColor } }
+            // --- NEW: Chart Click Options Generator ---
+            function getChartClickOptions(handler) {
+                return {
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const chart = elements[0].chart;
+                            const elementIndex = elements[0].index;
+                            handler(chart, elementIndex);
                         }
                     }
+                };
+            }
+
+            // --- NEW: Category Chart Click Handler ---
+            function handleCategoryChartClick(chart, index) {
+                const clickedLabel = chart.data.labels[index];
+                filterCategoryText.value = clickedLabel; // Set filter input
+                loadData(1); // Reload data
+            }
+
+             // --- NEW: Payer Chart Click Handler ---
+            function handlePayerChartClick(chart, index) {
+                 const clickedLabel = chart.data.labels[index];
+                 filterParty.value = clickedLabel; // Set filter input
+                 loadData(1); // Reload data
+            }
+
+            function renderMonthlyFlowChart(monthlyData = []) {
+                const canvasId = 'monthly-flow-chart';
+                // Process data for Chart.js
+                const labels = [...new Set(monthlyData.map(d => d.month))].sort();
+                const categories = [...new Set(monthlyData.map(d => d.category))];
+                const datasets = categories.map(category => {
+                     const incomeData = labels.map(month => monthlyData.find(d => d.month === month && d.category === category)?.income || 0);
+                     const outcomeData = labels.map(month => Math.abs(monthlyData.find(d => d.month === month && d.category === category)?.outcome || 0)); // Use absolute for chart display
+                    return [
+                        { label: `${categoryLabels[category] || category} - Income`, data: incomeData, backgroundColor: categoryColorsJs[category] || categoryColorsJs.other, stack: 'Income' },
+                        { label: `${categoryLabels[category] || category} - Outcome`, data: outcomeData, backgroundColor: categoryColorsJs[category] || categoryColorsJs.other, stack: 'Outcome' }
+                    ];
+                }).flat();
+
+                renderChart(canvasId, 'bar', { labels, datasets }, {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                         title: { display: true, text: 'Monthly Income vs. Outcome by Category', color: chartColors.textPrimary, font: { size: 16 } },
+                         legend: { display: false },
+                         tooltip: {
+                            mode: 'index', intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    const value = context.parsed.y;
+                                    const isOutcome = context.dataset.stack === 'Outcome';
+                                    const categoryName = Object.keys(categoryLabels).find(key => label.startsWith(categoryLabels[key])) || 'uncategorized';
+                                    if (label && value !== null && value !== 0) {
+                                        label = label.replace(' - Income', '').replace(' - Outcome', '');
+                                        const originalDataPoint = monthlyData.find(d => d.month === context.label && d.category === categoryName);
+                                        const actualValue = isOutcome ? originalDataPoint?.outcome : originalDataPoint?.income;
+                                        if (typeof actualValue === 'number' && !isNaN(actualValue)) {
+                                            label += ': ' + formatIsk(actualValue, true) + ' ISK';
+                                            return label;
+                                        }
+                                    } return null;
+                                },
+                                title: function(context) {
+                                     if (context.length > 0) { const [year, month] = context[0].label.split('-'); const date = new Date(Date.UTC(year, month - 1, 1)); return date.toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' }); } return '';
+                                }
+                            }
+                         }
+                    },
+                    scales: { x: { stacked: true, ticks: { color: chartColors.textSecondary }, grid: { color: chartColors.borderColor } }, y: { stacked: true, ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'ISK Amount', color: chartColors.textSecondary} } },
+                    interaction: { mode: 'index', intersect: false },
+                    // No click handler for this one (yet)
+                    // ...getChartClickOptions((chart, index) => {
+                    //     console.log('Clicked Monthly Flow:', chart.data.labels[index]);
+                    // })
                 });
             }
+
+
+            function renderCategoryTotalsChart(categoryData = []) {
+                const canvasId = 'category-totals-chart';
+                // Process data
+                 const labels = categoryData.map(d => categoryLabels[d.category] || d.category);
+                 const incomeValues = categoryData.map(d => d.total_income || 0);
+                 const outcomeValues = categoryData.map(d => Math.abs(d.total_outcome || 0));
+
+                renderChart(canvasId, 'bar', {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Total Income', data: incomeValues, backgroundColor: 'rgba(74, 222, 128, 0.6)', borderColor: chartColors.accentGreen, borderWidth: 1 },
+                        { label: 'Total Outcome', data: outcomeValues, backgroundColor: 'rgba(248, 113, 113, 0.6)', borderColor: chartColors.accentRed, borderWidth: 1 }
+                    ]
+                }, {
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                    plugins: {
+                         title: { display: true, text: 'Total Income/Outcome by Category (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
+                         legend: { position: 'top', labels: { color: chartColors.textSecondary } },
+                         tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatIsk(ctx.raw)} ISK` } }
+                    },
+                    scales: { x: { ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Total ISK', color: chartColors.textSecondary} }, y: { ticks: { color: chartColors.textPrimary }, grid: { color: chartColors.borderColor } } },
+                    ...getChartClickOptions(handleCategoryChartClick) // Add click handler
+                });
+            }
+
+            function renderTopPayersCountChart(topPayersData = []) {
+                const canvasId = 'top-payers-count-chart';
+                 // Process data
+                 const labels = topPayersData.map(d => d.first_party_name || 'Unknown');
+                 const counts = topPayersData.map(d => d.transaction_count);
+                 const bgColors = [chartColors.accentBlue, chartColors.accentPurple, chartColors.accentYellow, chartColors.accentOrange, chartColors.textSecondary];
+
+                renderChart(canvasId, 'bar', {
+                    labels: labels,
+                    datasets: [{ label: 'Number of Payments', data: counts, backgroundColor: bgColors, borderColor: chartColors.borderColor, borderWidth: 1 }]
+                }, {
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                     plugins: {
+                         title: { display: true, text: 'Top 5 Payers by Payment Count (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
+                         legend: { display: false },
+                         tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.raw} payments` } }
+                     },
+                    scales: { x: { ticks: { color: chartColors.textSecondary, precision: 0 }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Number of Payments', color: chartColors.textSecondary} }, y: { ticks: { color: chartColors.textPrimary }, grid: { display: false } } },
+                    ...getChartClickOptions(handlePayerChartClick) // Add click handler
+                });
+            }
+
+            function renderTopPayersAmountChart(topPayersData = []) {
+                const canvasId = 'top-payers-amount-chart';
+                 // Process data
+                 const labels = topPayersData.map(d => d.first_party_name || 'Unknown');
+                 const amounts = topPayersData.map(d => d.total_amount);
+                 const bgColors = [chartColors.accentBlue, chartColors.accentPurple, chartColors.accentYellow, chartColors.accentOrange, chartColors.textSecondary];
+
+                renderChart(canvasId, 'bar', {
+                    labels: labels,
+                    datasets: [{ label: 'Total Amount Paid', data: amounts, backgroundColor: bgColors, borderColor: chartColors.borderColor, borderWidth: 1 }]
+                }, {
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                     plugins: {
+                        title: { display: true, text: 'Top 5 Payers by Total Amount (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${formatIsk(ctx.raw)} ISK` } }
+                     },
+                    scales: { x: { ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Total ISK Paid', color: chartColors.textSecondary} }, y: { ticks: { color: chartColors.textPrimary }, grid: { display: false } } },
+                    ...getChartClickOptions(handlePayerChartClick) // Add click handler
+                });
+            }
+
+             // --- NEW: Render Payer Income Over Time Chart ---
+            function renderPayerIncomeOverTimeChart(payerIncomeData = []) {
+                const canvasId = 'payer-income-over-time-chart';
+                const payerNames = [...new Set(payerIncomeData.map(d => d.first_party_name || 'Unknown'))];
+                const colors = [chartColors.accentBlue, chartColors.accentPurple, chartColors.accentYellow, chartColors.accentOrange, chartColors.textSecondary];
+
+                const datasets = payerNames.map((name, index) => {
+                    const payerData = payerIncomeData.filter(d => (d.first_party_name || 'Unknown') === name);
+                    return {
+                        label: name,
+                        data: payerData.map(d => ({ x: new Date(d.date).valueOf(), y: d.daily_total_income })),
+                        borderColor: colors[index % colors.length],
+                        backgroundColor: `${colors[index % colors.length]}33`, // Add alpha
+                        fill: false,
+                        tension: 0.1,
+                        pointRadius: 4,
+                    };
+                });
+
+                renderChart(canvasId, 'line', { datasets }, {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        title: { display: true, text: 'Payer Income Over Time (Top 5 by Total)', color: chartColors.textPrimary, font: { size: 16 } },
+                        legend: { position: 'top', labels: { color: chartColors.textSecondary } },
+                        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatIsk(ctx.parsed.y)} ISK` } }
+                    },
+                    scales: {
+                        x: { type: 'time', time: { unit: 'day', tooltipFormat: 'MMM d, yyyy', displayFormats: { day: 'MMM d' } }, ticks: { color: chartColors.textSecondary }, grid: { color: chartColors.borderColor } },
+                        y: { beginAtZero: false, ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Daily ISK Paid', color: chartColors.textSecondary} }
+                    },
+                    ...getChartClickOptions(handlePayerChartClick) // Add click handler
+                });
+            }
+
 
             // --- Event Handlers ---
             async function loadData(page = 1) {
                 // Read ALL filters every time
                 const startDate = filterStartDate.value || null;
                 const endDate = filterEndDate.value || null;
-                const divisions = Array.from(filterDivisions.selectedOptions).map(opt => opt.value);
-                const categorySearch = filterCategoryText.value.trim() || null; // Read from new text input
+                const allDivisionsCheckbox = filterDivisionsContainer.querySelector('#div-all');
+                let selectedDivisions = [];
+                if (!allDivisionsCheckbox.checked) {
+                    selectedDivisions = Array.from(filterDivisionsContainer.querySelectorAll('input[type="checkbox"]:not(#div-all):checked')).map(cb => cb.value);
+                }
+                const categorySearch = filterCategoryText.value.trim() || null;
                 const refType = filterType.value.trim() || null;
                 const partySearch = filterParty.value.trim() || null;
                 const amountExact = filterAmountExact.value ? parseFloat(filterAmountExact.value) : null;
                 const reasonSearch = filterReason.value.trim() || null;
 
-                // Update global filters state including new filters
-                currentFilters = { startDate, endDate, divisions, categorySearch, refType, partySearch, amountExact, reasonSearch }; // Updated
+                // Update global filters state
+                currentFilters = { startDate, endDate, divisions: selectedDivisions, categorySearch, refType, partySearch, amountExact, reasonSearch };
+                console.log("Fetching data with filters:", currentFilters, "Page:", page);
 
-                console.log("Fetching data with filters:", currentFilters, "Page:", page); // Log filters being used
-
-                // Fetch both sets of data concurrently
                 const [transactionsResult, aggregatedResult] = await Promise.all([
                     fetchData('transactions', { ...currentFilters, page: page, limit: itemsPerPage }, 'POST'),
-                    // Aggregated data for charts/summary depends on primary filters + categorySearch
-                    fetchData('aggregated', { startDate, endDate, divisions, categorySearch }, 'POST')
+                    fetchData('aggregated', { startDate, endDate, divisions: selectedDivisions, categorySearch }, 'POST')
                 ]);
 
-                console.log("Transaction Result:", transactionsResult);
-                console.log("Aggregated Result:", aggregatedResult);
-
-
+                // Render Transactions
                 if (transactionsResult && transactionsResult.success) {
                     renderTransactions(transactionsResult.transactions);
                     currentPage = transactionsResult.currentPage;
                     totalPages = transactionsResult.totalPages;
                     renderPagination(currentPage, totalPages, transactionsResult.total);
                 } else {
-                    renderTransactions([]); // Clear table on error
-                    renderPagination(1, 1, 0);
+                    renderTransactions([]); renderPagination(1, 1, 0);
                     console.error("Failed to render transactions:", transactionsResult?.message);
                 }
 
+                // Render Aggregated Data & Charts
                 if (aggregatedResult && aggregatedResult.success && aggregatedResult.data) {
                     updateSummaryCards(aggregatedResult.data);
                     renderMonthlyFlowChart(aggregatedResult.data.monthly || []);
                     renderCategoryTotalsChart(aggregatedResult.data.categories || []);
+                    renderTopPayersCountChart(aggregatedResult.data.topPayersByCount || []);
+                    renderTopPayersAmountChart(aggregatedResult.data.topPayersByAmount || []);
+                    renderPayerIncomeOverTimeChart(aggregatedResult.data.payerIncomeOverTime || []); // Render new chart
                 } else {
-                    // Handle error or empty state for aggregated data
                     updateSummaryCards({});
                     renderMonthlyFlowChart([]);
                     renderCategoryTotalsChart([]);
+                    renderTopPayersCountChart([]);
+                    renderTopPayersAmountChart([]);
+                    renderPayerIncomeOverTimeChart([]); // Clear new chart on error
                     console.error("Failed to render aggregated data:", aggregatedResult?.message);
                 }
             }
@@ -799,6 +925,9 @@
                             updateSummaryCards(aggResult.data);
                             renderMonthlyFlowChart(aggResult.data.monthly || []);
                             renderCategoryTotalsChart(aggResult.data.categories || []);
+                            renderTopPayersCountChart(aggResult.data.topPayersByCount || []);
+                            renderTopPayersAmountChart(aggResult.data.topPayersByAmount || []);
+                            renderPayerIncomeOverTimeChart(aggResult.data.payerIncomeOverTime || []); // Re-render
                         }
                     });
                     // Update the visual style and original value attribute
@@ -832,13 +961,36 @@
             const debouncedLoadData = debounce(() => loadData(1), 500); // 500ms delay
 
             // --- Event Listeners ---
-            
-            // Apply button handles primary filters
-            applyFiltersBtn.addEventListener('click', () => loadData(1));
-            
-            // Listeners for primary filters (Date, Selects) trigger on 'change' and reload data
-            [filterStartDate, filterEndDate, filterDivisions].forEach(el => {
+
+            // Apply button REMOVED
+
+            // Listeners for primary filters (Date, Checkboxes) trigger on 'change' and reload data
+            [filterStartDate, filterEndDate, filterDivisionsContainer].forEach(el => {
                 el.addEventListener('change', () => loadData(1));
+            });
+
+            // Special handling for "All" checkbox
+            const allDivCheckbox = filterDivisionsContainer.querySelector('#div-all');
+            const otherDivCheckboxes = filterDivisionsContainer.querySelectorAll('input[type="checkbox"]:not(#div-all)');
+            allDivCheckbox.addEventListener('change', () => {
+                if (allDivCheckbox.checked) {
+                    otherDivCheckboxes.forEach(cb => cb.checked = false); // Uncheck others if 'All' is checked
+                }
+                 loadData(1); // Trigger reload
+            });
+            otherDivCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    if (cb.checked) {
+                        allDivCheckbox.checked = false; // Uncheck 'All' if a specific one is checked
+                    } else {
+                        // If *no* specific checkboxes are checked, re-check 'All'
+                        const anyChecked = Array.from(otherDivCheckboxes).some(el => el.checked);
+                        if (!anyChecked) {
+                            allDivCheckbox.checked = true;
+                        }
+                    }
+                    loadData(1); // Trigger reload
+                });
             });
 
             // Debounced listeners for secondary, text-based filters
@@ -861,7 +1013,7 @@
             socket.on('disconnect', () => console.log('Wallet Monitor disconnected from WebSocket.'));
 
             // --- Initial Load ---
-            
+
             initializeJsColors(); // Initialize colors after DOM is ready
 
             // --- Default Date Filter Logic ---
@@ -881,16 +1033,12 @@
             filterEndDate.value = endDateStr;
             // --- End Default Date Filter Logic ---
 
-            // --- Default Division & Category Selection Logic ---
-            // Select all divisions
-            Array.from(filterDivisions.options).forEach(option => {
-                option.selected = true;
-            });
-            // Categories are now a text filter, so no pre-selection is needed.
-             // --- End Default Selection Logic ---
+            // Initial state: "All" is checked
+            allDivCheckbox.checked = true;
+            otherDivCheckboxes.forEach(cb => cb.checked = false);
 
             loadData(1); // Load initial data using the default filters
-        
+
         });
     </script>
 </body>
