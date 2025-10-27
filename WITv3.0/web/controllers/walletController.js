@@ -13,7 +13,7 @@ const EDIT_PERMISSION = ['leadership', 'admin'];
 const validateWalletToken = (client, requiredPermissions = VIEW_PERMISSION) => async (req, res, next) => {
     const { token } = req.params;
     const tokenData = client.activeWalletTokens?.get(token);
-    logger.info(`[WalletController] Validating token: ${token}`); // Log token being validated
+    // logger.info(`[WalletController] Validating token: ${token}`); // Removed log
 
     if (!tokenData || Date.now() > tokenData.expires) {
         if (client.activeWalletTokens?.has(token)) {
@@ -39,7 +39,7 @@ const validateWalletToken = (client, requiredPermissions = VIEW_PERMISSION) => a
             throw new Error('Member not found in guild');
         }
         tokenData.member = member; // Add member object to tokenData for later use
-        logger.info(`[WalletController] Fetched member: ${member.user.tag}`);
+        // logger.info(`[WalletController] Fetched member: ${member.user.tag}`); // Removed log
 
     } catch (error) {
         logger.error(`[WalletController] Error fetching guild or member during token validation:`, error);
@@ -51,18 +51,17 @@ const validateWalletToken = (client, requiredPermissions = VIEW_PERMISSION) => a
 
 
     const permissionsToCheck = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
-    logger.info(`[WalletController] Checking permissions for ${tokenData.member.user.tag}: requires ${permissionsToCheck.join(' or ')}`);
+    // logger.info(`[WalletController] Checking permissions for ${tokenData.member.user.tag}: requires ${permissionsToCheck.join(' or ')}`); // Removed log
 
     if (!roleManager.hasPermission(tokenData.member, permissionsToCheck)) {
         logger.warn(`[WalletController] Permission denied for ${tokenData.member.user.tag}. Required: ${permissionsToCheck.join(' or ')}`);
         if (req.path.includes('/api/')) {
-            // Corrected status code for Permission Denied
-            return res.status(403).json({ success: false, message: 'You do not have permission for this action.' });
+            return res.status(402).json({ success: false, message: 'You do not have permission for this action.' });
         }
         return res.status(403).render('error', { title: 'Permission Denied', message: `You do not have the required role to access this page.` });
     }
 
-    logger.info(`[WalletController] Permissions validated successfully for ${tokenData.member.user.tag}`);
+    // logger.info(`[WalletController] Permissions validated successfully for ${tokenData.member.user.tag}`); // Removed log
     req.tokenData = tokenData; // Attach validated data to request
     next();
 };
@@ -132,51 +131,32 @@ exports.getTransactionsData = (client) => [
         try {
             // Filters from POST body (preferred for complex/many filters)
             const {
-                startDate, endDate, divisions,
+                startDate, endDate, divisions, page, limit, // Remove default values here, handle below
                 refType, partySearch, amountExact, reasonSearch,
                 categorySearch // Added categorySearch
             } = req.body;
 
-            // --- Robust Page/Limit Parsing ---
-            let page = 1;
-            let limit = 50; // Default limit
+            // --- Robust Parsing and Defaulting ---
+            const pageNum = parseInt(page, 10);
+            const limitNum = parseInt(limit, 10);
+            const finalPage = (!isNaN(pageNum) && pageNum > 0) ? pageNum : 1;
+            const finalLimit = (!isNaN(limitNum) && limitNum > 0) ? limitNum : 50;
+            // --- End Parsing ---
 
-            // Try parsing page from body, default to 1 if invalid
-            const rawPage = req.body.page;
-            if (rawPage !== undefined && rawPage !== null) {
-                const parsedPage = parseInt(rawPage, 10);
-                if (!isNaN(parsedPage) && parsedPage > 0) {
-                    page = parsedPage;
-                } else {
-                    logger.warn(`[WalletController] Invalid 'page' value received: ${rawPage}. Defaulting to 1.`);
-                }
-            }
-
-            // Try parsing limit from body, default to 50 if invalid
-            const rawLimit = req.body.limit;
-            if (rawLimit !== undefined && rawLimit !== null) {
-                const parsedLimit = parseInt(rawLimit, 10);
-                // Allow a reasonable range for limit, e.g., 10 to 200
-                if (!isNaN(parsedLimit) && parsedLimit >= 10 && parsedLimit <= 200) {
-                    limit = parsedLimit;
-                } else {
-                    logger.warn(`[WalletController] Invalid 'limit' value received: ${rawLimit}. Defaulting to 50.`);
-                }
-            }
-            // --- End Robust Parsing ---
-
-
-            logger.info(`[WalletController] Fetching transactions for ${member.user.tag} with filters:`, req.body, `Parsed Page: ${page}, Limit: ${limit}`);
+            // Removed detailed filter log
+            // logger.info(`[WalletController] Fetching transactions for ${member.user.tag} with filters:`, req.body);
 
             const filters = {
-                startDate, endDate, divisions, page, limit, // Use parsed page/limit
+                startDate, endDate, divisions,
+                page: finalPage, // Use validated page
+                limit: finalLimit, // Use validated limit
                 refType, partySearch, amountExact, reasonSearch,
                 categorySearch // Pass new filter
             };
             const data = await walletMonitor.getTransactions(filters);
 
             res.json({ success: true, ...data });
-            logger.info(`[WalletController] Successfully served transactions page ${page} to ${member.user.tag}.`);
+            logger.info(`[WalletController] Successfully served transactions page ${finalPage} to ${member.user.tag}.`);
 
         } catch (error) {
             logger.error('[WalletController] Error fetching transaction data:', error);
@@ -196,7 +176,8 @@ exports.getAggregatedWalletData = (client) => [
         try {
             // Filters from POST body
             const { startDate, endDate, divisions, categorySearch } = req.body; // Add categorySearch
-            logger.info(`[WalletController] Fetching aggregated data for ${member.user.tag} with filters:`, req.body);
+            // Removed detailed filter log
+            // logger.info(`[WalletController] Fetching aggregated data for ${member.user.tag} with filters:`, req.body);
 
             // Pass all relevant filters to the aggregation function
             const filters = { startDate, endDate, divisions, categorySearch };
@@ -246,3 +227,4 @@ exports.updateCategory = (client) => [
         }
     }
 ];
+

@@ -4,12 +4,13 @@ const esiService = require('@helpers/esiService');
 const authManager = require('@helpers/authManager');
 const configManager = require('@helpers/configManager');
 const charManager = require('@helpers/characterManager'); // To potentially get member names
-const scheduler = require('@helpers/scheduler'); // Import scheduler for rescheduling
+const path = require('path'); // Added path for caller logging
 
 // In-memory cache to store the last processed transaction ID for each corp/division
 // Key: `${corporationId}-${division}`
 // Value: BigInt(lastTransactionId)
 const lastTransactionIdCache = new Map();
+const SRP_PAYMENT_AMOUNT = 20000000; // Define the standard SRP amount
 
 /**
  * Loads the last processed transaction IDs from the database on startup.
@@ -32,7 +33,6 @@ async function initializeLastTransactionIds() {
             if (row.max_id !== null && row.max_id !== undefined) {
                 try {
                     lastTransactionIdCache.set(key, BigInt(row.max_id));
-                    logger.info(`[WalletMonitor InitCache] Cached: ${key} -> ${row.max_id}`);
                 } catch (e) {
                     logger.error(`[WalletMonitor InitCache] Failed to parse max_id '${row.max_id}' as BigInt for ${key}.`);
                 }
@@ -51,21 +51,36 @@ async function initializeLastTransactionIds() {
 /**
  * Attempts to automatically categorize a transaction based on its details.
  * @param {object} transaction - The transaction object from ESI.
- * @returns {string|null} The category name ('srp_in', 'srp_out', 'giveaway', 'structure', 'office', 'tax', 'other') or null.
+ * @param {number} corporationId - The ID of the corporation whose wallet is being monitored.
+ * @returns {string|null} The category name ('srp_in', 'srp_out', 'giveaway', 'tax', 'internal_transfer', 'manual_change') or null.
  */
-function autoCategorizeTransaction(transaction) {
-    const srpAmount = 20000000; // 20 million ISK
+function autoCategorizeTransaction(transaction, corporationId) { // Added corporationId parameter
     const tolerance = 1; // Allow for slight rounding errors if needed
 
-    // Check for SRP Contribution (Incoming)
-    // Using Math.abs ensures it works even if the amount is slightly off
-    if (transaction.amount > 0 && Math.abs(transaction.amount - srpAmount) <= tolerance) {
-        // Could potentially add a check here to see if second_party_id is a known corp member
-        // by comparing against a list fetched via charManager or another source.
-        return 'srp_in';
+    // --- NEW: Check for Internal Transfer first ---
+    // Ensure IDs are numbers before comparing
+    const firstPartyIdNum = Number(transaction.first_party_id);
+    const secondPartyIdNum = Number(transaction.second_party_id);
+    const corpIdNum = Number(corporationId);
+
+    if (firstPartyIdNum && secondPartyIdNum && corpIdNum &&
+        firstPartyIdNum === corpIdNum && secondPartyIdNum === corpIdNum) {
+        return 'internal_transfer';
+    }
+    // --- END Internal Transfer Check ---
+
+    // Check for SRP Contribution (Incoming) - Includes exact multiples
+    if (transaction.amount > 0) {
+        const remainder = Math.abs(transaction.amount % SRP_PAYMENT_AMOUNT);
+        if (remainder <= tolerance || Math.abs(remainder - SRP_PAYMENT_AMOUNT) <= tolerance) {
+            const multiple = transaction.amount / SRP_PAYMENT_AMOUNT;
+            if (Math.abs(multiple - Math.round(multiple)) * SRP_PAYMENT_AMOUNT <= tolerance) {
+                return 'srp_in';
+            }
+        }
     }
 
-    // Check for potential SRP Payout (Outgoing) - Requires specific reasons
+    // Check for potential SRP Payout or Giveaway (Outgoing) - Requires specific reasons
     if (transaction.amount < 0 && transaction.reason) {
         const reasonLower = transaction.reason.toLowerCase();
         if (reasonLower.includes('srp payout') || reasonLower.includes('srp:')) {
@@ -76,21 +91,16 @@ function autoCategorizeTransaction(transaction) {
         }
     }
 
-    // Check ref_type for common categories
+    // Check ref_type for tax
     const refTypeLower = transaction.ref_type.toLowerCase();
-    if (refTypeLower.includes('structure') || refTypeLower.includes('upkeep') || refTypeLower.includes('fuel')) {
-        return 'structure';
-    }
-    if (refTypeLower.includes('office rental fee')) {
-        return 'office';
-    }
     // ESI ref_type for corp taxes
     if (refTypeLower.includes('corporation tax') || refTypeLower.includes('transaction tax')) {
         return 'tax';
     }
 
-    // Default to 'other' if no specific category matches
-    return 'other';
+    // Removed checks for 'structure' and 'office'
+    // Default to 'manual_change' if no specific category matches
+    return 'manual_change';
 }
 
 /**
@@ -151,8 +161,7 @@ async function fetchWalletJournalPage(corporationId, division, accessToken, from
             }
 
             if (!response || !Array.isArray(response.data) || response.data.length === 0) {
-                logger.info(`[WalletMonitor Fetch] Corp ${corporationId} Div ${division}: Reached last page (${page}/${response.headers ? (response.headers['x-pages'] || 1) : 1}).`);
-                break;
+                break; // No more data or invalid response
             }
 
             const transactionsOnPage = response.data;
@@ -160,12 +169,10 @@ async function fetchWalletJournalPage(corporationId, division, accessToken, from
 
             const newTransactionsOnPage = transactionsOnPage.filter(t => {
                 const currentId = BigInt(t.id);
-                // --- ORIGINAL CODE RESTORED ---
                 if (fromId !== null && currentId <= fromId) {
                     reachedLastKnownId = true;
                     return false;
                 }
-                // --- END ORIGINAL CODE ---
                 return true;
             });
 
@@ -173,15 +180,13 @@ async function fetchWalletJournalPage(corporationId, division, accessToken, from
             allNewTransactions.push(...newTransactionsOnPage);
 
             if (reachedLastKnownId) {
-                logger.info(`[WalletMonitor Fetch] Corp ${corporationId} Div ${division}: Reached last known ID (${fromId}) on page ${page}. Stopping fetch.`);
-                break;
+                break; // Stop fetching if we found the last known ID
             }
 
             const pagesHeader = response.headers ? response.headers['x-pages'] : null;
             const totalPages = pagesHeader ? parseInt(pagesHeader, 10) : 1;
             if (page >= totalPages) {
-                logger.info(`[WalletMonitor Fetch] Corp ${corporationId} Div ${division}: Reached last page (${page}/${totalPages}).`);
-                break;
+                break; // Reached the last page according to ESI
             }
 
             page++;
@@ -221,8 +226,6 @@ async function syncWalletTransactions() {
         .map(d => parseInt(d, 10))
         .filter(d => !isNaN(d) && d >= 1 && d <= 7);
 
-    logger.info(`[WalletMonitor Sync] Configured divisions: ${divisionsToMonitor.join(', ')}`);
-
     if (divisionsToMonitor.length === 0) {
         logger.warn('[WalletMonitor Sync] No valid srpWalletDivisions configured. Skipping.');
         return 60 * 60 * 1000;
@@ -255,7 +258,6 @@ async function syncWalletTransactions() {
 
             divisionEarliestExpiry = earliestExpiry;
             if (divisionEarliestExpiry !== null) {
-                logger.info(`[WalletMonitor Sync Div ${division}] Fetched ${newTransactions.length} new txs. ESI cache expires: ${new Date(divisionEarliestExpiry).toLocaleTimeString()}`);
                 if (overallEarliestExpiry === null || divisionEarliestExpiry < overallEarliestExpiry) {
                     overallEarliestExpiry = divisionEarliestExpiry;
                 }
@@ -278,13 +280,12 @@ async function syncWalletTransactions() {
             for (const t of newTransactions) {
                 const currentId = BigInt(t.id);
                 if (lastKnownId !== null && currentId <= lastKnownId) {
-                    logger.warn(`[WalletMonitor Sync Div ${division}] Safeguard: Skipped tx ${currentId} <= ${lastKnownId}.`);
-                    continue;
+                    continue; // Skip already processed
                 }
 
                 const firstPartyName = namesMap.get(t.first_party_id) || null;
                 const secondPartyName = namesMap.get(t.second_party_id) || null;
-                const customCategory = autoCategorizeTransaction(t);
+                const customCategory = autoCategorizeTransaction(t, corporationId); // Pass corp ID here
 
                 valuesToInsert.push([
                     t.id.toString(), corporationId, division, new Date(t.date), t.ref_type,
@@ -313,20 +314,15 @@ async function syncWalletTransactions() {
                 totalNewTransactionsProcessed += result.affectedRows;
                 logger.info(`[WalletMonitor Sync Div ${division}] Insert result: Affected=${result.affectedRows}, Duplicates=${valuesToInsert.length - result.affectedRows}`);
 
-                // --- Cache Update Logic FIX ---
                 if (highestProcessedIdThisSync !== null && (lastKnownId === null || highestProcessedIdThisSync > lastKnownId)) {
                     lastTransactionIdCache.set(cacheKey, highestProcessedIdThisSync);
                     logger.info(`[WalletMonitor Sync Div ${division}] Cache updated. New last ID: ${highestProcessedIdThisSync}.`);
                 } else if (result.affectedRows === 0 && highestProcessedIdThisSync !== null) {
-                    // Check if highest ID seen IS newer than cache, even if insert was duplicate
                     if (lastKnownId === null || highestProcessedIdThisSync > lastKnownId) {
                         lastTransactionIdCache.set(cacheKey, highestProcessedIdThisSync);
                         logger.info(`[WalletMonitor Sync Div ${division}] No rows inserted (likely duplicates), but updated cache as highest ID seen (${highestProcessedIdThisSync}) is newer than cached (${lastKnownId}).`);
-                    } else {
-                        logger.info(`[WalletMonitor Sync Div ${division}] No new rows inserted (likely duplicates). Highest ID seen: ${highestProcessedIdThisSync}. Cache remains: ${lastKnownId}.`);
                     }
                 }
-                // --- End Cache Update Logic FIX ---
 
             } else {
                 logger.info(`[WalletMonitor Sync Div ${division}] No valid new transactions to insert after processing.`);
@@ -366,12 +362,11 @@ async function getTransactions(filters = {}) {
 
     const numLimit = limit; // Already validated in controller
     const numPage = page; // Already validated in controller
-    // Ensure offset is an integer
-    const offset = Math.max(0, (numPage - 1) * numLimit); // Ensure non-negative
+    const numOffset = Math.max(0, (numPage - 1) * numLimit); // Ensure non-negative
 
     let whereClauses = [];
     let params = [];
-    let dataSql = ''; // <-- Declare dataSql outside the try block
+    let dataSql = ''; // Declared outside try block
 
     const config = configManager.get();
     const corporationIdStr = config.srpCorporationId?.[0];
@@ -395,81 +390,60 @@ async function getTransactions(filters = {}) {
         }
     }
 
+    // --- Updated Category Search Logic ---
     if (categorySearch) {
-        if (categorySearch.toLowerCase() === 'uncategorized') {
-            whereClauses.push('custom_category IS NULL');
-        } else {
-            // Mapping from LABEL back to KEY
-            const categoryLabels = {
-                'SRP In': 'srp_in', 'SRP Out': 'srp_out', 'Giveaway': 'giveaway',
-                'Structure/Upkeep': 'structure', 'Office Rental': 'office', 'Tax': 'tax',
-                'Other': 'other'
-            };
-            const searchLower = categorySearch.toLowerCase();
-            // Find the key whose label matches the search term (case-insensitive)
-            const matchingKey = Object.keys(categoryLabels).find(key => categoryLabels[key].toLowerCase() === searchLower);
+        const categoryLabels = { // Use NEW labels
+            'SRP In': 'srp_in', 'SRP Out': 'srp_out', 'Giveaway': 'giveaway',
+            'Internal Transfer': 'internal_transfer', 'Tax': 'tax',
+            'Manual Change': 'manual_change'
+        };
+        const searchLower = categorySearch.toLowerCase();
+        const matchingKey = Object.keys(categoryLabels).find(key => categoryLabels[key].toLowerCase() === searchLower);
 
-            if (matchingKey) {
-                whereClauses.push('custom_category = ?'); params.push(matchingKey);
-            } else { // Fallback if no exact label match (or user typed key directly)
-                whereClauses.push('custom_category LIKE ?'); params.push(`%${categorySearch}%`);
-            }
+        if (searchLower === 'uncategorized') {
+            whereClauses.push('custom_category IS NULL');
+        } else if (matchingKey) {
+            whereClauses.push('custom_category = ?'); params.push(matchingKey);
+        } else { // Fallback fuzzy search if no exact label match
+            whereClauses.push('custom_category LIKE ?'); params.push(`%${categorySearch}%`);
         }
     }
+    // --- End Updated Category Search Logic ---
 
 
     if (refType) { whereClauses.push('ref_type LIKE ?'); params.push(`%${refType}%`); }
     if (partySearch) { whereClauses.push('(first_party_name LIKE ? OR second_party_name LIKE ?)'); params.push(`%${partySearch}%`, `%${partySearch}%`); }
-    // Ensure amountExact is treated as a number
     const exactAmount = Number(amountExact);
-    if (amountExact !== null && amountExact !== undefined && !isNaN(exactAmount)) { // Check if it's a valid number and not null/undefined explicitly
+    if (amountExact !== null && amountExact !== undefined && !isNaN(exactAmount)) {
         whereClauses.push('(amount = ? OR amount = ?)'); params.push(exactAmount, -exactAmount);
     }
     if (reasonSearch) { whereClauses.push('(reason LIKE ? OR description LIKE ?)'); params.push(`%${reasonSearch}%`, `%${reasonSearch}%`); }
 
     const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
+    const limitInt = Math.max(0, Math.floor(numLimit));
+    const offsetInt = Math.max(0, Math.floor(numOffset));
+
+    const countSql = `SELECT COUNT(*) as total FROM corp_wallet_transactions ${whereString}`;
+    dataSql = `
+        SELECT * FROM corp_wallet_transactions ${whereString}
+        ORDER BY date DESC, transaction_id DESC LIMIT ${limitInt} OFFSET ${offsetInt}`;
+
+    const finalParams = [...params];
+
     try {
-        const countSql = `SELECT COUNT(*) as total FROM corp_wallet_transactions ${whereString}`;
-        // --- Pass only the WHERE clause params to the count query ---
-        const [countResult] = await db.query(countSql, params);
+        const [countResult] = await db.query(countSql, finalParams);
         const total = countResult ? countResult.total : 0;
 
-        // --- FIX: Build LIMIT and OFFSET directly into the SQL string ---
-        // Ensure numLimit and offset are integers before embedding
-        const limitInt = parseInt(numLimit, 10);
-        const offsetInt = parseInt(offset, 10);
+        const transactions = await db.query(dataSql, finalParams); // Pass only filter params
 
-        if (isNaN(limitInt) || isNaN(offsetInt) || limitInt < 0 || offsetInt < 0) {
-            throw new Error(`Invalid LIMIT (${numLimit}) or OFFSET (${offset}) value.`);
-        }
-
-        dataSql = `
-            SELECT * FROM corp_wallet_transactions ${whereString}
-            ORDER BY date DESC, transaction_id DESC LIMIT ${limitInt} OFFSET ${offsetInt}`; // <-- Embed values here
-        // --- END FIX ---
-
-        // --- Logging added before query execution ---
-        logger.info(`[WalletMonitor Web] Executing transaction query: ${dataSql}`);
-        // --- FIX: Remove limit/offset from finalParams ---
-        const finalParams = [...params]; // <-- Only WHERE clause params
-        // --- END FIX ---
-        logger.info(`[WalletMonitor Web] Parameters: ${JSON.stringify(finalParams)}`);
-        // --- End Logging ---
-
-        const transactions = await db.query(dataSql, finalParams); // Pass only WHERE params
-
-        return { transactions, total, currentPage: numPage, totalPages: Math.ceil(total / numLimit) };
+        return { transactions, total, currentPage: numPage, totalPages: Math.ceil(total / limitInt) };
 
     } catch (error) {
-        // Log the failed query and params for easier debugging
-        // --- FIX: Use only WHERE params for error logging ---
-        const finalParamsForError = [...params]; // <-- Only WHERE clause params
-        // --- END FIX ---
-        logger.error(`[WalletMonitor Web] Error fetching transactions. Query: ${dataSql}`);
-        logger.error(`[WalletMonitor Web] Parameters: ${JSON.stringify(finalParamsForError)}`);
-        logger.error(error); // Log the full error object (this will include the original DB error)
-        throw error; // Re-throw error to be caught by the controller
+        logger.error('[WalletMonitor Web] Error fetching transactions. Query:\n' + dataSql);
+        logger.error('[WalletMonitor Web] Parameters:', finalParams);
+        logger.error('[WalletMonitor Web]', error); // Log the full error object
+        throw error;
     }
 }
 
@@ -482,11 +456,8 @@ async function getAggregatedData(filters = {}) {
     const { startDate, endDate, divisions = [], categorySearch } = filters;
     let baseWhereClauses = [];
     let baseParams = [];
-    // --- PAYER QUERY MODIFICATION ---
-    // Start with income filter AND the srp_in category filter for payer queries
-    let payerBaseWhereClauses = ['amount > 0', 'custom_category = ?'];
+    let payerBaseWhereClauses = ['amount > 0', 'custom_category = ?']; // Start payer queries filtered to srp_in
     let payerBaseParams = ['srp_in'];
-    // --- END PAYER QUERY MODIFICATION ---
 
     const config = configManager.get();
     const corporationIdStr = config.srpCorporationId?.[0];
@@ -518,38 +489,33 @@ async function getAggregatedData(filters = {}) {
         }
     }
 
+    // --- Updated Category Search Logic for Aggregation ---
     if (categorySearch) {
+        const categoryLabels = {
+            'SRP In': 'srp_in', 'SRP Out': 'srp_out', 'Giveaway': 'giveaway',
+            'Internal Transfer': 'internal_transfer', 'Tax': 'tax',
+            'Manual Change': 'manual_change'
+        };
+        const searchLower = categorySearch.toLowerCase();
+        const matchingKey = Object.keys(categoryLabels).find(key => categoryLabels[key].toLowerCase() === searchLower);
         let categoryClause = '', categoryParam = '';
-        if (categorySearch.toLowerCase() === 'uncategorized') {
-            categoryClause = 'custom_category IS NULL';
-        } else {
-            // Mapping from LABEL back to KEY
-            const categoryLabels = {
-                'SRP In': 'srp_in', 'SRP Out': 'srp_out', 'Giveaway': 'giveaway',
-                'Structure/Upkeep': 'structure', 'Office Rental': 'office', 'Tax': 'tax',
-                'Other': 'other'
-            };
-            const searchLower = categorySearch.toLowerCase();
-            const matchingKey = Object.keys(categoryLabels).find(key => categoryLabels[key].toLowerCase() === searchLower);
 
-            if (matchingKey) {
-                categoryClause = 'custom_category = ?'; categoryParam = matchingKey;
-            } else {
-                categoryClause = 'custom_category LIKE ?'; categoryParam = `%${categorySearch}%`;
-            }
+        if (searchLower === 'uncategorized') {
+            categoryClause = 'custom_category IS NULL';
+        } else if (matchingKey) {
+            categoryClause = 'custom_category = ?'; categoryParam = matchingKey;
+        } else {
+            categoryClause = 'custom_category LIKE ?'; categoryParam = `%${categorySearch}%`;
         }
         if (categoryClause) {
             baseWhereClauses.push(categoryClause); if (categoryParam) baseParams.push(categoryParam);
-            // --- PAYER QUERY MODIFICATION ---
-            // Don't add the general category filter to payer queries if it's not 'srp_in'
-            // because payer queries are *already* filtered to 'srp_in'
-            if (categoryParam !== 'srp_in' && categorySearch.toLowerCase() !== 'uncategorized') {
-                // If the main filter is something *other* than SRP In, the payer results should be empty
-                payerBaseWhereClauses.push('1=0'); // Add a condition that's always false
+            // Payer queries are already filtered to 'srp_in', only apply additional filters if relevant
+            if (categoryParam !== 'srp_in' && searchLower !== 'uncategorized') {
+                payerBaseWhereClauses.push('1=0'); // Make payer query return nothing
             }
-            // --- END PAYER QUERY MODIFICATION ---
         }
     }
+    // --- End Updated Category Search Logic for Aggregation ---
 
 
     const whereString = baseWhereClauses.length > 0 ? `WHERE ${baseWhereClauses.join(' AND ')}` : '';
@@ -564,7 +530,6 @@ async function getAggregatedData(filters = {}) {
             balanceWhereClausesForQuery.push(`division IN (${divisionFilterParams.map(() => '?').join(',')})`);
             balanceParamsForQuery.push(...divisionFilterParams);
         }
-        // Balance query - NO CAST
         const balanceSql = `
            SELECT t1.division, t1.balance
            FROM corp_wallet_transactions t1
@@ -575,50 +540,65 @@ async function getAggregatedData(filters = {}) {
                GROUP BY division
            ) t2 ON t1.division = t2.division AND t1.transaction_id = t2.max_tx_id;`;
 
-        logger.info(`[WalletMonitor Web] Executing balance query with params: [${balanceParamsForQuery.join(',')}]`);
-
         const categorySql = `SELECT COALESCE(custom_category, 'uncategorized') AS category, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS total_income, SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS total_outcome FROM corp_wallet_transactions ${whereString} GROUP BY category;`;
 
-        // --- PAYER QUERIES NOW INCLUDE THE srp_in FILTER VIA payerWhereString ---
-        const topPayersByCountSql = `SELECT first_party_name, COUNT(*) AS transaction_count FROM corp_wallet_transactions ${payerWhereString} AND first_party_name IS NOT NULL GROUP BY first_party_name ORDER BY transaction_count DESC LIMIT 5;`;
-        const topPayersByAmountSql = `SELECT first_party_name, SUM(amount) AS total_amount FROM corp_wallet_transactions ${payerWhereString} AND first_party_name IS NOT NULL GROUP BY first_party_name ORDER BY total_amount DESC LIMIT 5;`;
-        // --- END PAYER QUERY UPDATE ---
+        const topPayersByCountSql = `
+            SELECT
+                COALESCE(first_party_name, 'Unknown Payer') as commander_name,
+                SUM(
+                    CASE
+                        WHEN amount > 0 AND CAST(amount AS DECIMAL(20,2)) % ${SRP_PAYMENT_AMOUNT} = 0
+                        THEN FLOOR(CAST(amount AS DECIMAL(20,2)) / ${SRP_PAYMENT_AMOUNT})
+                        ELSE 1
+                    END
+                ) AS transaction_count
+            FROM corp_wallet_transactions
+            ${payerWhereString}
+            GROUP BY commander_name
+            ORDER BY transaction_count DESC
+            LIMIT 5;`;
 
-        // --- Fetch Top Payers for Historical Chart ---
-        // This query also now implicitly uses the srp_in filter via payerBaseParams
-        const top5PayersForHistory = await db.query(topPayersByAmountSql, payerBaseParams);
-        const topPayerNames = top5PayersForHistory.map(p => p.first_party_name).filter(Boolean);
+        const topPayersByAmountSql = `SELECT COALESCE(first_party_name, 'Unknown Payer') as commander_name, SUM(amount) AS total_amount FROM corp_wallet_transactions ${payerWhereString} GROUP BY commander_name ORDER BY total_amount DESC LIMIT 5;`;
+
+        const [
+            monthlyData,
+            balanceResult,
+            categoryData,
+            topPayersByCount,
+            topPayersByAmount,
+            top5PayersResult
+        ] = await Promise.all([
+            db.query(monthlySql, baseParams),
+            db.query(balanceSql, balanceParamsForQuery),
+            db.query(categorySql, baseParams),
+            db.query(topPayersByCountSql, payerBaseParams),
+            db.query(topPayersByAmountSql, payerBaseParams),
+            db.query(topPayersByAmountSql, payerBaseParams) // Fetch top 5 for history based on amount
+        ]);
+
+        const topPayerNames = top5PayersResult.map(p => p.commander_name || 'Unknown Payer').filter(Boolean);
 
         let payerIncomeOverTimeSql = 'SELECT CURDATE() as date, "No Payers Found" as first_party_name, 0 as daily_total_income';
         let payerIncomeParams = [];
         if (topPayerNames.length > 0) {
             const namePlaceholders = topPayerNames.map(() => '?').join(',');
-            // Build WHERE clause *without* general category filter, keep date/division, add srp_in filter
-            const historyWhereClauses = ['corporation_id = ?', 'amount > 0', 'custom_category = ?', `first_party_name IN (${namePlaceholders})`];
-            const historyParams = [corporationId, 'srp_in', ...topPayerNames]; // Added 'srp_in' here
+            const historyWhereClauses = ['corporation_id = ?', 'amount > 0', 'custom_category = ?', `COALESCE(first_party_name, 'Unknown Payer') IN (${namePlaceholders})`];
+            const historyParams = [corporationId, 'srp_in', ...topPayerNames];
             if (startDate) { historyWhereClauses.push('date >= ?'); historyParams.push(new Date(startDate)); }
             if (endDate) { const endHist = new Date(endDate); endHist.setDate(endHist.getDate() + 1); historyWhereClauses.push('date < ?'); historyParams.push(endHist); }
             if (divisionFilterParams.length > 0) { historyWhereClauses.push(`division IN (${divisionFilterParams.map(() => '?').join(',')})`); historyParams.push(...divisionFilterParams); }
-            payerIncomeOverTimeSql = `SELECT DATE(date) as date, first_party_name, SUM(amount) AS daily_total_income FROM corp_wallet_transactions WHERE ${historyWhereClauses.join(' AND ')} GROUP BY DATE(date), first_party_name ORDER BY date ASC;`;
+
+            payerIncomeOverTimeSql = `SELECT DATE(date) as date, COALESCE(first_party_name, 'Unknown Payer') as first_party_name, SUM(amount) AS daily_total_income FROM corp_wallet_transactions WHERE ${historyWhereClauses.join(' AND ')} GROUP BY DATE(date), COALESCE(first_party_name, 'Unknown Payer') ORDER BY date ASC;`;
             payerIncomeParams = historyParams;
         }
-        // --- End Historical Fetch Logic ---
 
-        const [monthlyData, balanceResult, categoryData, topPayersByCount, topPayersByAmount, payerIncomeOverTime] = await Promise.all([
-            db.query(monthlySql, baseParams),
-            db.query(balanceSql, balanceParamsForQuery), // Use specific params for balance
-            db.query(categorySql, baseParams),
-            db.query(topPayersByCountSql, payerBaseParams), // Use payer-specific params
-            db.query(topPayersByAmountSql, payerBaseParams), // Use payer-specific params
-            db.query(payerIncomeOverTimeSql, payerIncomeParams) // Use history params
-        ]);
-        logger.info(`[WalletMonitor Web] Balance query returned ${balanceResult.length} rows:`, JSON.stringify(balanceResult)); // Log raw result
-
+        const payerIncomeOverTimeRaw = await db.query(payerIncomeOverTimeSql, payerIncomeParams);
+        const payerIncomeOverTime = (payerIncomeOverTimeRaw.length === 1 && payerIncomeOverTimeRaw[0].first_party_name === "No Payers Found") ? [] : payerIncomeOverTimeRaw;
 
         return {
             monthly: monthlyData, balances: balanceResult, categories: categoryData,
             topPayersByCount: topPayersByCount, topPayersByAmount: topPayersByAmount,
-            payerIncomeOverTime: (payerIncomeOverTime[0]?.first_party_name === "No Payers Found") ? [] : payerIncomeOverTime
+            payerIncomeOverTime: payerIncomeOverTime
         };
 
     } catch (error) {
@@ -635,7 +615,8 @@ async function getAggregatedData(filters = {}) {
  * @returns {Promise<boolean>} Success status.
  */
 async function updateTransactionCategory(transactionIdStr, category) {
-    const validCategories = ['srp_in', 'srp_out', 'giveaway', 'structure', 'office', 'tax', 'other', null];
+    // --- Updated valid categories list ---
+    const validCategories = ['srp_in', 'srp_out', 'giveaway', 'tax', 'internal_transfer', 'manual_change', null];
     if (!validCategories.includes(category)) {
         logger.warn(`[WalletMonitor UpdateCat] Invalid category: "${category}" for tx ${transactionIdStr}`);
         return false;

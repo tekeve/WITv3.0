@@ -194,8 +194,8 @@
                 <label for="filter-divisions">Divisions</label>
                 <div id="filter-divisions" class="checkbox-group">
                     <div class="checkbox-item"><input type="checkbox" id="div-all" value="all" checked><label for="div-all">All</label></div>
-                    <div class="checkbox-item"><input type="checkbox" id="div-1" value="1"><label for="div-1">1 - SRP In</label></div>
-                    <div class="checkbox-item"><input type="checkbox" id="div-2" value="2"><label for="div-2">2 - SRP Out</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-1" value="1"><label for="div-1">1 - Master</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-2" value="2"><label for="div-2">2</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="div-3" value="3"><label for="div-3">3</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="div-4" value="4"><label for="div-4">4</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="div-5" value="5"><label for="div-5">5</label></div>
@@ -353,7 +353,8 @@
                      accentOrange: computedStyles.getPropertyValue('--accent-orange').trim(),
 
                 };
-                console.log("Initialized JS Colors:", categoryColorsJs, chartColors); // Debug log
+                // Removed noisy log
+                // console.log("Initialized JS Colors:", categoryColorsJs, chartColors);
             }
             // --- END CSS Variable Reading ---
 
@@ -463,18 +464,26 @@
                         }
                     }
 
-                    console.log(`[FetchData] Requesting URL: ${url}`, options); // Log request details
+                    // Removed detailed request logging
+                    // console.log(`[FetchData] Requesting URL: ${url}`, options);
 
                     const response = await fetch(url, options);
                     const data = await response.json();
                     if (!response.ok) {
-                        throw new Error(data.message || `HTTP error! Status: ${response.status}`);
+                        const statusText = response.statusText;
+                        const serverMessage = data.message || `HTTP error! Status: ${response.status}`;
+                        const errorMsg = `Failed to fetch data from ${endpoint}. Server responded with ${response.status} (${statusText}): ${serverMessage}`;
+                        console.error('API Call Failed:', errorMsg, 'Response body:', data);
+                        showToast(errorMsg, 'error');
+                        return null; // Return null on error
                     }
-                    console.log(`[${endpoint}] Data received:`, data); // Add logging
+                    // Removed detailed response logging
+                    // console.log(`[${endpoint}] Data received:`, data);
                     return data;
                 } catch (error) {
-                    showToast(`Error fetching data: ${error.message}`, 'error');
-                    console.error('API Call Failed:', error);
+                    const errorMsg = `Error fetching data from ${endpoint}: ${error.message}`;
+                    console.error('API Call Failed:', errorMsg, error);
+                    showToast(errorMsg, 'error');
                     return null; // Return null on error
                 } finally {
                     showLoading(false);
@@ -563,7 +572,8 @@
             }
 
             function updateSummaryCards(aggregatedData) {
-                console.log("Updating summary cards with data:", aggregatedData); // Log received data
+                // Removed detailed log
+                // console.log("Updating summary cards with data:", aggregatedData);
                 let totalIncome = 0;
                 let totalOutcome = 0;
 
@@ -574,9 +584,10 @@
                         totalIncome += Number(cat.total_income) || 0;
                         totalOutcome += Number(cat.total_outcome) || 0; // Outcome is already negative
                     });
-                    console.log("Calculated Totals:", { totalIncome, totalOutcome }); // Log calculated totals
+                    // Removed detailed log
+                    // console.log("Calculated Totals:", { totalIncome, totalOutcome });
                 } else {
-                    console.log("Aggregated categories data is missing or not an array.");
+                    // console.log("Aggregated categories data is missing or not an array."); // Keep this warning? Maybe
                 }
                 const netChange = totalIncome + totalOutcome;
 
@@ -643,12 +654,24 @@
             // --- Chart Rendering ---
              function renderChart(canvasId, type, data, options) {
                 const ctx = document.getElementById(canvasId)?.getContext('2d');
-                if (!ctx) return;
-                if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+                if (!ctx) {
+                    console.error(`[RenderChart] Canvas element with ID "${canvasId}" not found.`);
+                    return;
+                }
+                if (chartInstances[canvasId]) {
+                    // console.log(`[RenderChart] Destroying existing chart for ${canvasId}`); // Removed log
+                    chartInstances[canvasId].destroy();
+                }
 
-                // Handle empty data case by showing a message
-                const isEmpty = !data || !data.labels || data.labels.length === 0 || !data.datasets || data.datasets.every(ds => !ds.data || ds.data.length === 0);
+                // --- MODIFIED isEmpty Check ---
+                // Focus on whether there are any datasets with actual data points
+                const hasActualData = data && data.datasets && data.datasets.some(ds => ds.data && ds.data.length > 0);
+                const isEmpty = !hasActualData;
+                // --- END MODIFICATION ---
+
                 if (isEmpty) {
+                    // Removed detailed empty data log
+                    // console.log(`[RenderChart] No valid data found for chart "${canvasId}". Rendering 'No Data' message. Data object:`, data);
                     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
                     ctx.save();
                     ctx.fillStyle = chartColors.textSecondary;
@@ -659,7 +682,22 @@
                     return; // Don't create Chart.js instance for empty data
                 }
 
-                chartInstances[canvasId] = new Chart(ctx, { type, data, options });
+                // Removed detailed chart render log
+                // console.log(`[RenderChart] Rendering chart "${canvasId}" with type "${type}". Options:`, options, "Data:", data);
+                try {
+                    chartInstances[canvasId] = new Chart(ctx, { type, data, options });
+                } catch (chartError) {
+                    console.error(`[RenderChart] Error creating Chart.js instance for "${canvasId}":`, chartError);
+                    showToast(`Error rendering chart: ${chartError.message}`, 'error');
+                     // Attempt to show error on canvas
+                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    ctx.save();
+                    ctx.fillStyle = chartColors.accentRed || '#f87171'; // Use accentRed or fallback
+                    ctx.textAlign = 'center';
+                    ctx.font = '14px Inter, sans-serif';
+                    ctx.fillText('Error Rendering Chart', ctx.canvas.width / 2, ctx.canvas.height / 2);
+                    ctx.restore();
+                }
              }
 
             // --- NEW: Chart Click Options Generator ---
@@ -753,12 +791,12 @@
                     labels: labels,
                     datasets: [
                         { label: 'Total Income', data: incomeValues, backgroundColor: 'rgba(74, 222, 128, 0.6)', borderColor: chartColors.accentGreen, borderWidth: 1 },
-                        { label: 'Total Expenditure', data: outcomeValues, backgroundColor: 'rgba(248, 113, 113, 0.6)', borderColor: chartColors.accentRed, borderWidth: 1 }
+                        { label: 'Total Outcome', data: outcomeValues, backgroundColor: 'rgba(248, 113, 113, 0.6)', borderColor: chartColors.accentRed, borderWidth: 1 }
                     ]
                 }, {
                     responsive: true, maintainAspectRatio: false, indexAxis: 'y',
                     plugins: {
-                         title: { display: true, text: 'Total Income/Expenditure by Category (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
+                         title: { display: true, text: 'Total Income/Outcome by Category (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
                          legend: { position: 'top', labels: { color: chartColors.textSecondary } },
                          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatIsk(ctx.raw)} ISK` } }
                     },
@@ -770,7 +808,7 @@
             function renderTopPayersCountChart(topPayersData = []) {
                 const canvasId = 'top-payers-count-chart';
                  // Process data
-                 const labels = topPayersData.map(d => d.first_party_name || 'Unknown');
+                 const labels = topPayersData.map(d => d.commander_name || 'Unknown'); // Updated field name
                  const counts = topPayersData.map(d => d.transaction_count);
                  const bgColors = [chartColors.accentBlue, chartColors.accentPurple, chartColors.accentYellow, chartColors.accentOrange, chartColors.textSecondary];
 
@@ -792,7 +830,7 @@
             function renderTopPayersAmountChart(topPayersData = []) {
                 const canvasId = 'top-payers-amount-chart';
                  // Process data
-                 const labels = topPayersData.map(d => d.first_party_name || 'Unknown');
+                 const labels = topPayersData.map(d => d.commander_name || 'Unknown'); // Updated field name
                  const amounts = topPayersData.map(d => d.total_amount);
                  const bgColors = [chartColors.accentBlue, chartColors.accentPurple, chartColors.accentYellow, chartColors.accentOrange, chartColors.textSecondary];
 
@@ -811,9 +849,14 @@
                 });
             }
 
-             // --- NEW: Render Payer Income Over Time Chart ---
+             // --- Render Payer Income Over Time Chart ---
             function renderPayerIncomeOverTimeChart(payerIncomeData = []) {
                 const canvasId = 'payer-income-over-time-chart';
+                // Removed debugging logs
+                if (!Array.isArray(payerIncomeData)) {
+                    payerIncomeData = [];
+                }
+
                 const payerNames = [...new Set(payerIncomeData.map(d => d.first_party_name || 'Unknown'))];
                 const colors = [chartColors.accentBlue, chartColors.accentPurple, chartColors.accentYellow, chartColors.accentOrange, chartColors.textSecondary];
 
@@ -829,6 +872,9 @@
                         pointRadius: 4,
                     };
                 });
+
+                const hasValidData = datasets.length > 0 && datasets.some(ds => ds.data.length > 0 && ds.data.some(p => !isNaN(p.x) && !isNaN(p.y)));
+                // Removed debug log for no valid data
 
                 renderChart(canvasId, 'line', { datasets }, {
                     responsive: true, maintainAspectRatio: false,
@@ -864,7 +910,7 @@
 
                 // Update global filters state
                 currentFilters = { startDate, endDate, divisions: selectedDivisions, categorySearch, refType, partySearch, amountExact, reasonSearch };
-                console.log("Fetching data with filters:", currentFilters, "Page:", page);
+                // Removed filter logging
 
                 const [transactionsResult, aggregatedResult] = await Promise.all([
                     fetchData('transactions', { ...currentFilters, page: page, limit: itemsPerPage }, 'POST'),
@@ -879,7 +925,7 @@
                     renderPagination(currentPage, totalPages, transactionsResult.total);
                 } else {
                     renderTransactions([]); renderPagination(1, 1, 0);
-                    console.error("Failed to render transactions:", transactionsResult?.message);
+                    console.error("Failed to render transactions:", transactionsResult?.message); // Kept essential error log
                 }
 
                 // Render Aggregated Data & Charts
@@ -897,7 +943,7 @@
                     renderTopPayersCountChart([]);
                     renderTopPayersAmountChart([]);
                     renderPayerIncomeOverTimeChart([]); // Clear new chart on error
-                    console.error("Failed to render aggregated data:", aggregatedResult?.message);
+                    console.error("Failed to render aggregated data:", aggregatedResult?.message); // Kept essential error log
                 }
             }
 
