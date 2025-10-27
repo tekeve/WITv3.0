@@ -370,6 +370,7 @@ async function getTransactions(filters = {}) {
 
     let whereClauses = [];
     let params = [];
+    let dataSql = ''; // <-- Declare dataSql outside the try block
 
     const config = configManager.get();
     const corporationIdStr = config.srpCorporationId?.[0];
@@ -432,13 +433,15 @@ async function getTransactions(filters = {}) {
         const [countResult] = await db.query(countSql, params);
         const total = countResult ? countResult.total : 0;
 
-        const dataSql = `
+        // Assign to the outer scope variable
+        dataSql = `
             SELECT * FROM corp_wallet_transactions ${whereString}
             ORDER BY date DESC, transaction_id DESC LIMIT ? OFFSET ?`;
 
         // --- Logging added before query execution ---
         logger.info(`[WalletMonitor Web] Executing transaction query: ${dataSql}`);
         const finalParams = [...params, numLimit, offset];
+        // --- Log finalParams *before* the query ---
         logger.info(`[WalletMonitor Web] Parameters: ${JSON.stringify(finalParams)}`);
         logger.info(`[WalletMonitor Web] numLimit=${numLimit} (Type: ${typeof numLimit}), offset=${offset} (Type: ${typeof offset})`);
         // --- End Logging ---
@@ -449,8 +452,11 @@ async function getTransactions(filters = {}) {
 
     } catch (error) {
         // Log the failed query and params for easier debugging
-        logger.error(`[WalletMonitor Web] Error fetching transactions. Query: ${dataSql}, Params: ${JSON.stringify([...params, numLimit, offset])}`);
-        logger.error(error); // Log the full error object
+        // --- Now dataSql should be accessible here ---
+        const finalParamsForError = [...params, numLimit, offset]; // Reconstruct params for logging
+        logger.error(`[WalletMonitor Web] Error fetching transactions. Query: ${dataSql}`); // Log dataSql here
+        logger.error(`[WalletMonitor Web] Parameters: ${JSON.stringify(finalParamsForError)}`); // Log params again
+        logger.error(error); // Log the full error object (this will include the original DB error)
         throw error; // Re-throw error to be caught by the controller
     }
 }
@@ -646,3 +652,4 @@ module.exports = {
     getAggregatedData,
     updateTransactionCategory,
 };
+
