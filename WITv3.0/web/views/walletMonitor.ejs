@@ -194,8 +194,8 @@
                 <label for="filter-divisions">Divisions</label>
                 <div id="filter-divisions" class="checkbox-group">
                     <div class="checkbox-item"><input type="checkbox" id="div-all" value="all" checked><label for="div-all">All</label></div>
-                    <div class="checkbox-item"><input type="checkbox" id="div-1" value="1"><label for="div-1">1 - Master</label></div>
-                    <div class="checkbox-item"><input type="checkbox" id="div-2" value="2"><label for="div-2">2</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-1" value="1"><label for="div-1">1 - SRP In</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-2" value="2"><label for="div-2">2 - SRP Out</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="div-3" value="3"><label for="div-3">3</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="div-4" value="4"><label for="div-4">4</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="div-5" value="5"><label for="div-5">5</label></div>
@@ -753,12 +753,12 @@
                     labels: labels,
                     datasets: [
                         { label: 'Total Income', data: incomeValues, backgroundColor: 'rgba(74, 222, 128, 0.6)', borderColor: chartColors.accentGreen, borderWidth: 1 },
-                        { label: 'Total Outcome', data: outcomeValues, backgroundColor: 'rgba(248, 113, 113, 0.6)', borderColor: chartColors.accentRed, borderWidth: 1 }
+                        { label: 'Total Expenditure', data: outcomeValues, backgroundColor: 'rgba(248, 113, 113, 0.6)', borderColor: chartColors.accentRed, borderWidth: 1 }
                     ]
                 }, {
                     responsive: true, maintainAspectRatio: false, indexAxis: 'y',
                     plugins: {
-                         title: { display: true, text: 'Total Income/Outcome by Category (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
+                         title: { display: true, text: 'Total Income/Expenditure by Category (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
                          legend: { position: 'top', labels: { color: chartColors.textSecondary } },
                          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatIsk(ctx.raw)} ISK` } }
                     },
