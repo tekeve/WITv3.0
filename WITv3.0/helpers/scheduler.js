@@ -9,6 +9,7 @@ const TOKEN_REFRESH_INTERVAL_DAYS = 7; // Refresh ESI tokens every 7 days
 let commanderListTimeout = null;
 let tokenRefreshTimeout = null;
 let walletSyncTimeout = null;
+let nextWalletSyncTimestamp = null; // Variable to store the next sync timestamp
 
 /**
  * Schedules the next weekly update for the commander list.
@@ -84,6 +85,7 @@ function scheduleTokenRefresh(client) {
  */
 async function runWalletSyncNow(client) {
     if (walletSyncTimeout) clearTimeout(walletSyncTimeout);
+    nextWalletSyncTimestamp = null; // Reset timestamp before starting
 
     // Require walletMonitor right before using its function
     const walletMonitor = require('@helpers/walletMonitor');
@@ -114,6 +116,7 @@ function scheduleNextWalletSync(client, delayMs) {
 
     const safeDelay = Math.max(10000, delayMs); // Min 10 seconds
     const nextRunTime = new Date(Date.now() + safeDelay);
+    nextWalletSyncTimestamp = nextRunTime.getTime(); // Store the next run time
 
     logger.info(`[Scheduler] Next wallet sync scheduled for ${nextRunTime.toLocaleTimeString()} (in ${Math.round(safeDelay / 1000)}s).`);
 
@@ -142,8 +145,21 @@ async function initialize(client) {
     });
 }
 
+/**
+ * Gets the timestamp for the next scheduled wallet sync.
+ * @returns {number|null} Timestamp in milliseconds or null if not scheduled.
+ */
+function getNextWalletSyncTime() {
+    // Defensive check to prevent ReferenceError, though it shouldn't be needed.
+    if (typeof nextWalletSyncTimestamp === 'undefined') {
+        logger.error("[Scheduler] CRITICAL: nextWalletSyncTimestamp variable is undefined when getNextWalletSyncTime() is called!");
+        return null; // Return null instead of throwing
+    }
+    return nextWalletSyncTimestamp;
+}
+
 module.exports = {
     initialize,
     scheduleNextWalletSync,
+    getNextWalletSyncTime // Export the new function
 };
-

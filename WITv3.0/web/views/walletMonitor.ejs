@@ -10,6 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
+        /* CSS remains the same */
         :root {
             --bg-primary: #1e293b; --bg-secondary: #334155; --bg-tertiary: #475569;
             --text-primary: #e2e8f0; --text-secondary: #94a3b8; --accent-blue: #38bdf8;
@@ -29,8 +30,15 @@
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-primary); margin: 0; padding: 2rem; font-size: 14px; }
         .container { max-width: 95%; margin: auto; }
         h1, h2 { color: #f8fafc; text-align: center; }
-        h1 { margin-bottom: 2rem; }
+        h1 { margin-bottom: 0.5rem; } /* Reduced margin */
         h2 { font-size: 1.25rem; margin-top: 2rem; margin-bottom: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+        /* Style for subtitle */
+        .page-subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
         .panel { background-color: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; border: 1px solid var(--border-color); margin-bottom: 2rem; }
 
         /* Filters */
@@ -222,6 +230,10 @@
 <body>
     <div class="container">
         <h1>Corporation Wallet Monitor</h1>
+        <!-- Added subtitle with countdown timer -->
+        <p class="page-subtitle">
+            Next wallet sync in: <span id="sync-countdown" style="font-weight: bold;">--:--</span>
+        </p>
 
         <div class="panel primary-filters">
             <div class="form-group">
@@ -242,7 +254,7 @@
                     <div class="checkbox-item"><input type="checkbox" id="div-4" value="4"><label for="div-4">4</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="div-5" value="5"><label for="div-5">5</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="div-6" value="6"><label for="div-6">6</label></div>
-                    <div class="checkbox-item"><input type="checkbox" id="div-7" value="7 - SRP"><label for="div-7">7 - SRP</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="div-7" value="7"><label for="div-7">7 - SRP</label></div>
                 </div>
             </div>
              <!-- Apply Filters Button REMOVED --></div>
@@ -334,15 +346,54 @@
         document.addEventListener('DOMContentLoaded', () => {
             const token = "<%= token %>";
             const canEdit = <%- canEdit %>;
+            const nextSyncTimestamp = <%- nextSyncTimestamp %>; // Get timestamp from controller
             let currentPage = 1;
             let totalPages = 1;
-            const itemsPerPage = 25; // *** CHANGED from 50 to 25 ***
-            let currentFilters = {}; // Store current filter values
+            const itemsPerPage = 25;
+            let currentFilters = {};
             let chartInstances = {};
-            let debounceTimeout; // For debouncing text input
+            let debounceTimeout;
+            let countdownInterval; // Interval timer for countdown
+
+            // --- Countdown Timer Logic ---
+            const countdownEl = document.getElementById('sync-countdown');
+
+            function updateCountdown() {
+                if (!nextSyncTimestamp) {
+                    countdownEl.textContent = 'Scheduled';
+                    return;
+                }
+                const now = Date.now();
+                const remainingMs = nextSyncTimestamp - now;
+
+                if (remainingMs <= 0) {
+                    countdownEl.textContent = 'Syncing...';
+                    clearInterval(countdownInterval);
+                    return;
+                }
+
+                const totalSeconds = Math.floor(remainingMs / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+
+                countdownEl.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+
+            function startCountdown() {
+                clearInterval(countdownInterval); // Clear any existing interval
+                if (nextSyncTimestamp) {
+                    updateCountdown(); // Update immediately
+                    countdownInterval = setInterval(updateCountdown, 1000); // Update every second
+                } else {
+                    countdownEl.textContent = 'Scheduled';
+                }
+            }
+            // --- End Countdown Timer Logic ---
+
 
             // --- Read CSS Variables into JS Variables ---
-            let computedStyles, categoryColorsJs, categoryLabels, chartColors;
+            // (Rest of the CSS variable reading code remains the same)
+             let computedStyles, categoryColorsJs, categoryLabels, chartColors;
 
             function initializeJsColors() {
                 computedStyles = getComputedStyle(document.documentElement);
@@ -374,8 +425,7 @@
             }
             // --- END CSS Variable Reading ---
 
-
-            // User-friendly labels for categories
+             // User-friendly labels for categories
             categoryLabels = { // Keep this definition
                 srp_in: 'SRP In',
                 srp_out: 'SRP Out',
@@ -394,6 +444,7 @@
 
 
             // --- DOM Elements ---
+            // (DOM element references remain the same)
             const transactionsTbody = document.getElementById('transactions-tbody');
             const prevPageBtn = document.getElementById('prev-page-btn');
             const nextPageBtn = document.getElementById('next-page-btn');
@@ -415,9 +466,9 @@
             const summaryOutcomeEl = document.getElementById('summary-outcome');
             const summaryNetEl = document.getElementById('summary-net');
 
-
             // --- Utility Functions ---
-            function formatIsk(value, showSign = false) {
+            // (formatIsk, formatDate, showLoading, showToast remain the same)
+             function formatIsk(value, showSign = false) {
                 if (value === null || value === undefined || isNaN(value)) return '0';
                 const num = Number(value);
                 const sign = showSign && num > 0 ? '+' : '';
@@ -460,7 +511,8 @@
             }
 
             // --- API Call Function ---
-            async function fetchData(endpoint, body = null, method = 'GET') {
+            // (fetchData remains the same)
+             async function fetchData(endpoint, body = null, method = 'GET') {
                 showLoading(true);
                 try {
                     const options = {
@@ -505,9 +557,9 @@
                 }
             }
 
-
             // --- Data Rendering ---
-            function renderTransactions(transactions) {
+            // (renderTransactions, renderPagination, updateSummaryCards remain the same)
+             function renderTransactions(transactions) {
                 transactionsTbody.innerHTML = ''; // Clear existing rows
                 if (!transactions || transactions.length === 0) {
                     transactionsTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--text-secondary);">No transactions found matching filters.</td></tr>`;
@@ -648,6 +700,8 @@
             }
 
             // --- Chart Rendering ---
+            // (renderChart, getChartClickOptions, handleCategoryChartClick, handlePayerChartClick, handleMonthlyFlowChartClick remain the same)
+            // --- Chart Rendering ---
              function renderChart(canvasId, type, data, options) {
                 const ctx = document.getElementById(canvasId)?.getContext('2d');
                 if (!ctx) {
@@ -756,45 +810,101 @@
             }
 
 
+            // (renderMonthlyFlowChart, renderCategoryTotalsChart, renderTopPayersCountChart, renderTopPayersAmountChart, renderPayerIncomeOverTimeChart remain the same)
              // Render Monthly Flow Chart
             function renderMonthlyFlowChart(monthlyData = []) {
                 const canvasId = 'monthly-flow-chart';
                 const labels = [...new Set(monthlyData.map(d => d.month))].sort();
                 const categories = [...new Set(monthlyData.map(d => d.category))];
 
-                const datasets = categories.map(category => {
-                    const label = categoryLabels[category] || category;
+                // --- MODIFIED DATASET CREATION ---
+                const datasets = [];
+                categories.forEach(category => {
+                    const label = categoryLabels[category] || category; // Get user-friendly label
                     const color = categoryColorsJs[category] || categoryColorsJs.uncategorized;
                     const incomeData = labels.map(month => monthlyData.find(d => d.month === month && d.category === category)?.income || 0);
-                    const outcomeData = labels.map(month => Math.abs(monthlyData.find(d => d.month === month && d.category === category)?.outcome || 0));
-                    return [
-                        { label: `${label} - Income`, data: incomeData, backgroundColor: color + 'a0', borderColor: color, stack: 'Income', categoryKey: category, borderWidth: 1 },
-                        { label: `${label} - Outcome`, data: outcomeData, backgroundColor: color + 'a0', borderColor: color, stack: 'Outcome', categoryKey: category, borderWidth: 1 }
-                    ];
-                }).flat();
+                    const outcomeData = labels.map(month => Math.abs(monthlyData.find(d => d.month === month && d.category === category)?.outcome || 0)); // Absolute value for outcome stack
+
+                    const hasIncome = incomeData.some(val => val > 0);
+                    const hasOutcome = outcomeData.some(val => val > 0);
+
+                    // Only add datasets if they actually contain data for this category
+                    if (hasIncome) {
+                        datasets.push({
+                            label: label, // Use the base category label
+                            data: incomeData,
+                            backgroundColor: color + 'a0', // Slightly transparent
+                            borderColor: color,
+                            borderWidth: 1,
+                            stack: 'Income', // Stack all income together
+                            categoryKey: category // Store the original key for filtering
+                        });
+                    }
+                    if (hasOutcome) {
+                         datasets.push({
+                            label: label, // Use the base category label
+                            data: outcomeData,
+                            backgroundColor: color + 'a0', // Slightly transparent
+                            borderColor: color,
+                            borderWidth: 1,
+                            stack: 'Outcome', // Stack all outcome together
+                            categoryKey: category // Store the original key for filtering
+                        });
+                    }
+                });
+                // --- END MODIFIED DATASET CREATION ---
 
                 renderChart(canvasId, 'bar', { labels, datasets }, {
                     plugins: {
                          title: { display: true, text: 'Monthly Income vs. Outcome by Category', color: chartColors.textPrimary, font: { size: 16 } },
-                         legend: { // *** ADDED LEGEND CONFIG ***
+                         legend: {
                              display: true,
                              position: 'top',
-                             labels: { color: chartColors.textSecondary },
-                             onClick: (e, legendItem, legend) => { // Custom onClick handler
+                             labels: {
+                                color: chartColors.textSecondary,
+                                // Filter labels to show only unique base category names
+                                filter: function(item, chart) {
+                                    // Keep only one legend item per category label
+                                    return !item.text.endsWith(' - Hidden'); // Hide internal labels if needed
+                                },
+                                // Generate labels to show only unique category names
+                                generateLabels: function(chart) {
+                                    const datasets = chart.data.datasets;
+                                    const uniqueLabels = new Map();
+                                    datasets.forEach((dataset, index) => { // Added index
+                                        if (!uniqueLabels.has(dataset.label)) {
+                                            uniqueLabels.set(dataset.label, {
+                                                text: dataset.label,
+                                                fillStyle: dataset.backgroundColor,
+                                                strokeStyle: dataset.borderColor,
+                                                lineWidth: dataset.borderWidth,
+                                                hidden: chart.getDatasetMeta(index).hidden, // Use index
+                                                // Store indices of all datasets belonging to this label
+                                                datasetIndices: [index] // Use index
+                                            });
+                                        } else {
+                                            // Add index to existing label entry
+                                            uniqueLabels.get(dataset.label).datasetIndices.push(index); // Use index
+                                        }
+                                    });
+                                    return Array.from(uniqueLabels.values());
+                                }
+                             },
+                             onClick: (e, legendItem, legend) => { // Modified onClick handler
                                 const chart = legend.chart;
-                                const index = legendItem.datasetIndex;
-                                const meta = chart.getDatasetMeta(index);
+                                const clickedLabel = legendItem.text;
+                                // Find all datasets associated with this label
+                                const datasetIndices = legendItem.datasetIndices;
 
-                                // Get the base category name from the clicked item's label
-                                const clickedLabelBase = legendItem.text.split(' - ')[0];
+                                // Determine the new hidden state based on the first dataset found
+                                const meta = chart.getDatasetMeta(datasetIndices[0]);
+                                const newHidden = !meta.hidden;
 
-                                chart.data.datasets.forEach((dataset, i) => {
-                                    // If this dataset belongs to the same category
-                                    if (dataset.label.startsWith(clickedLabelBase)) {
-                                        // Toggle visibility based on the *clicked* item's current visibility
-                                        chart.getDatasetMeta(i).hidden = !meta.hidden;
-                                    }
+                                // Toggle visibility for ALL datasets belonging to this legend item
+                                datasetIndices.forEach(index => {
+                                    chart.getDatasetMeta(index).hidden = newHidden;
                                 });
+
                                 chart.update();
                              }
                          },
@@ -802,19 +912,22 @@
                             mode: 'index', intersect: false,
                             callbacks: {
                                 label: function(context) {
-                                    let label = context.dataset.label || '';
+                                    let label = context.dataset.label || ''; // Base category name
                                     const value = context.parsed.y;
                                     const isOutcome = context.dataset.stack === 'Outcome';
-                                    const categoryName = context.dataset.categoryKey || 'uncategorized'; // Use stored categoryKey
+                                    const flowType = isOutcome ? 'Outcome' : 'Income';
+                                    const categoryKey = context.dataset.categoryKey || 'uncategorized';
+
                                     if (label && value !== null && value !== 0) {
-                                        label = label.replace(' - Income', '').replace(' - Outcome', '');
-                                        const originalDataPoint = monthlyData.find(d => d.month === context.label && d.category === categoryName);
+                                        // Find the original data point to get the signed value
+                                        const originalDataPoint = monthlyData.find(d => d.month === context.label && d.category === categoryKey);
                                         const actualValue = isOutcome ? originalDataPoint?.outcome : originalDataPoint?.income;
+
                                         if (typeof actualValue === 'number' && !isNaN(actualValue)) {
-                                            label += ': ' + formatIsk(actualValue, true) + ' ISK';
+                                             label += ` (${flowType}): ${formatIsk(actualValue, true)} ISK`; // Show signed value
                                             return label;
                                         }
-                                    } return null;
+                                    } return null; // Don't show tooltip label if value is 0
                                 },
                                 title: function(context) {
                                      if (context.length > 0) { const [year, month] = context[0].label.split('-'); const date = new Date(Date.UTC(year, month - 1, 1)); return date.toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' }); } return '';
@@ -827,7 +940,7 @@
                         y: { stacked: true, ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'ISK Amount', color: chartColors.textSecondary} }
                     },
                     interaction: { mode: 'index', intersect: false },
-                    // Use the more specific click handler
+                    // Use the more specific click handler for bars
                      onClick: (event, elements) => {
                         if (elements.length > 0) {
                             const chart = elements[0].chart;
@@ -975,9 +1088,9 @@
                  });
              }
 
-
             // --- Event Handlers ---
-            async function loadData(page = 1) {
+            // (loadData, handleCategoryChange, debounce remain the same)
+             async function loadData(page = 1) {
                 // Read ALL filters every time
                 const startDate = filterStartDate.value || null;
                 const endDate = filterEndDate.value || null;
@@ -1090,8 +1203,8 @@
             const debouncedLoadData = debounce(() => loadData(1), 500); // 500ms delay
 
             // --- Event Listeners ---
-
-            // Listeners for primary filters (Date, Checkboxes) trigger on 'change' and reload data
+            // (Filter listeners remain the same)
+             // Listeners for primary filters (Date, Checkboxes) trigger on 'change' and reload data
             [filterStartDate, filterEndDate, filterDivisionsContainer].forEach(el => {
                 el.addEventListener('change', () => loadData(1));
             });
@@ -1129,19 +1242,23 @@
             prevPageBtn.addEventListener('click', () => { if (currentPage > 1) loadData(currentPage - 1); });
             nextPageBtn.addEventListener('click', () => { if (currentPage < totalPages) loadData(currentPage + 1); });
 
+
             // WebSocket Listener
             const socket = io();
             socket.on('connect', () => console.log('Wallet Monitor connected to WebSocket.'));
             socket.on('wallet-update', () => {
-                console.log('Received wallet-update event. Reloading data.');
+                console.log('Received wallet-update event. Reloading page.');
                 showToast('Wallet data updated, reloading...', 'info');
-                loadData(currentPage); // Reload current page and charts
+                // Reload the page to get the new countdown time and data
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000); // Small delay before reload
             });
             socket.on('disconnect', () => console.log('Wallet Monitor disconnected from WebSocket.'));
 
             // --- Initial Load ---
-
-            initializeJsColors(); // Initialize colors after DOM is ready
+            // (Initialization logic remains mostly the same)
+             initializeJsColors(); // Initialize colors after DOM is ready
 
             // --- Default Date Filter Logic ---
             const today = new Date();
@@ -1164,6 +1281,7 @@
             allDivCheckbox.checked = true;
             otherDivCheckboxes.forEach(cb => cb.checked = false);
 
+            startCountdown(); // Start the countdown timer
             loadData(1); // Load initial data using the default filters
 
         });
