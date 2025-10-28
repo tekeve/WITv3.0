@@ -372,3 +372,5 @@ FodyWeavers.xsd
 /WITv3.0/sql/databaserestorelocal.sql
 /WITv3.0/sql/databaserestorewtm.sql
 /WITv3.0/sql/historical_payins_division1.sql
+/WITv3.0/sql/historical_payouts_division1.sql
+/WITv3.0/sql/historical_payouts_division2.sql

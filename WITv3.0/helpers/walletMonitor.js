@@ -394,8 +394,7 @@ async function getTransactions(filters = {}) {
     if (categorySearch) {
         const categoryLabels = { // Use NEW labels
             'SRP In': 'srp_in', 'SRP Out': 'srp_out', 'Giveaway': 'giveaway',
-            'Internal Transfer': 'internal_transfer', 'Tax': 'tax',
-            'Manual Change': 'manual_change'
+            'Internal Transfer': 'internal_transfer', 'Tax': 'tax', 'Manual Change': 'manual_change', 'Other': 'other'
         };
         const searchLower = categorySearch.toLowerCase();
         const matchingKey = Object.keys(categoryLabels).find(key => categoryLabels[key].toLowerCase() === searchLower);
@@ -493,8 +492,7 @@ async function getAggregatedData(filters = {}) {
     if (categorySearch) {
         const categoryLabels = {
             'SRP In': 'srp_in', 'SRP Out': 'srp_out', 'Giveaway': 'giveaway',
-            'Internal Transfer': 'internal_transfer', 'Tax': 'tax',
-            'Manual Change': 'manual_change'
+            'Internal Transfer': 'internal_transfer', 'Tax': 'tax', 'Manual Change': 'manual_change', 'Other': 'other'
         };
         const searchLower = categorySearch.toLowerCase();
         const matchingKey = Object.keys(categoryLabels).find(key => categoryLabels[key].toLowerCase() === searchLower);
@@ -616,7 +614,10 @@ async function getAggregatedData(filters = {}) {
  */
 async function updateTransactionCategory(transactionIdStr, category) {
     // --- Updated valid categories list ---
-    const validCategories = ['srp_in', 'srp_out', 'giveaway', 'tax', 'internal_transfer', 'manual_change', null];
+    // Added 'other' to allow explicit selection by user
+    const validCategories = ['srp_in', 'srp_out', 'giveaway', 'tax', 'internal_transfer', 'manual_change', 'other', null];
+    // --- End Update ---
+
     if (!validCategories.includes(category)) {
         logger.warn(`[WalletMonitor UpdateCat] Invalid category: "${category}" for tx ${transactionIdStr}`);
         return false;
@@ -645,4 +646,3 @@ module.exports = {
     getAggregatedData,
     updateTransactionCategory,
 };
-

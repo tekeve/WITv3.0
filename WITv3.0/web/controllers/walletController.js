@@ -210,6 +210,16 @@ exports.updateCategory = (client) => [
                 return res.status(400).json({ success: false, message: 'Missing transaction ID or category.' });
             }
 
+            // --- Updated valid categories list ---
+            // Added 'other' to allow explicit selection
+            const validCategories = ['srp_in', 'srp_out', 'giveaway', 'tax', 'internal_transfer', 'manual_change', 'other', null];
+            if (!validCategories.includes(category)) {
+                logger.warn(`[WalletController UpdateCat] Invalid category provided: "${category}" for tx ${transactionId}`);
+                return res.status(400).json({ success: false, message: `Invalid category specified: "${category}".` });
+            }
+            // --- End Update ---
+
+
             const success = await walletMonitor.updateTransactionCategory(transactionId, category);
 
             if (success) {
