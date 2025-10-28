@@ -180,8 +180,35 @@
         .spinner { width: 50px; height: 50px; border: 5px solid var(--bg-tertiary); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Tooltip (standard title attribute will be used) */
-        td.reason-cell { cursor: help; } /* Add cursor hint */
+        /* Tooltip Styles */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: max-content;
+            max-width: 300px;
+            background-color: #555;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; /* Position above the element */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.8rem;
+            white-space: pre-wrap; /* Allow line breaks */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
 
          /* Toast Styles */
         #toast-container { position: fixed; top: 1.5rem; right: 1.5rem; z-index: 2000; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -274,7 +301,6 @@
                             <th style="width: 18%;">Type</th>
                             <th style="width: 26%;">Reason / Desc</th>
                         </tr>
-                        {/* Filter row */}
                         <tr class="filter-row">
                             <th></th>
                             <th></th>
@@ -491,7 +517,6 @@
                 transactions.forEach(t => {
                     const tr = document.createElement('tr');
                     const amountClass = t.amount > 0 ? 'positive' : (t.amount < 0 ? 'negative' : '');
-                    // Use 'uncategorized' if custom_category is null or undefined
                     const categoryKey = t.custom_category || 'uncategorized';
                     const categoryClass = `category-${categoryKey}`;
 
@@ -507,10 +532,9 @@
                     }
                     const direction = t.amount > 0 ? 'From' : (t.amount < 0 ? 'To' : '');
 
-
-                    // Build tooltip content for Date cell
+                    // Build tooltip content for Date cell (keeping ID and Balance info here)
                     let dateTooltipText = `ID: ${t.transaction_id}\nBalance: ${formatIsk(t.balance)} ISK`;
-                    if (t.tax_receiver_id) dateTooltipText += `\nTax To: ${t.tax_receiver_id}`; // Fetch name later if needed
+                    if (t.tax_receiver_id) dateTooltipText += `\nTax To: ${t.tax_receiver_id}`;
                     if (t.tax_amount) dateTooltipText += `\nTax Amt: ${formatIsk(t.tax_amount)} ISK`;
                     if (t.context_id) dateTooltipText += `\nContext ID: ${t.context_id}`;
                     if (t.context_type) dateTooltipText += `\nContext Type: ${t.context_type}`;
@@ -518,11 +542,9 @@
                     // Create category dropdown (only if user can edit)
                     let categoryCellContent = `<span class="${categoryClass}">${categoryLabels[categoryKey] || 'Uncategorized'}</span>`;
                     if (canEdit) {
-                        // Store the original value to allow reverting on error
                         const originalValue = t.custom_category === null ? 'null' : t.custom_category;
-                        // Build the options string dynamically using the updated categoryLabels
                         const optionsHtml = Object.entries(categoryLabels)
-                            .filter(([key, _]) => key !== 'uncategorized') // Exclude 'uncategorized' from options
+                            .filter(([key, _]) => key !== 'uncategorized')
                             .map(([key, label]) =>
                                 `<option value="${key}" ${t.custom_category === key ? 'selected' : ''}>${label}</option>`
                             ).join('');
@@ -535,9 +557,9 @@
                         `;
                     }
 
-                    // *** ADD title attribute to the Reason/Desc TD ***
                     const reasonDesc = t.reason || t.description || '';
 
+                    // *** FIXED HTML STRUCTURE ***
                     tr.innerHTML = `
                         <td class="tooltip">${formatDate(t.date)}<span class="tooltiptext">${dateTooltipText}</span></td>
                         <td>${t.division}</td>
@@ -545,7 +567,7 @@
                         <td class="tooltip">${direction} ${partyName}<span class="tooltiptext">${partyId ? `Party ID: ${partyId}` : 'No Party ID'}</span></td>
                         <td>${categoryCellContent}</td>
                         <td>${t.ref_type || ''}</td>
-                        <td class="reason-cell" title="${reasonDesc.replace(/"/g, '&quot;')}">${reasonDesc}</td> {/* Added title attribute */}
+                        <td class="reason-cell" title="${reasonDesc.replace(/"/g, '&quot;')}">${reasonDesc}</td>
                     `;
                     transactionsTbody.appendChild(tr);
                 });
@@ -636,7 +658,6 @@
                     chartInstances[canvasId].destroy();
                 }
 
-                // *** FIXED Syntax Error Here ***
                 const hasActualData = data && data.datasets && data.datasets.some(ds => ds.data && ds.data.length > 0 && ds.data.some(val => val !== 0));
                 const isEmpty = !hasActualData;
 
@@ -825,7 +846,6 @@
                 const incomeValues = categoryData.map(d => d.total_income || 0);
                 const outcomeValues = categoryData.map(d => Math.abs(d.total_outcome || 0));
 
-                // *** UPDATED: Use category specific colors ***
                 const backgroundColors = categoryData.map(d => (categoryColorsJs[d.category] || categoryColorsJs.uncategorized) + 'a0'); // Add alpha
                 const borderColors = categoryData.map(d => categoryColorsJs[d.category] || categoryColorsJs.uncategorized);
 
@@ -839,14 +859,29 @@
                     indexAxis: 'y',
                     plugins: {
                          title: { display: true, text: 'Total Income/Outcome by Category (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
-                         legend: { position: 'top', labels: { color: chartColors.textSecondary } },
+                         legend: {
+                            display: true, // Make legend visible
+                            position: 'top',
+                            labels: { color: chartColors.textSecondary },
+                            // Add onClick handler for the legend
+                            onClick: (e, legendItem, legend) => {
+                                const chart = legend.chart;
+                                // Correctly get the index of the clicked bar/label
+                                const index = legendItem.index;
+                                const clickedLabel = chart.data.labels[index]; // Get the category label using the correct index
+                                if (clickedLabel) {
+                                     filterCategoryText.value = clickedLabel; // Set filter input
+                                     loadData(1); // Reload data based on the click
+                                }
+                            }
+                         },
                          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatIsk(ctx.raw)} ISK` } }
                     },
                     scales: {
                          x: { ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Total ISK', color: chartColors.textSecondary} },
                          y: { ticks: { color: chartColors.textPrimary }, grid: { display: false } }
                     },
-                    onClick: getChartClickOptions(handleCategoryChartClick) // Add click handler
+                    onClick: getChartClickOptions(handleCategoryChartClick) // Keep existing bar click handler
                 });
             }
 
@@ -1035,7 +1070,7 @@
                     // Revert UI on failure
                     selectElement.value = originalValue || 'null'; // Revert to original value
                     const revertedKey = selectElement.value === 'null' ? 'uncategorized' : selectElement.value;
-                    const revertedClass = `category-select ${revertedKey}`;
+                    const revertedClass = `category-select category-${revertedKey}`; // Fixed class name construction
                     selectElement.className = revertedClass; // Make sure to update the class to reflect the reverted category
                 }
                 selectElement.disabled = false; // Re-enable select
