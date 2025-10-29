@@ -641,40 +641,47 @@
                 nextPageBtn.disabled = currentPage >= totalPages;
             }
 
-            // *** UPDATED: Use isDatasetVisible for summary calculation ***
             function updateSummaryCards() {
                 let totalIncome = 0;
                 let totalOutcome = 0;
                 const visibleCategoryKeys = new Set();
-                const monthlyChart = chartInstances['monthly-flow-chart'];
+                const categoryChart = chartInstances['category-totals-chart']; // Use category chart for visibility
+                const monthlyChart = chartInstances['monthly-flow-chart']; // Keep reference to monthly chart
 
-                if (monthlyChart && currentAggregatedData && Array.isArray(currentAggregatedData.categories)) {
-                    // Determine which categories are visible in the monthly chart
-                    monthlyChart.data.datasets.forEach((dataset, index) => {
-                         // *** CHANGE: Use isDatasetVisible ***
-                        if (monthlyChart.isDatasetVisible(index)) {
-                            visibleCategoryKeys.add(dataset.categoryKey);
+                // Determine visible categories based on the legend state of EITHER chart
+                // Prefer category chart if its legend is available, else use monthly
+                let legendSourceChart = categoryChart;
+                if (!legendSourceChart || !legendSourceChart.legend || !legendSourceChart.legend.legendItems || legendSourceChart.legend.legendItems.length === 0) {
+                    legendSourceChart = monthlyChart;
+                }
+
+                if (legendSourceChart && legendSourceChart.legend && Array.isArray(legendSourceChart.legend.legendItems)) {
+                    legendSourceChart.legend.legendItems.forEach((legendItem) => {
+                        if (!legendItem.hidden) {
+                            const key = categoryKeysByLabel[legendItem.text];
+                            if (key) visibleCategoryKeys.add(key);
                         }
                     });
-
-                    // Sum totals for visible categories (excluding internal_transfer)
+                } else if (currentAggregatedData && Array.isArray(currentAggregatedData.categories)) {
+                    // Fallback if NO chart legend is ready: include all non-internal categories
                     currentAggregatedData.categories.forEach(cat => {
-                        // Exclude internal transfers AND check if the category key is in the visible set
+                        if (cat.category !== 'internal_transfer') {
+                            visibleCategoryKeys.add(cat.category);
+                        }
+                    });
+                }
+
+
+                // Sum totals for visible categories (excluding internal_transfer)
+                if (currentAggregatedData && Array.isArray(currentAggregatedData.categories)) {
+                    currentAggregatedData.categories.forEach(cat => {
                         if (cat.category !== 'internal_transfer' && visibleCategoryKeys.has(cat.category)) {
                             totalIncome += Number(cat.total_income) || 0;
                             totalOutcome += Number(cat.total_outcome) || 0; // Outcome is already negative
                         }
                     });
-                } else if (currentAggregatedData && Array.isArray(currentAggregatedData.categories)) {
-                    // Fallback if chart doesn't exist yet (initial load): exclude internal transfers
-                     currentAggregatedData.categories.forEach(cat => {
-                        if (cat.category !== 'internal_transfer') {
-                            totalIncome += Number(cat.total_income) || 0;
-                            totalOutcome += Number(cat.total_outcome) || 0;
-                        }
-                    });
                 }
-                // --- End of new logic section ---
+
 
                 const netChange = totalIncome + totalOutcome;
 
@@ -684,7 +691,6 @@
                 summaryNetEl.className = `summary-value ${netChange >= 0 ? 'positive' : 'negative'}`;
 
                 // --- Dynamic Balance Card Rendering ---
-                // (This part remains unchanged)
                 let expectedDivisions = new Set(
                     Array.from(filterDivisionsContainer.querySelectorAll('input[type="checkbox"]:not(#div-all):checked'))
                     .map(cb => cb.value)
@@ -693,6 +699,7 @@
                     expectedDivisions = new Set(['1', '2', '3', '4', '5', '6', '7']);
                 }
                 const displayedDivisions = new Set();
+                // Clear only balance cards before re-rendering
                 summaryGrid.querySelectorAll('.summary-card[id^="summary-balance-"]').forEach(card => card.remove());
                 if (currentAggregatedData && Array.isArray(currentAggregatedData.balances)) {
                     currentAggregatedData.balances.forEach(bal => {
@@ -707,10 +714,11 @@
                                 <div class="summary-label">Balance (Div ${bal.division})</div>
                                 <div class="summary-value">${formatIsk(bal.balance)} ISK</div>
                             `;
-                            summaryGrid.appendChild(card);
+                            summaryGrid.appendChild(card); // Append to the grid
                         }
                     });
                 }
+                 // Add placeholders for expected but not found divisions
                 expectedDivisions.forEach(divStr => {
                     if (!displayedDivisions.has(divStr)) {
                         const balanceCardId = `summary-balance-${divStr}`;
@@ -721,15 +729,14 @@
                             <div class="summary-label">Balance (Div ${divStr})</div>
                             <div class="summary-value">N/A</div>
                         `;
-                        summaryGrid.appendChild(card);
+                        summaryGrid.appendChild(card); // Append placeholder to the grid
                     }
                 });
                 // --- End Dynamic Balance Card Rendering ---
             }
 
             // --- Chart Rendering ---
-            // (renderChart, getChartClickOptions, handleCategoryChartClick, handlePayerChartClick, handleMonthlyFlowChartClick remain the same)
-            // --- Chart Rendering ---
+            // (renderChart, getChartClickOptions, handlePayerChartClick, handleMonthlyFlowChartClick remain the same)
              function renderChart(canvasId, type, data, options) {
                 const ctx = document.getElementById(canvasId)?.getContext('2d');
                 if (!ctx) {
@@ -838,104 +845,110 @@
             }
 
 
-            // (renderMonthlyFlowChart, renderCategoryTotalsChart, renderTopPayersCountChart, renderTopPayersAmountChart, renderPayerIncomeOverTimeChart remain the same)
              // Render Monthly Flow Chart
             function renderMonthlyFlowChart(monthlyData = []) {
                 const canvasId = 'monthly-flow-chart';
                 const labels = [...new Set(monthlyData.map(d => d.month))].sort();
                 const categories = [...new Set(monthlyData.map(d => d.category))];
 
-                // --- MODIFIED DATASET CREATION ---
                 const datasets = [];
                 categories.forEach(category => {
-                    const label = categoryLabels[category] || category; // Get user-friendly label
+                    const label = categoryLabels[category] || category;
                     const color = categoryColorsJs[category] || categoryColorsJs.uncategorized;
                     const incomeData = labels.map(month => monthlyData.find(d => d.month === month && d.category === category)?.income || 0);
-                    const outcomeData = labels.map(month => Math.abs(monthlyData.find(d => d.month === month && d.category === category)?.outcome || 0)); // Absolute value for outcome stack
+                    const outcomeData = labels.map(month => Math.abs(monthlyData.find(d => d.month === month && d.category === category)?.outcome || 0));
 
                     const hasIncome = incomeData.some(val => val > 0);
                     const hasOutcome = outcomeData.some(val => val > 0);
 
-                    // Only add datasets if they actually contain data for this category
                     if (hasIncome) {
-                        datasets.push({
-                            label: label, // Use the base category label
-                            data: incomeData,
-                            backgroundColor: color + 'a0', // Slightly transparent
-                            borderColor: color,
-                            borderWidth: 1,
-                            stack: 'Income', // Stack all income together
-                            categoryKey: category // Store the original key for filtering
-                        });
+                        datasets.push({ label, data: incomeData, backgroundColor: color + 'a0', borderColor: color, borderWidth: 1, stack: 'Income', categoryKey: category });
                     }
                     if (hasOutcome) {
-                         datasets.push({
-                            label: label, // Use the base category label
-                            data: outcomeData,
-                            backgroundColor: color + 'a0', // Slightly transparent
-                            borderColor: color,
-                            borderWidth: 1,
-                            stack: 'Outcome', // Stack all outcome together
-                            categoryKey: category // Store the original key for filtering
-                        });
+                        datasets.push({ label, data: outcomeData, backgroundColor: color + 'a0', borderColor: color, borderWidth: 1, stack: 'Outcome', categoryKey: category });
                     }
                 });
-                // --- END MODIFIED DATASET CREATION ---
 
                 renderChart(canvasId, 'bar', { labels, datasets }, {
                     plugins: {
-                         title: { display: true, text: 'Monthly Income vs. Outcome by Category', color: chartColors.textPrimary, font: { size: 16 } },
-                         legend: {
-                             display: true,
-                             position: 'top',
-                             labels: {
-                                filter: function(item, chart) { // Keep the filter
-                                    return !item.text.endsWith(' - Hidden');
-                                },
-                                generateLabels: function(chart) { // Keep generateLabels
+                        title: { display: true, text: 'Monthly Income vs. Outcome by Category', color: chartColors.textPrimary, font: { size: 16 } },
+                        legend: {
+                            display: true, position: 'top',
+                            labels: {
+                                color: chartColors.textSecondary,
+                                filter: (item) => item.text && !item.text.endsWith(' - Hidden'),
+                                generateLabels: (chart) => {
                                     const datasets = chart.data.datasets;
                                     const uniqueLabels = new Map();
                                     datasets.forEach((dataset, index) => {
                                         if (!uniqueLabels.has(dataset.label)) {
+                                            const meta = chart.getDatasetMeta(index);
                                             uniqueLabels.set(dataset.label, {
-                                                text: dataset.label,
-                                                fillStyle: dataset.backgroundColor,
-                                                strokeStyle: dataset.borderColor,
-                                                lineWidth: dataset.borderWidth,
-                                                hidden: chart.getDatasetMeta(index).hidden,
-                                                datasetIndices: [index],
-                                                fontColor: chartColors.textSecondary // Explicitly set font color
+                                                text: dataset.label, fillStyle: dataset.backgroundColor, strokeStyle: dataset.borderColor,
+                                                lineWidth: dataset.borderWidth, hidden: meta ? meta.hidden : false, // Check if meta exists
+                                                datasetIndices: [index]
                                             });
                                         } else {
-                                            uniqueLabels.get(dataset.label).datasetIndices.push(index);
+                                            const meta = chart.getDatasetMeta(index);
+                                            const existing = uniqueLabels.get(dataset.label);
+                                            existing.datasetIndices.push(index);
+                                            // Ensure hidden state is consistent if multiple datasets share the label
+                                            if (meta && meta.hidden) existing.hidden = true;
                                         }
                                     });
                                     return Array.from(uniqueLabels.values());
                                 }
-                             },
-                             // *** UPDATED onClick to trigger summary update ***
+                            },
+                             // *** REVISED onClick to sync with category chart ***
                              onClick: (e, legendItem, legend) => {
                                 const chart = legend.chart;
                                 const datasetIndices = legendItem.datasetIndices;
                                 if (!datasetIndices || datasetIndices.length === 0) return;
-                                const meta = chart.getDatasetMeta(datasetIndices[0]);
-                                if (!meta) return;
-                                const newHidden = !meta.hidden;
-                                datasetIndices.forEach(index => {
-                                    const currentMeta = chart.getDatasetMeta(index);
-                                    if (currentMeta) {
-                                         currentMeta.hidden = newHidden;
-                                    }
+
+                                // Determine the new hidden state based on the *first* dataset's current state
+                                const firstMeta = chart.getDatasetMeta(datasetIndices[0]);
+                                const newHidden = firstMeta ? !firstMeta.hidden : false; // Default to not hidden if meta missing
+                                const clickedCategoryKey = categoryKeysByLabel[legendItem.text]; // Get key from label
+
+                                // Update the clicked legend item state
+                                legendItem.hidden = newHidden;
+
+                                // Update visibility for relevant datasets in THIS chart (Monthly)
+                                datasetIndices.forEach(idx => {
+                                    const meta = chart.getDatasetMeta(idx);
+                                    if(meta) meta.hidden = newHidden;
                                 });
                                 chart.update();
-                                updateSummaryCards(); // Call updateSummaryCards after chart updates
-                             }
-                         },
-                         tooltip: { // Keep tooltip
+
+                                // Update visibility for relevant datasets in the OTHER chart (Category Totals)
+                                const categoryChart = chartInstances['category-totals-chart'];
+                                if (categoryChart) {
+                                    // Also update the corresponding legend item in the category chart
+                                    const catLegendItem = categoryChart.legend?.legendItems?.find(item => item.text === legendItem.text);
+                                    if (catLegendItem) catLegendItem.hidden = newHidden;
+
+                                    categoryChart.data.datasets.forEach((ds, dsIndex) => {
+                                         // Use the categoryKeys stored in the dataset to find matches
+                                        ds.categoryKeys.forEach((key, dataIndex) => {
+                                             if (key === clickedCategoryKey) {
+                                                const catMeta = categoryChart.getDatasetMeta(dsIndex);
+                                                // We need to be careful here if the category chart groups income/outcome
+                                                // for the same category under one legend item.
+                                                // For now, assume we hide both income/outcome bars for the category.
+                                                if (catMeta) catMeta.hidden = newHidden;
+                                             }
+                                        });
+                                    });
+                                    categoryChart.update();
+                                }
+                                updateSummaryCards(); // Call once after both charts update
+                            }
+                        },
+                        tooltip: {
                             mode: 'index', intersect: false,
                             callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || ''; // Base category name
+                                label: (context) => {
+                                    let label = context.dataset.label || '';
                                     const value = context.parsed.y;
                                     const isOutcome = context.dataset.stack === 'Outcome';
                                     const flowType = isOutcome ? 'Outcome' : 'Income';
@@ -943,75 +956,131 @@
                                     if (label && value !== null && value !== 0) {
                                         const originalDataPoint = monthlyData.find(d => d.month === context.label && d.category === categoryKey);
                                         const actualValue = isOutcome ? originalDataPoint?.outcome : originalDataPoint?.income;
-                                        if (typeof actualValue === 'number' && !isNaN(actualValue)) {
-                                             label += ` (${flowType}): ${formatIsk(actualValue, true)} ISK`; // Show signed value
+                                        if (typeof actualValue === 'number') {
+                                            label += ` (${flowType}): ${formatIsk(actualValue, true)} ISK`;
                                             return label;
                                         }
                                     } return null;
                                 },
-                                title: function(context) {
-                                     if (context.length > 0) { const [year, month] = context[0].label.split('-'); const date = new Date(Date.UTC(year, month - 1, 1)); return date.toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' }); } return '';
+                                title: (context) => {
+                                    if (context.length > 0) { const [y, m] = context[0].label.split('-'); return new Date(Date.UTC(y, m - 1)).toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' }); } return '';
                                 }
                             }
-                         }
+                        }
                     },
-                    scales: { // Keep scales
+                    scales: {
                         x: { stacked: true, ticks: { color: chartColors.textSecondary }, grid: { color: chartColors.borderColor } },
                         y: { stacked: true, ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'ISK Amount', color: chartColors.textSecondary} }
                     },
-                    interaction: { mode: 'index', intersect: false }, // Keep interaction
-                     onClick: (event, elements) => { // Keep onClick for bars
-                        if (elements.length > 0) {
-                            const chart = elements[0].chart;
-                            const elementIndex = elements[0].index;
-                            const datasetIndex = elements[0].datasetIndex;
-                            handleMonthlyFlowChartClick(chart, elementIndex, datasetIndex);
-                        }
+                    interaction: { mode: 'index', intersect: false },
+                     onClick: (event, elements) => {
+                        if (elements.length > 0) handleMonthlyFlowChartClick(elements[0].chart, elements[0].index, elements[0].datasetIndex);
                     }
                 });
             }
 
-            // Render Category Totals Chart
+            // Render Category Totals Chart - *** REVISED ***
             function renderCategoryTotalsChart(categoryData = []) {
                 const canvasId = 'category-totals-chart';
                 const labels = categoryData.map(d => categoryLabels[d.category] || d.category);
                 const incomeValues = categoryData.map(d => d.total_income || 0);
-                const outcomeValues = categoryData.map(d => Math.abs(d.total_outcome || 0));
-
-                const backgroundColors = categoryData.map(d => (categoryColorsJs[d.category] || categoryColorsJs.uncategorized) + 'a0'); // Add alpha
+                const outcomeValues = categoryData.map(d => Math.abs(d.total_outcome || 0)); // Use absolute
+                const backgroundColors = categoryData.map(d => (categoryColorsJs[d.category] || categoryColorsJs.uncategorized) + 'a0');
                 const borderColors = categoryData.map(d => categoryColorsJs[d.category] || categoryColorsJs.uncategorized);
+                const categoryKeys = categoryData.map(d => d.category); // Store keys
 
                 renderChart(canvasId, 'bar', {
                     labels: labels,
                     datasets: [
-                        { label: 'Total Income', data: incomeValues, backgroundColor: backgroundColors, borderColor: borderColors, borderWidth: 1 },
-                        { label: 'Total Outcome', data: outcomeValues, backgroundColor: backgroundColors, borderColor: borderColors, borderWidth: 1 }
+                        { label: 'Total Income', data: incomeValues, backgroundColor: backgroundColors, borderColor: borderColors, borderWidth: 1, stack: 'flow', categoryKeys: categoryKeys},
+                        { label: 'Total Outcome', data: outcomeValues, backgroundColor: backgroundColors, borderColor: borderColors, borderWidth: 1, stack: 'flow', categoryKeys: categoryKeys }
                     ]
                 }, {
                     indexAxis: 'y',
                     plugins: {
-                         title: { display: true, text: 'Total Income/Outcome by Category (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
-                         legend: {
-                            display: true, // Make legend visible
-                            position: 'top',
-                            labels: { color: chartColors.textSecondary }, // Correct place for legend label color
-                            onClick: (e, legendItem, legend) => {
-                                const chart = legend.chart;
-                                const index = legendItem.index;
-                                const clickedLabel = chart.data.labels[index];
-                                if (clickedLabel) {
-                                     filterCategoryText.value = clickedLabel;
-                                     loadData(1);
+                        title: { display: true, text: 'Total Income/Outcome by Category (Filtered)', color: chartColors.textPrimary, font: { size: 16 } },
+                        legend: {
+                            display: true, position: 'top',
+                            labels: {
+                                color: chartColors.textSecondary,
+                                generateLabels: (chart) => {
+                                    const categoryMeta = {};
+                                    chart.data.labels.forEach((label, index) => {
+                                        const key = categoryKeysByLabel[label] || 'uncategorized';
+                                        if (!categoryMeta[key]) {
+                                            let isHidden = false;
+                                            // Check the *legend* state directly for this chart
+                                            const currentLegendItem = chart.legend?.legendItems?.find(item => item.text === label);
+                                            if (currentLegendItem) {
+                                                isHidden = currentLegendItem.hidden;
+                                            } else { // Fallback if legend not ready (should be rare now)
+                                                 // Check meta state based on the *first* dataset associated with this label/index
+                                                const meta = chart.getDatasetMeta(0); // Assuming dataset 0 represents income
+                                                if (meta && meta.data[index]) { // Check if data exists for this index
+                                                    isHidden = meta.hidden;
+                                                }
+                                            }
+                                            categoryMeta[key] = {
+                                                text: label, fillStyle: backgroundColors[index], strokeStyle: borderColors[index],
+                                                lineWidth: 1, hidden: isHidden, index: index
+                                            };
+                                        }
+                                    });
+                                    return Object.values(categoryMeta);
                                 }
+                            },
+                             // *** REVISED onClick to sync with monthly chart ***
+                             onClick: (e, legendItem, legend) => {
+                                const chart = legend.chart;
+                                const index = legendItem.index; // Index corresponds to the category/label index
+                                if (index === undefined) return;
+                                const newHidden = !legendItem.hidden;
+                                legendItem.hidden = newHidden; // Update this legend item
+                                const clickedCategoryKey = categoryKeysByLabel[legendItem.text];
+
+                                // Update this chart (Category Totals Chart)
+                                chart.data.datasets.forEach((ds, dsIndex) => {
+                                    // Since both datasets (income/outcome) use the same categoryKeys array,
+                                    // we check if the key at the clicked index matches.
+                                    if (ds.categoryKeys && ds.categoryKeys[index] === clickedCategoryKey) {
+                                         const meta = chart.getDatasetMeta(dsIndex);
+                                         if (meta) meta.hidden = newHidden;
+                                    }
+                                });
+                                chart.update();
+
+                                // Update the monthly chart
+                                const monthlyChart = chartInstances['monthly-flow-chart'];
+                                if (monthlyChart) {
+                                    const monthlyLegendItem = monthlyChart.legend?.legendItems?.find(item => item.text === legendItem.text);
+                                    if (monthlyLegendItem) monthlyLegendItem.hidden = newHidden;
+                                    monthlyChart.data.datasets.forEach((ds, dsIndex) => {
+                                        if (ds.categoryKey === clickedCategoryKey) {
+                                             const monthlyMeta = monthlyChart.getDatasetMeta(dsIndex);
+                                             if (monthlyMeta) monthlyMeta.hidden = newHidden;
+                                        }
+                                    });
+                                    monthlyChart.update();
+                                }
+                                updateSummaryCards(); // Call once
                             }
-                         },
-                         tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatIsk(ctx.raw)} ISK` } }
+                        },
+                        tooltip: {
+                             callbacks: {
+                                label: (ctx) => {
+                                    const flowType = ctx.datasetIndex === 0 ? 'Income' : 'Outcome';
+                                    return `${ctx.label} (${flowType}): ${formatIsk(ctx.raw)} ISK`;
+                                }
+                             }
+                        }
                     },
                     scales: {
                          x: { ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Total ISK', color: chartColors.textSecondary} },
                          y: { ticks: { color: chartColors.textPrimary }, grid: { display: false } }
                     },
-                    onClick: getChartClickOptions(handleCategoryChartClick)
+                     onClick: (event, elements) => {
+                        if (elements.length > 0) handleCategoryChartClick(elements[0].chart, elements[0].index);
+                    }
                 });
             }
 
@@ -1154,12 +1223,14 @@
 
                 // Render Aggregated Data & Charts (using stored global data now)
                 if (currentAggregatedData) {
-                    updateSummaryCards(); // Update based on stored data and chart visibility
+                     // Render charts first
                     renderMonthlyFlowChart(currentAggregatedData.monthly || []);
                     renderCategoryTotalsChart(currentAggregatedData.categories || []);
                     renderTopPayersCountChart(currentAggregatedData.topPayersByCount || []);
                     renderTopPayersAmountChart(currentAggregatedData.topPayersByAmount || []);
                     renderPayerIncomeOverTimeChart(currentAggregatedData.payerIncomeOverTime || []);
+                     // Then update summary cards based on chart visibility (especially category chart)
+                    updateSummaryCards();
                 } else {
                     updateSummaryCards({});
                     renderMonthlyFlowChart([]);
