@@ -522,6 +522,7 @@ async function getAggregatedData(filters = {}) {
     try {
         const monthlySql = `SELECT DATE_FORMAT(date, '%Y-%m') AS month, COALESCE(custom_category, 'uncategorized') AS category, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income, SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS outcome FROM corp_wallet_transactions ${whereString} GROUP BY month, category ORDER BY month ASC;`;
 
+        // ... existing balanceSql and categorySql ...
         const balanceWhereClausesForQuery = ['corporation_id = ?'];
         const balanceParamsForQuery = [corporationId];
         if (divisionFilterParams.length > 0) {
@@ -540,6 +541,18 @@ async function getAggregatedData(filters = {}) {
 
         const categorySql = `SELECT COALESCE(custom_category, 'uncategorized') AS category, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS total_income, SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END) AS total_outcome FROM corp_wallet_transactions ${whereString} GROUP BY category;`;
 
+
+        // Fetch daily income for ALL payers matching the payer filters
+        const payerIncomeOverTimeSql = `
+            SELECT DATE(date) as date,
+                   COALESCE(first_party_name, 'Unknown Payer') as first_party_name,
+                   SUM(amount) AS daily_total_income
+            FROM corp_wallet_transactions
+            ${payerWhereString}
+            GROUP BY DATE(date), COALESCE(first_party_name, 'Unknown Payer')
+            ORDER BY date ASC;`;
+
+        // Fetch top payers for the other two charts (still limited to 5)
         const topPayersByCountSql = `
             SELECT
                 COALESCE(first_party_name, 'Unknown Payer') as commander_name,
@@ -558,45 +571,29 @@ async function getAggregatedData(filters = {}) {
 
         const topPayersByAmountSql = `SELECT COALESCE(first_party_name, 'Unknown Payer') as commander_name, SUM(amount) AS total_amount FROM corp_wallet_transactions ${payerWhereString} GROUP BY commander_name ORDER BY total_amount DESC LIMIT 5;`;
 
+
         const [
             monthlyData,
             balanceResult,
             categoryData,
             topPayersByCount,
             topPayersByAmount,
-            top5PayersResult
+            payerIncomeOverTimeRaw
         ] = await Promise.all([
             db.query(monthlySql, baseParams),
             db.query(balanceSql, balanceParamsForQuery),
             db.query(categorySql, baseParams),
             db.query(topPayersByCountSql, payerBaseParams),
             db.query(topPayersByAmountSql, payerBaseParams),
-            db.query(topPayersByAmountSql, payerBaseParams) // Fetch top 5 for history based on amount
+            db.query(payerIncomeOverTimeSql, payerBaseParams) // Use payerBaseParams
         ]);
 
-        const topPayerNames = top5PayersResult.map(p => p.commander_name || 'Unknown Payer').filter(Boolean);
-
-        let payerIncomeOverTimeSql = 'SELECT CURDATE() as date, "No Payers Found" as first_party_name, 0 as daily_total_income';
-        let payerIncomeParams = [];
-        if (topPayerNames.length > 0) {
-            const namePlaceholders = topPayerNames.map(() => '?').join(',');
-            const historyWhereClauses = ['corporation_id = ?', 'amount > 0', 'custom_category = ?', `COALESCE(first_party_name, 'Unknown Payer') IN (${namePlaceholders})`];
-            const historyParams = [corporationId, 'srp_in', ...topPayerNames];
-            if (startDate) { historyWhereClauses.push('date >= ?'); historyParams.push(new Date(startDate)); }
-            if (endDate) { const endHist = new Date(endDate); endHist.setDate(endHist.getDate() + 1); historyWhereClauses.push('date < ?'); historyParams.push(endHist); }
-            if (divisionFilterParams.length > 0) { historyWhereClauses.push(`division IN (${divisionFilterParams.map(() => '?').join(',')})`); historyParams.push(...divisionFilterParams); }
-
-            payerIncomeOverTimeSql = `SELECT DATE(date) as date, COALESCE(first_party_name, 'Unknown Payer') as first_party_name, SUM(amount) AS daily_total_income FROM corp_wallet_transactions WHERE ${historyWhereClauses.join(' AND ')} GROUP BY DATE(date), COALESCE(first_party_name, 'Unknown Payer') ORDER BY date ASC;`;
-            payerIncomeParams = historyParams;
-        }
-
-        const payerIncomeOverTimeRaw = await db.query(payerIncomeOverTimeSql, payerIncomeParams);
-        const payerIncomeOverTime = (payerIncomeOverTimeRaw.length === 1 && payerIncomeOverTimeRaw[0].first_party_name === "No Payers Found") ? [] : payerIncomeOverTimeRaw;
+        const payerIncomeOverTime = payerIncomeOverTimeRaw;
 
         return {
             monthly: monthlyData, balances: balanceResult, categories: categoryData,
             topPayersByCount: topPayersByCount, topPayersByAmount: topPayersByAmount,
-            payerIncomeOverTime: payerIncomeOverTime
+            payerIncomeOverTime: payerIncomeOverTime // Pass the complete history data
         };
 
     } catch (error) {
@@ -605,13 +602,7 @@ async function getAggregatedData(filters = {}) {
     }
 }
 
-
-/**
- * Updates the custom category for a specific transaction.
- * @param {string} transactionIdStr - The transaction ID.
- * @param {string|null} category - The new category or null.
- * @returns {Promise<boolean>} Success status.
- */
+// ... existing updateTransactionCategory function ...
 async function updateTransactionCategory(transactionIdStr, category) {
     // --- Updated valid categories list ---
     // Added 'other' to allow explicit selection by user
@@ -646,3 +637,4 @@ module.exports = {
     getAggregatedData,
     updateTransactionCategory,
 };
+

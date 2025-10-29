@@ -354,6 +354,7 @@
             let chartInstances = {};
             let debounceTimeout;
             let countdownInterval; // Interval timer for countdown
+            let currentAggregatedData = null; // Store fetched aggregated data
 
             // --- Countdown Timer Logic ---
             const countdownEl = document.getElementById('sync-countdown');
@@ -422,6 +423,8 @@
                      accentGrey: computedStyles.getPropertyValue('--text-secondary').trim(), // Use text-secondary for a grey
 
                 };
+
+                 // *** REMOVED Global Default Setting for color ***
             }
             // --- END CSS Variable Reading ---
 
@@ -558,7 +561,7 @@
             }
 
             // --- Data Rendering ---
-            // (renderTransactions, renderPagination, updateSummaryCards remain the same)
+            // (renderTransactions, renderPagination remain the same)
              function renderTransactions(transactions) {
                 transactionsTbody.innerHTML = ''; // Clear existing rows
                 if (!transactions || transactions.length === 0) {
@@ -638,17 +641,41 @@
                 nextPageBtn.disabled = currentPage >= totalPages;
             }
 
-            function updateSummaryCards(aggregatedData) {
+            // *** UPDATED: Use isDatasetVisible for summary calculation ***
+            function updateSummaryCards() {
                 let totalIncome = 0;
                 let totalOutcome = 0;
+                const visibleCategoryKeys = new Set();
+                const monthlyChart = chartInstances['monthly-flow-chart'];
 
-                // Ensure aggregatedData and aggregatedData.categories exist and are arrays
-                if (aggregatedData && Array.isArray(aggregatedData.categories)) {
-                    aggregatedData.categories.forEach(cat => {
-                        totalIncome += Number(cat.total_income) || 0;
-                        totalOutcome += Number(cat.total_outcome) || 0; // Outcome is already negative
+                if (monthlyChart && currentAggregatedData && Array.isArray(currentAggregatedData.categories)) {
+                    // Determine which categories are visible in the monthly chart
+                    monthlyChart.data.datasets.forEach((dataset, index) => {
+                         // *** CHANGE: Use isDatasetVisible ***
+                        if (monthlyChart.isDatasetVisible(index)) {
+                            visibleCategoryKeys.add(dataset.categoryKey);
+                        }
+                    });
+
+                    // Sum totals for visible categories (excluding internal_transfer)
+                    currentAggregatedData.categories.forEach(cat => {
+                        // Exclude internal transfers AND check if the category key is in the visible set
+                        if (cat.category !== 'internal_transfer' && visibleCategoryKeys.has(cat.category)) {
+                            totalIncome += Number(cat.total_income) || 0;
+                            totalOutcome += Number(cat.total_outcome) || 0; // Outcome is already negative
+                        }
+                    });
+                } else if (currentAggregatedData && Array.isArray(currentAggregatedData.categories)) {
+                    // Fallback if chart doesn't exist yet (initial load): exclude internal transfers
+                     currentAggregatedData.categories.forEach(cat => {
+                        if (cat.category !== 'internal_transfer') {
+                            totalIncome += Number(cat.total_income) || 0;
+                            totalOutcome += Number(cat.total_outcome) || 0;
+                        }
                     });
                 }
+                // --- End of new logic section ---
+
                 const netChange = totalIncome + totalOutcome;
 
                 summaryIncomeEl.textContent = `${formatIsk(totalIncome)} ISK`;
@@ -657,6 +684,7 @@
                 summaryNetEl.className = `summary-value ${netChange >= 0 ? 'positive' : 'negative'}`;
 
                 // --- Dynamic Balance Card Rendering ---
+                // (This part remains unchanged)
                 let expectedDivisions = new Set(
                     Array.from(filterDivisionsContainer.querySelectorAll('input[type="checkbox"]:not(#div-all):checked'))
                     .map(cb => cb.value)
@@ -666,8 +694,8 @@
                 }
                 const displayedDivisions = new Set();
                 summaryGrid.querySelectorAll('.summary-card[id^="summary-balance-"]').forEach(card => card.remove());
-                if (aggregatedData && Array.isArray(aggregatedData.balances)) {
-                    aggregatedData.balances.forEach(bal => {
+                if (currentAggregatedData && Array.isArray(currentAggregatedData.balances)) {
+                    currentAggregatedData.balances.forEach(bal => {
                         const divisionStr = String(bal.division);
                         if (expectedDivisions.has(divisionStr)) {
                             displayedDivisions.add(divisionStr);
@@ -734,7 +762,7 @@
                         plugins: {
                             legend: {
                                 display: false, // Default legend behavior
-                                labels: { color: chartColors.textSecondary }
+                                labels: { color: chartColors.textSecondary } // Use global default if possible
                             },
                             tooltip: { // Default tooltip behavior
                                 callbacks: {
@@ -861,54 +889,49 @@
                              display: true,
                              position: 'top',
                              labels: {
-                                color: chartColors.textSecondary,
-                                // Filter labels to show only unique base category names
-                                filter: function(item, chart) {
-                                    // Keep only one legend item per category label
-                                    return !item.text.endsWith(' - Hidden'); // Hide internal labels if needed
+                                filter: function(item, chart) { // Keep the filter
+                                    return !item.text.endsWith(' - Hidden');
                                 },
-                                // Generate labels to show only unique category names
-                                generateLabels: function(chart) {
+                                generateLabels: function(chart) { // Keep generateLabels
                                     const datasets = chart.data.datasets;
                                     const uniqueLabels = new Map();
-                                    datasets.forEach((dataset, index) => { // Added index
+                                    datasets.forEach((dataset, index) => {
                                         if (!uniqueLabels.has(dataset.label)) {
                                             uniqueLabels.set(dataset.label, {
                                                 text: dataset.label,
                                                 fillStyle: dataset.backgroundColor,
                                                 strokeStyle: dataset.borderColor,
                                                 lineWidth: dataset.borderWidth,
-                                                hidden: chart.getDatasetMeta(index).hidden, // Use index
-                                                // Store indices of all datasets belonging to this label
-                                                datasetIndices: [index] // Use index
+                                                hidden: chart.getDatasetMeta(index).hidden,
+                                                datasetIndices: [index],
+                                                fontColor: chartColors.textSecondary // Explicitly set font color
                                             });
                                         } else {
-                                            // Add index to existing label entry
-                                            uniqueLabels.get(dataset.label).datasetIndices.push(index); // Use index
+                                            uniqueLabels.get(dataset.label).datasetIndices.push(index);
                                         }
                                     });
                                     return Array.from(uniqueLabels.values());
                                 }
                              },
-                             onClick: (e, legendItem, legend) => { // Modified onClick handler
+                             // *** UPDATED onClick to trigger summary update ***
+                             onClick: (e, legendItem, legend) => {
                                 const chart = legend.chart;
-                                const clickedLabel = legendItem.text;
-                                // Find all datasets associated with this label
                                 const datasetIndices = legendItem.datasetIndices;
-
-                                // Determine the new hidden state based on the first dataset found
+                                if (!datasetIndices || datasetIndices.length === 0) return;
                                 const meta = chart.getDatasetMeta(datasetIndices[0]);
+                                if (!meta) return;
                                 const newHidden = !meta.hidden;
-
-                                // Toggle visibility for ALL datasets belonging to this legend item
                                 datasetIndices.forEach(index => {
-                                    chart.getDatasetMeta(index).hidden = newHidden;
+                                    const currentMeta = chart.getDatasetMeta(index);
+                                    if (currentMeta) {
+                                         currentMeta.hidden = newHidden;
+                                    }
                                 });
-
                                 chart.update();
+                                updateSummaryCards(); // Call updateSummaryCards after chart updates
                              }
                          },
-                         tooltip: {
+                         tooltip: { // Keep tooltip
                             mode: 'index', intersect: false,
                             callbacks: {
                                 label: function(context) {
@@ -917,17 +940,14 @@
                                     const isOutcome = context.dataset.stack === 'Outcome';
                                     const flowType = isOutcome ? 'Outcome' : 'Income';
                                     const categoryKey = context.dataset.categoryKey || 'uncategorized';
-
                                     if (label && value !== null && value !== 0) {
-                                        // Find the original data point to get the signed value
                                         const originalDataPoint = monthlyData.find(d => d.month === context.label && d.category === categoryKey);
                                         const actualValue = isOutcome ? originalDataPoint?.outcome : originalDataPoint?.income;
-
                                         if (typeof actualValue === 'number' && !isNaN(actualValue)) {
                                              label += ` (${flowType}): ${formatIsk(actualValue, true)} ISK`; // Show signed value
                                             return label;
                                         }
-                                    } return null; // Don't show tooltip label if value is 0
+                                    } return null;
                                 },
                                 title: function(context) {
                                      if (context.length > 0) { const [year, month] = context[0].label.split('-'); const date = new Date(Date.UTC(year, month - 1, 1)); return date.toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' }); } return '';
@@ -935,17 +955,16 @@
                             }
                          }
                     },
-                    scales: {
+                    scales: { // Keep scales
                         x: { stacked: true, ticks: { color: chartColors.textSecondary }, grid: { color: chartColors.borderColor } },
                         y: { stacked: true, ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'ISK Amount', color: chartColors.textSecondary} }
                     },
-                    interaction: { mode: 'index', intersect: false },
-                    // Use the more specific click handler for bars
-                     onClick: (event, elements) => {
+                    interaction: { mode: 'index', intersect: false }, // Keep interaction
+                     onClick: (event, elements) => { // Keep onClick for bars
                         if (elements.length > 0) {
                             const chart = elements[0].chart;
                             const elementIndex = elements[0].index;
-                            const datasetIndex = elements[0].datasetIndex; // Get dataset index too
+                            const datasetIndex = elements[0].datasetIndex;
                             handleMonthlyFlowChartClick(chart, elementIndex, datasetIndex);
                         }
                     }
@@ -975,16 +994,14 @@
                          legend: {
                             display: true, // Make legend visible
                             position: 'top',
-                            labels: { color: chartColors.textSecondary },
-                            // Add onClick handler for the legend
+                            labels: { color: chartColors.textSecondary }, // Correct place for legend label color
                             onClick: (e, legendItem, legend) => {
                                 const chart = legend.chart;
-                                // Correctly get the index of the clicked bar/label
                                 const index = legendItem.index;
-                                const clickedLabel = chart.data.labels[index]; // Get the category label using the correct index
+                                const clickedLabel = chart.data.labels[index];
                                 if (clickedLabel) {
-                                     filterCategoryText.value = clickedLabel; // Set filter input
-                                     loadData(1); // Reload data based on the click
+                                     filterCategoryText.value = clickedLabel;
+                                     loadData(1);
                                 }
                             }
                          },
@@ -994,7 +1011,7 @@
                          x: { ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Total ISK', color: chartColors.textSecondary} },
                          y: { ticks: { color: chartColors.textPrimary }, grid: { display: false } }
                     },
-                    onClick: getChartClickOptions(handleCategoryChartClick) // Keep existing bar click handler
+                    onClick: getChartClickOptions(handleCategoryChartClick)
                 });
             }
 
@@ -1004,7 +1021,6 @@
                  const canvasId = 'top-payers-count-chart';
                  const labels = topPayersData.map(d => d.commander_name || 'Unknown');
                  const counts = topPayersData.map(d => d.transaction_count);
-                 // Use consistent accent colors
                  const bgColors = [chartColors.accentBlue, chartColors.accentPurple, chartColors.accentYellow, chartColors.accentOrange, chartColors.accentGrey];
 
                  renderChart(canvasId, 'bar', {
@@ -1021,7 +1037,7 @@
                          x: { ticks: { color: chartColors.textSecondary, precision: 0 }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Number of Payments', color: chartColors.textSecondary} },
                          y: { ticks: { color: chartColors.textPrimary }, grid: { display: false } }
                      },
-                     onClick: getChartClickOptions(handlePayerChartClick) // Add click handler
+                     onClick: getChartClickOptions(handlePayerChartClick)
                  });
              }
 
@@ -1030,7 +1046,6 @@
                  const canvasId = 'top-payers-amount-chart';
                  const labels = topPayersData.map(d => d.commander_name || 'Unknown');
                  const amounts = topPayersData.map(d => d.total_amount);
-                 // Use consistent accent colors
                  const bgColors = [chartColors.accentBlue, chartColors.accentPurple, chartColors.accentYellow, chartColors.accentOrange, chartColors.accentGrey];
 
                  renderChart(canvasId, 'bar', {
@@ -1047,7 +1062,7 @@
                          x: { ticks: { color: chartColors.textSecondary, callback: value => formatIsk(value) }, grid: { color: chartColors.borderColor }, title: {display: true, text:'Total ISK Paid', color: chartColors.textSecondary} },
                          y: { ticks: { color: chartColors.textPrimary }, grid: { display: false } }
                      },
-                     onClick: getChartClickOptions(handlePayerChartClick) // Add click handler
+                     onClick: getChartClickOptions(handlePayerChartClick)
                  });
              }
 
@@ -1057,12 +1072,17 @@
                  if (!Array.isArray(payerIncomeData)) payerIncomeData = [];
 
                  const payerNames = [...new Set(payerIncomeData.map(d => d.first_party_name || 'Unknown'))];
-                 // Use consistent accent colors
-                 const colors = [chartColors.accentBlue, chartColors.accentPurple, chartColors.accentYellow, chartColors.accentOrange, chartColors.accentGrey];
+                 // *** EXPANDED Color Palette ***
+                 // Using a larger set of potentially repeating but visually distinct colors
+                 const colors = [
+                     chartColors.accentBlue, chartColors.accentPurple, chartColors.accentYellow, chartColors.accentOrange, chartColors.accentGreen, chartColors.accentRed, chartColors.accentGrey,
+                     '#1abc9c', '#e74c3c', '#9b59b6', '#34495e', '#f1c40f', '#e67e22', '#2ecc71', '#95a5a6',
+                     '#d35400', '#c0392b', '#8e44ad', '#2c3e50', '#f39c12', '#bdc3c7', '#7f8c8d'
+                    ];
 
                  const datasets = payerNames.map((name, index) => {
                      const payerData = payerIncomeData.filter(d => (d.first_party_name || 'Unknown') === name);
-                     const color = colors[index % colors.length]; // Cycle through colors
+                     const color = colors[index % colors.length]; // Cycle through expanded colors
                      return {
                          label: name,
                          data: payerData.map(d => ({ x: new Date(d.date).valueOf(), y: d.daily_total_income })),
@@ -1074,10 +1094,15 @@
                      };
                  });
 
+                 // *** ADD Logic to disable legend if too many payers ***
+                 const legendDisplay = payerNames.length <= 15; // Only show legend if 15 or fewer payers
+
                  renderChart(canvasId, 'line', { datasets }, {
                      plugins: {
-                         title: { display: true, text: 'Payer Income Over Time (Top 5 by Total)', color: chartColors.textPrimary, font: { size: 16 } },
-                         legend: { position: 'top', labels: { color: chartColors.textSecondary } },
+                         // *** CHANGE Title ***
+                         title: { display: true, text: 'Payer Income Over Time (All Payers)', color: chartColors.textPrimary, font: { size: 16 } },
+                         // *** CHANGE Legend Display based on count ***
+                         legend: { display: legendDisplay, position: 'top', labels: { color: chartColors.textSecondary } },
                          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatIsk(ctx.parsed.y)} ISK` } }
                      },
                      scales: {
@@ -1113,6 +1138,9 @@
                     fetchData('aggregated', { startDate, endDate, divisions: selectedDivisions, categorySearch }, 'POST')
                 ]);
 
+                // Store aggregated data globally
+                currentAggregatedData = (aggregatedResult && aggregatedResult.success) ? aggregatedResult.data : null;
+
                 // Render Transactions
                 if (transactionsResult && transactionsResult.success) {
                     renderTransactions(transactionsResult.transactions);
@@ -1124,21 +1152,21 @@
                     console.error("Failed to render transactions:", transactionsResult?.message);
                 }
 
-                // Render Aggregated Data & Charts
-                if (aggregatedResult && aggregatedResult.success && aggregatedResult.data) {
-                    updateSummaryCards(aggregatedResult.data);
-                    renderMonthlyFlowChart(aggregatedResult.data.monthly || []);
-                    renderCategoryTotalsChart(aggregatedResult.data.categories || []);
-                    renderTopPayersCountChart(aggregatedResult.data.topPayersByCount || []);
-                    renderTopPayersAmountChart(aggregatedResult.data.topPayersByAmount || []);
-                    renderPayerIncomeOverTimeChart(aggregatedResult.data.payerIncomeOverTime || []); // Render new chart
+                // Render Aggregated Data & Charts (using stored global data now)
+                if (currentAggregatedData) {
+                    updateSummaryCards(); // Update based on stored data and chart visibility
+                    renderMonthlyFlowChart(currentAggregatedData.monthly || []);
+                    renderCategoryTotalsChart(currentAggregatedData.categories || []);
+                    renderTopPayersCountChart(currentAggregatedData.topPayersByCount || []);
+                    renderTopPayersAmountChart(currentAggregatedData.topPayersByAmount || []);
+                    renderPayerIncomeOverTimeChart(currentAggregatedData.payerIncomeOverTime || []);
                 } else {
                     updateSummaryCards({});
                     renderMonthlyFlowChart([]);
                     renderCategoryTotalsChart([]);
                     renderTopPayersCountChart([]);
                     renderTopPayersAmountChart([]);
-                    renderPayerIncomeOverTimeChart([]); // Clear new chart on error
+                    renderPayerIncomeOverTimeChart([]);
                     console.error("Failed to render aggregated data:", aggregatedResult?.message);
                 }
             }
@@ -1164,12 +1192,14 @@
                         categorySearch: currentFilters.categorySearch // Pass current category filter
                     }, 'POST').then(aggResult => {
                         if (aggResult && aggResult.success && aggResult.data) {
-                            updateSummaryCards(aggResult.data);
-                            renderMonthlyFlowChart(aggResult.data.monthly || []);
-                            renderCategoryTotalsChart(aggResult.data.categories || []);
-                            renderTopPayersCountChart(aggResult.data.topPayersByCount || []);
-                            renderTopPayersAmountChart(aggResult.data.topPayersByAmount || []);
-                            renderPayerIncomeOverTimeChart(aggResult.data.payerIncomeOverTime || []); // Re-render
+                            // Update stored global data
+                            currentAggregatedData = aggResult.data;
+                            updateSummaryCards(); // Update summaries
+                            renderMonthlyFlowChart(currentAggregatedData.monthly || []);
+                            renderCategoryTotalsChart(currentAggregatedData.categories || []);
+                            renderTopPayersCountChart(currentAggregatedData.topPayersByCount || []);
+                            renderTopPayersAmountChart(currentAggregatedData.topPayersByAmount || []);
+                            renderPayerIncomeOverTimeChart(currentAggregatedData.payerIncomeOverTime || []); // Re-render
                         }
                     });
                     // Update the visual style and original value attribute
