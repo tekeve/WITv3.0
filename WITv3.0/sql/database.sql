@@ -6,7 +6,7 @@
 -- --------------------------------------------------------
 
 -- Dumping database structure for wit-db
-CREATE DATABASE IF NOT EXISTS `wit-db` /*!40100 DEFAULT CHARACTER SET utf8mb4 */;
+CREATE DATABASE IF NOT EXISTS `wit-db`;
 USE `wit-db`;
 
 -- Dumping structure for table wit-db.action_log_settings
@@ -376,7 +376,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   CONSTRAINT `roles` CHECK (json_valid(`roles`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- *** ADD NEW TABLE FOR CORP WALLET TRANSACTIONS ***
+-- Dumping structure for table wit-db.corp_wallet_transactions ***
 CREATE TABLE IF NOT EXISTS `corp_wallet_transactions` (
   `transaction_id` BIGINT UNSIGNED NOT NULL,
   `corporation_id` INT UNSIGNED NOT NULL,
