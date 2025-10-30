@@ -880,6 +880,7 @@
                             display: true, position: 'top',
                             labels: {
                                 color: chartColors.textSecondary,
+                                fontColor: chartColors.textSecondary, // ** ADDED FONT COLOR **
                                 filter: (item) => item.text && !item.text.endsWith(' - Hidden'),
                                 generateLabels: (chart) => {
                                     const datasets = chart.data.datasets;
@@ -890,7 +891,8 @@
                                             uniqueLabels.set(dataset.label, {
                                                 text: dataset.label, fillStyle: dataset.backgroundColor, strokeStyle: dataset.borderColor,
                                                 lineWidth: dataset.borderWidth, hidden: meta ? meta.hidden : false, // Check if meta exists
-                                                datasetIndices: [index] // Store the index of the first dataset for this label
+                                                datasetIndices: [index], // Store the index of the first dataset for this label
+                                                fontColor: chartColors.textSecondary // ** ADDED FONT COLOR **
                                             });
                                         } else {
                                             const existing = uniqueLabels.get(dataset.label);
@@ -1014,6 +1016,7 @@
                             display: true, position: 'top',
                             labels: {
                                 color: chartColors.textSecondary,
+                                fontColor: chartColors.textSecondary, // ** ADDED FONT COLOR **
                                 generateLabels: (chart) => {
                                     const categoryMeta = {};
                                     chart.data.labels.forEach((label, index) => {
@@ -1031,7 +1034,8 @@
                                             }
                                             categoryMeta[key] = {
                                                 text: label, fillStyle: backgroundColors[index], strokeStyle: borderColors[index],
-                                                lineWidth: 1, hidden: isHidden, index: index
+                                                lineWidth: 1, hidden: isHidden, index: index,
+                                                fontColor: chartColors.textSecondary // ** ADDED FONT COLOR **
                                             };
                                         }
                                     });
