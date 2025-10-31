@@ -2,6 +2,8 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Embed
 const crypto = require('crypto');
 const authManager = require('@helpers/authManager.js');
 const logger = require('@helpers/logger');
+const roleManager = require('@helpers/roleManager.js'); // Import roleManager
+const esiService = require('@helpers/esiService.js'); // Import esiService for status check
 
 module.exports = {
     // Keep permissions as they are, but users needing wallet access will need specific roles.
@@ -39,16 +41,24 @@ module.exports = {
             }
 
             // --- SCOPE UPDATE START ---
-            // Define all required scopes, including the new wallet scope
-            const requiredScopes = [
+            // Define base scopes required for all users
+            const baseScopes = [
                 'esi-mail.send_mail.v1',
                 'esi-mail.read_mail.v1',
                 'esi-search.search_structures.v1',
-                'esi-wallet.read_corporation_wallets.v1' // <-- New Scope Added
             ];
+
+            // Check if the user is Leadership or higher
+            const isLeadership = roleManager.isLeadershipOrHigher(interaction.member);
+
+            // Add wallet scope ONLY if the user is Leadership or higher
+            if (isLeadership) {
+                baseScopes.push('esi-wallet.read_corporation_wallets.v1');
+            }
+
             // Combine configured scopes with required scopes, ensuring uniqueness
             const configuredScopes = ESI_SCOPES.split(' ').filter(Boolean); // Filter out empty strings
-            const finalScopesSet = new Set([...configuredScopes, ...requiredScopes]);
+            const finalScopesSet = new Set([...configuredScopes, ...baseScopes]);
             const finalScopesString = Array.from(finalScopesSet).join(' ');
             // --- SCOPE UPDATE END ---
 
@@ -68,8 +78,13 @@ module.exports = {
                         .setURL(authUrl)
                 );
 
+            // Dynamically change the message based on whether wallet scopes are being requested
+            const content = isLeadership
+                ? 'Click the button below to authorize. **As Leadership, this will request corporation wallet read permissions** in addition to mail and search scopes.'
+                : 'Click the button below to authorize your character. This grants permissions for mail and search. **Wallet permissions are not requested for your account.**';
+
             await interaction.reply({
-                content: 'Click the button below to authorize your character. This grants permissions for mail, search, and potentially corporation wallet reading (if you have corp roles). **Important:** Authenticate with a character registered to your profile. If you manage corp wallets, use that character.',
+                content: content,
                 components: [row],
                 flags: [MessageFlags.Ephemeral]
             });
@@ -135,3 +150,4 @@ module.exports = {
         }
     },
 };
+
