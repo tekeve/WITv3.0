@@ -1302,39 +1302,13 @@
 
                 if (result && result.success) {
                     showToast(result.message, 'success');
-                    // Update successful, refresh aggregated data for accuracy
-                    fetchData('aggregated', { // Re-fetch aggregated data only
-                        startDate: currentFilters.startDate,
-                        endDate: currentFilters.endDate,
-                        divisions: currentFilters.divisions,
-                        categorySearch: currentFilters.categorySearch // Pass current category filter
-                    }, 'POST').then(aggResult => {
-                         // ** START v4 Robustness **
-                        if (aggResult && aggResult.success && aggResult.data) {
-                            currentAggregatedData = aggResult.data;
-                            // Ensure properties exist before rendering
-                            currentAggregatedData.monthly = currentAggregatedData.monthly || [];
-                            currentAggregatedData.categories = currentAggregatedData.categories || [];
-                            currentAggregatedData.balances = currentAggregatedData.balances || [];
-                            currentAggregatedData.topPayersByCount = currentAggregatedData.topPayersByCount || [];
-                            currentAggregatedData.topPayersByAmount = currentAggregatedData.topPayersByAmount || [];
-                            currentAggregatedData.payerIncomeOverTime = currentAggregatedData.payerIncomeOverTime || [];
+                    
+                    // OLD CODE REMOVED - No longer need to manually refetch aggregated data here.
+                    // The 'wallet-update' socket event emitted by the server will
+                    // be received by this client and trigger loadData(currentPage)
+                    // in the socket handler below, which is cleaner.
 
-                            updateSummaryCards(); // Update summaries
-                            renderMonthlyFlowChart(currentAggregatedData.monthly);
-                            renderCategoryTotalsChart(currentAggregatedData.categories);
-                            renderTopPayersCountChart(currentAggregatedData.topPayersByCount);
-                            renderTopPayersAmountChart(currentAggregatedData.topPayersByAmount);
-                            renderPayerIncomeOverTimeChart(currentAggregatedData.payerIncomeOverTime); // Re-render
-                        } else {
-                            // Handle case where aggregated data fetch failed after category update
-                             console.error("Failed to fetch updated aggregated data after category change.");
-                             // Optionally show an info toast, but don't revert the successful change
-                             showToast("Category updated, but charts/summary might not reflect it immediately.", "info");
-                        }
-                        // ** END v4 Robustness **
-                    });
-                    // Update the visual style and original value attribute
+                    // Update the visual style and original value attribute immediately
                     const categoryKey = newCategory || 'uncategorized';
                     const categoryClass = `category-${categoryKey}`;
                     selectElement.className = `category-select ${categoryClass}`; // Update class directly
@@ -1409,12 +1383,12 @@
             const socket = io();
             socket.on('connect', () => console.log('Wallet Monitor connected to WebSocket.'));
             socket.on('wallet-update', () => {
-                console.log('Received wallet-update event. Reloading page.');
-                showToast('Wallet data updated, reloading...', 'info');
-                // Reload the page to get the new countdown time and data
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000); // Small delay before reload
+                console.log('Received wallet-update event. Refreshing data.');
+                showToast('Wallet data updated.', 'info');
+                // ** THE FIX **
+                // Instead of reloading the page, just reload the data.
+                // This preserves all current filters.
+                loadData(currentPage);
             });
             socket.on('disconnect', () => console.log('Wallet Monitor disconnected from WebSocket.'));
 
@@ -1450,4 +1424,5 @@
     </script>
 </body>
 </html>
+
 
