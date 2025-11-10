@@ -1,20 +1,81 @@
-﻿const fs = require('fs');
+﻿require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+const fs = require('fs');
 const path = require('path');
-const chalk = require('chalk');
 require('module-alias/register');
-const logger = require('@helpers/logger');
-const { Client, Collection, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
-const configManager = require('@helpers/configManager');
-const incursionManager = require('@helpers/incursionManager');
-const db = require('@helpers/database');
-const { startServer } = require('./web/server.js');
-const roleHierarchyManager = require('@helpers/roleHierarchyManager');
-const reactionRoleManager = require('@helpers/reactionRoleManager');
-const scheduler = require('@helpers/scheduler'); // Added for scheduled tasks
-const trainingSyncManager = require('@helpers/trainingSyncManager'); // Import the training sync manager
+const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
+const { services, initializeServices } = require('@services/index.js');
 
+// Init Discord Client
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildInvites,
+        GatewayIntentBits.GuildModeration,
+        GatewayIntentBits.GuildMessageReactions,
+    ],
+    partials: [
+        Partials.Message,
+        Partials.Channel,
+        Partials.GuildMember,
+        Partials.Reaction,
+        Partials.User
+    ],
+});
+
+client.command = new Collection();
+
+/**
+ * Loads all enabled plugins from the plugins directory.
+ * @param {object} services - The core services to pass to each plugin.
+ */
+function loadPlugins(services) {
+    const pluginsConfigPath = path.join(__dirname, 'plugins', 'plugins.json');
+    let pluginConfigs;
+
+    try {
+        const configFile = fs.readFileSync(pluginsConfigPath, 'utf8');
+        pluginConfigs = JSON.parse(configFile);
+    } catch (error) {
+        services.logger.error(`Failed to read plugins.json: ${error.message}`);
+        return;
+    }
+
+    services.logger.info('Loading plugins...');
+
+    for (const plugin of pluginConfigs) {
+        if (plugin.enabled) {
+            const pluginPath = path.join(__dirname, 'plugins', plugin.directory);
+            try {
+                const pluginMainFile = path.join(pluginPath, 'index.js');
+                if (!fs.existsSync(pluginMainFile)) {
+                    services.logger.warn(`Plugin "${plugin.name}" is enabled but ${pluginMainFile} was not found.`);
+                    continue;
+                }
+
+                const pluginModule = require(pluginMainFile);
+
+                if (typeof pluginModule.initialize === 'function') {
+                    // Initialize the plugin, passing in all core services
+                    pluginModule.initialize(services);
+                    services.logger.info(`Successfully loaded plugin: ${plugin.name}`);
+                } else {
+                    services.logger.warn(`Plugin "${plugin.name}" does not have an 'initialize' function.`);
+                }
+
+            } catch (error) {
+                services.logger.error(`Failed to load plugin "${plugin.name}": ${error.message}`);
+                console.error(error); // Log the full stack trace
+            }
+        } else {
+            services.logger.info(`Skipping disabled plugin: ${plugin.name}`);
+        }
+    }
+}
 
 async function deployCommands() {
     const commandsToDeploy = [];
@@ -52,15 +113,6 @@ async function deployCommands() {
 }
 
 async function initializeApp() {
-    if (process.argv.includes('--db-setup')) {
-        logger.info('Running database setup...');
-        await db.runSetup();
-        process.exit(0);
-    }
-    if (process.argv.includes('--deploy')) {
-        await deployCommands();
-        process.exit(0);
-    }
 
     const dbConnected = await db.ensureDatabaseExistsAndConnected();
     if (!dbConnected) {
@@ -73,25 +125,6 @@ async function initializeApp() {
     await roleHierarchyManager.reloadHierarchy();
     await reactionRoleManager.loadReactionRoles(); // Load reaction roles on startup
 
-    const client = new Client({
-        intents: [
-            GatewayIntentBits.Guilds,
-            GatewayIntentBits.GuildMembers,
-            GatewayIntentBits.GuildMessages,
-            GatewayIntentBits.MessageContent,
-            GatewayIntentBits.GuildVoiceStates,
-            GatewayIntentBits.GuildInvites,
-            GatewayIntentBits.GuildModeration,
-            GatewayIntentBits.GuildMessageReactions, // Added for reaction roles
-        ],
-        partials: [
-            Partials.Message,
-            Partials.Channel,
-            Partials.GuildMember,
-            Partials.Reaction, // Added for reaction roles
-            Partials.User      // Added for reaction roles
-        ],
-    });
 
     client.activeSrpTokens = new Map();
     client.activeSetupTokens = new Map();
@@ -109,57 +142,45 @@ async function initializeApp() {
     client.mockOverride = null;
 
     startServer(client);
+}
+/**
+ * Main function to start the bot
+ */
+async function startBot() {
+    try {
 
-    client.commands = new Collection();
-    const foldersPath = path.join(__dirname, 'commands');
-    const commandFolders = fs.readdirSync(foldersPath);
-
-    for (const folder of commandFolders) {
-        const commandsPath = path.join(foldersPath, folder);
-        const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-        for (const file of commandFiles) {
-            const filePath = path.join(commandsPath, file);
-            const command = require(filePath);
-            // FIX: Changed check from 'permission' to 'permissions' to standardize.
-            if ('data' in command && ('execute' in command || 'autocomplete' in command) && 'permissions' in command) {
-                client.commands.set(command.data.name, command);
-            } else {
-                logger.warn(`The command at ${filePath} is missing a required "data", "execute", "autocomplete", or "permissions" property.`);
-            }
+        if (process.argv.includes('--db-setup')) {
+            logger.info('Running database setup...');
+            await services.db.runSetup();
+            process.exit(0);
         }
+        if (process.argv.includes('--deploy')) {
+            await deployCommands();
+            process.exit(0);
+        }
+
+        // 1. Initialize Core Services (DB, Config, etc.)
+        await initializeServices();
+
+        // 2. Add the Discord client to the services object
+        // This makes it available to all plugins
+        services.client = client;
+
+        // 3. Load all plugins
+        // Plugins will now register all commands, events, and start the web server.
+        loadPlugins(services);
+
+        // 4. Login to Discord
+        services.logger.info('Logging in to Discord...');
+        await client.login(process.env.DISCORD_TOKEN);
+        services.logger.info('Bot is logged in and ready.');
+
+    } catch (error) {
+        console.error(`Error during bot startup: ${error.message}`);
+        console.error(error);
+        process.exit(1);
     }
-
-    const { updateIncursions } = require('@helpers/incursionController.js');
-    client.updateIncursions = (options) => updateIncursions(client, options);
-
-    // --- CONSOLIDATED EVENT HANDLER LOADING ---
-    const clientReadyHandler = require('./events/clientReady');
-    const interactionCreateHandler = require('./events/interactionCreate');
-    const srpSubmissionHandler = require('./events/srpSubmission');
-    const residentAppSubmissionHandler = require('./events/residentAppSubmission');
-    const { registerActionLogEvents } = require('./events/actionLogHandler');
-    const { registerReactionEvents } = require('./events/reactionHandler'); // Added for reaction roles
-
-    // --- Make clientReady handler async ---
-    client.once(clientReadyHandler.name, async (...args) => {
-        // --- Await handler execution ---
-        await clientReadyHandler.execute(...args, client);
-    });
-    client.on(interactionCreateHandler.name, (...args) => interactionCreateHandler.execute(...args, client));
-    client.on(srpSubmissionHandler.name, (...args) => srpSubmissionHandler.execute(...args, client));
-    client.on(residentAppSubmissionHandler.name, (...args) => residentAppSubmissionHandler.execute(...args, client));
-
-    // Register all action log event listeners
-    registerActionLogEvents(client);
-    // Register reaction role event listeners
-    registerReactionEvents(client);
-
-
-    logger.info('Loaded all event handlers.');
-    // --- END OF NEW LOADING LOGIC ---
-
-    client.login(process.env.DISCORD_TOKEN);
 }
 
-initializeApp();
+startBot();
 

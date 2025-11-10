@@ -12,6 +12,8 @@
   "_moduleAliases": {
     "@root": ".",
     "@helpers": "./helpers",
+    "@services": "./services",
+    "@logger": "./services/logger.js",
     "@embeds": "./embeds",
     "@interactions": "./interactions",
     "@webHelpers": "./web/helpers",

@@ -1,6 +1,6 @@
 ﻿const { Events, EmbedBuilder, AuditLogEvent, PermissionsBitField } = require('discord.js');
 const actionLog = require('@helpers/actionLog');
-const logger = require('@helpers/logger');
+const logger = services.logger;
 const characterManager = require('@helpers/characterManager');
 const ErrorHandler = require('@helpers/errorHandler');
 const { diffWords } = require('diff');
