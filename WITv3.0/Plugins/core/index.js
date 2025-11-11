@@ -1,79 +1,219 @@
-// --- plugins/core-functionality/index.js ---
-// This plugin loads all your legacy commands, events, and starts the web server.
-// This is a temporary step. The goal is to move all this logic
-// into smaller, dedicated plugins over time.
+const { SlashCommandBuilder, REST, Routes } = require('discord.js');
+const { getLogger } = require('@services/logger');
+const WebTokenManager = require('./managers/webTokenManager');
+const IncursionManager = require('./managers/incursionManager');
+const WalletMonitor = require('./walletMonitor');
 
-const fs = require('fs');
-const path = require('path');
+// legacy -- replace ---
+const esiService = require('@helpers/esiService');
+const authManager = require('@helpers/authManager');
+const configManager = require('@helpers/configManager');
+
+// --- IMPORT YOUR OLD HANDLERS/MANAGERS ---
+// We will now import the *logic* from the old files
+const interactionCreateHandler = require('../../events/interactionCreate');
+
 
 /**
- * Initializes the core-functionality plugin.
- * @param {object} services - Core services injected from app.js
+ * This is an example of how your *existing* functionality can be
+ * migrated into a "core" plugin.
+ *
+ * You would move all logic from `commands/`, `events/`, `helpers/`, and `web/`
+ * into a plugin like this.
  */
-function initialize(services) {
-    const { client, logger } = services;
+class CoreFunctionalityPlugin {
 
-    logger.info('Initializing Core Functionality Plugin...');
+    constructor(client, sharedServices) {
+        // --- Required properties ---
+        this.name = "WIT Core";
+        this.version = "3.0.0";
 
-    // --- EVENT HANDLER ---
-    // This code is moved from original app.js
-    logger.info('Loading core events...');
-    const eventsPath = path.join(__dirname, '../../events');
-    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+        // --- Store references ---
+        this.client = client;
+        this.db = sharedServices.db;
+        this.config = sharedServices.config;
+        this.logger = sharedServices.logger(this.name);
 
-    for (const file of eventFiles) {
-        const filePath = path.join(eventsPath, file);
-        const event = require(filePath);
-        if (event.once) {
-            // ** CRITICAL CHANGE **
-            // We now pass the entire 'services' object to the event, not just 'client'
-            client.once(event.name, (...args) => event.execute(...args, services));
-        } else {
-            // ** CRITICAL CHANGE **
-            // We now pass the entire 'services' object to the event, not just 'client'
-            client.on(event.name, (...args) => event.execute(...args, services));
-        }
+        // --- Inject Managers ---
+        this.webTokenManager = new WebTokenManager(this.db, this.logger);
+        this.incursionManager = new IncursionManager(this);
+        this.walletMonitor = new WalletMonitor(this);
+
+        // --- Legacy Helpers ---
+        this.esiService = esiService;
+        this.authManager = authManager;
+        this.configManager = configManager;
+
+        this.logger.info("Core plugin constructed.");
     }
-    logger.info('Core events loaded.');
 
-    // --- 2. MIGRATE COMMAND HANDLER ---
-    // This code is moved from your original app.js
-    // ...
-    logger.info('Loading core commands...');
-    // NOTE: fs operations still use relative paths.
-    const commandsPath = path.join(__dirname, '../../commands');
-    const commandFolders = fs.readdirSync(commandsPath);
+    /**
+     * Load method is called by the PluginManager.
+     */
+    load() {
+        this.logger.info("Core plugin is loading...");
 
-    for (const folder of commandFolders) {
-        const folderPath = path.join(commandsPath, folder);
-        const commandFiles = fs.readdirSync(folderPath).filter(file => file.endsWith('.js'));
-        for (const file of commandFiles) {
-            const filePath = path.join(folderPath, file);
-            const command = require(filePath);
-            if (command.data && command.execute) {
-                client.commands.set(command.data.name, command);
-            } else {
-                logger.warn(`Command file at ${filePath} is missing "data" or "execute" property.`);
+        // --- 1. Define Commands ---
+        this.commands = []; // Start with an empty array
+
+        // --- We will migrate commands here later ---
+        // EXAMPLE:
+        // this.commands.push({
+        //     data: new SlashCommandBuilder().setName('ping-core').setDescription('Replies with Pong! (from core)'),
+        //     execute: async (interaction) => {
+        //         await interaction.reply('Pong from core!');
+        //     }
+        // });
+
+        this.logger.info(`Loaded ${this.commands.length} core commands.`);
+
+
+        // --- 2. Define Event Listeners ---
+        // You would load these from your `events/` files
+        // NOTE: `interactionCreate` and `clientReady` are handled in app.js for now,
+        // but could be moved here.
+        const reactionHandler = require('../../events/reactionHandler'); // Example
+
+        this.eventListeners = [
+            {
+                event: 'messageReactionAdd',
+                once: false,
+                execute: (reaction, user) => reactionHandler.execute(this.client, reaction, user, 'add')
+            },
+            {
+                event: 'messageReactionRemove',
+                once: false,
+                execute: (reaction, user) => reactionHandler.execute(this.client, reaction, user, 'remove')
             }
-        }
+            // ... add all other event listeners (actionLogHandler, etc.)
+        ]
+        // --- ADD THIS BLOCK: Core Event Handlers ---
+        this.eventListeners.push({
+            event: 'interactionCreate',
+            once: false,
+            // We pass 'this.client' because the old handler expects it as the first arg
+            execute: (...args) => interactionCreateHandler.execute(this.client, ...args)
+        });
+
+        // --- REPLACE THE OLD 'ready' HANDLER WITH THIS ---
+        this.eventListeners.push({
+            event: 'clientReady',
+            once: true,
+            execute: async () => {
+                this.logger.info(`Bot is ready! Logged in as ${this.client.user.tag}`);
+
+                // --- 1. DEPLOY SLASH COMMANDS ---
+                if (!this.client.commandData || this.client.commandData.length === 0) {
+                    this.logger.warn('No command data found on client. Skipping deployment.');
+                    return;
+                }
+
+                const rest = new REST().setToken(this.config.DISCORD_TOKEN);
+                const guildId = this.config.GUILD_ID; // <-- Use your existing GUILD_ID
+
+                if (!guildId) {
+                    this.logger.error('GUILD_ID is not set in .env file. Cannot deploy commands.');
+                    return;
+                }
+
+                try {
+                    this.logger.info(`Started refreshing ${this.client.commandData.length} application (/) commands for guild ${guildId}.`);
+
+                    // --- Deploy to your specific Guild (Instant) ---
+                    const data = await rest.put(
+                        Routes.applicationGuildCommands(this.client.user.id, guildId),
+                        { body: this.client.commandData },
+                    );
+
+                    this.logger.info(`Successfully reloaded ${data.length} (/) commands for guild ${guildId}.`);
+
+                } catch (error) {
+                    this.logger.error('Failed to reload application (/) commands:', { error });
+                }
+
+                // --- 2. RUN OLD clientReady.js LOGIC ---
+                try {
+                    this.logger.info('Running core clientReady tasks...');
+
+                    this.logger.info('Initializing wallet transaction ID cache...');
+                    await this.walletMonitor.initializeLastTransactionIds();
+                    this.logger.info('Wallet transaction ID cache initialized.');
+
+                    this.logger.info('Restoring saved status...');
+                    await this.statusManager.restoreSavedStatus();
+
+                    this.logger.info('Loading and scheduling reminders...');
+                    await this.reminderManager.loadAndScheduleReminders();
+
+                    this.logger.info('Starting incursion monitor...');
+                    await this.incursionManager.updateIncursions()
+
+                    this.logger.info('All clientReady tasks completed.');
+                } catch (error) {
+                    this.logger.error('Error making clientReady:', { error });
+                }
+            }
+        });
+        // --- END OF REPLACEMENT BLOCK ---
+
+        this.logger.info(`Loaded ${this.eventListeners.length} core event listeners.`);
+
+        this.logger.info("Core plugin loaded.");
     }
-    logger.info('Core commands loaded.');
 
+    /**
+     * 3. Register Web Routes
+     * You would load these from your `web/routes/` files
+     */
+    registerWebRoutes(webApp) {
+        this.logger.info("Registering core web routes...");
 
-    // --- 3. MIGRATE WEB SERVER START ---
-    // This code is moved from your original app.js
-    logger.info('Starting web server via core plugin...');
-    // Use the module-alias for the web server
-    const startServer = require('@web/server');
+        // --- Example for SRP routes ---
+        // const srpController = require('../../web/controllers/srpController')(this.client, this.db);
+        // const srpRouter = require('../../web/routes/srpRoutes')(srpController);
 
-    // ** CRITICAL CHANGE **
-    // We now pass the entire 'services' object to the server.
-    // You will need to refactor web/server.js to accept this.
-    startServer(services);
-    logger.info('Web server started by core-functionality plugin.');
+        // This is how you would have loaded it before:
+        // webApp.use('/srp', srpRouter);
+
+        // --- NEW PATTERN ---
+        // Here, we define the routes directly and apply the middleware.
+        // 1. The GET route requires a valid token, but does NOT consume it
+        webApp.get(
+            '/srp/form',
+            this.webTokenManager.validateTokenMiddleware('srp', false), // <-- consumeToken = false
+            (req, res) => {
+                // If we get here, the token was valid.
+                // We *must* pass the token to the template.
+                res.render('srpForm', {
+                    userId: req.tokenData.user_id,
+                    token: req.tokenData.token // Pass the token itself back to the form
+                });
+            }
+        );
+
+        // 2. The POST route validates AND consumes the token
+        webApp.post(
+            '/srp/submit',
+            this.webTokenManager.validateTokenMiddleware('srp', true), // <-- consumeToken = true
+            (req, res) => {
+                // If we get here, the token was valid and has now been consumed.
+                // The token data is available from the middleware.
+
+                // Process the form submission...
+                // const { zkill, details } = req.body;
+                // const userId = req.tokenData.user_id;
+                // this.srpManager.process(userId, zkill, details);
+
+                // Show success
+                res.render('success', { message: 'SRP submitted successfully!' });
+            }
+        );
+
+        // ... register all other routes (isk, logi, quiz, etc.)
+
+        this.logger.info("Core web routes registered.");
+    }
 }
 
-module.exports = {
-    initialize
-};
-
+// --- REQUIRED ---
+module.exports = CoreFunctionalityPlugin;

@@ -1,18 +1,78 @@
-﻿let incursionSystems = null;
+// --- LIKELY DEPENDENCIES ---
+// Add any other dependencies your old file needed
+const { EmbedBuilder } = require('discord.js');
+const { createIncursionEmbed } = require('../../../embeds/incursionEmbed');
 
-
+/**
+ * Manages fetching and reporting EVE Online incursions.
+ * This helper is refactored as a class to be used by the Core plugin.
+ */
 class IncursionManager {
 
+    /**
+     * @param {object} plugin - The core plugin instance.
+     * @param {Client} plugin.client - The Discord.js Client.
+     * @param {any} plugin.db - The database connection pool.
+     * @param {winston.Logger} plugin.logger - The plugin's logger.
+     * @param {object} plugin.config - The process.env config.
+     */
     constructor(plugin) {
-        this.logger = plugin.logger,
-        this.db = plugin.db,
-        this.esiService = plugin.esiService,
-        this.authManager = plugin.authManager
+        // Unpack the shared services from the plugin
+        this.client = plugin.client;
+        this.db = plugin.db;
+        this.logger = plugin.logger;
+        this.config = plugin.config;
+        this.esiService = plugin.esiService;
+        // You can also initialize any internal state here
+        this.lastIncursionState = null;
     }
 
     /**
-     * Fetches the latest incursion system data from the database and updates the in-memory cache.
+     * Fetches the current incursion data from ESI.
+     * This is the function that was causing the error.
      */
+    async updateIncursions() {
+        this.logger.info('Fetching incursion data...');
+        try {
+            // --- This is just example logic ---
+            // --- Replace this with your actual logic from the old file ---
+
+            // 1. Fetch data from ESI
+            const incursionData = await esiService.getIncursions(); // Assumes esiService exists
+
+            // 2. Check if the state has changed
+            if (JSON.stringify(incursionData) === JSON.stringify(this.lastIncursionState)) {
+                this.logger.debug('Incursion state unchanged, skipping update.');
+                return;
+            }
+            this.lastIncursionState = incursionData;
+
+            // 3. Find the configured channel to post in
+            const channelId = this.config.INCURSION_CHANNEL_ID;
+            if (!channelId) {
+                this.logger.warn('INCURSION_CHANNEL_ID not set, cannot post update.');
+                return;
+            }
+
+            const channel = await this.client.channels.fetch(channelId);
+            if (!channel) {
+                this.logger.error(`Cannot find incursion channel with ID: ${channelId}`);
+                return;
+            }
+
+            // 4. Create the embed
+            const embed = createIncursionEmbed(incursionData);
+
+            // 5. Post the update
+            await channel.send({ embeds: [embed] });
+            this.logger.info('Posted incursion update to channel.');
+
+            // --- End of example logic ---
+
+        } catch (error) {
+            this.logger.error('Failed to update incursions:', { error: error.stack || error });
+        }
+    }
     async loadIncursionSystems() {
         try {
             this.logger.info('Loading incursion systems data from the database...');
@@ -161,7 +221,6 @@ class IncursionManager {
         return incursionSystems;
     }
 }
-module.exports = {
-    IncursionManager,
-};
 
+// Export the class so the plugin can create an instance of it
+module.exports = IncursionManager;

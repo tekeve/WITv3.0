@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.2752196">
   <ItemGroup>
-    <Folder Include="Plugins\example-plugin\" />
-    <Folder Include="Plugins\core\" />
+    <Folder Include="Plugins\ping-example\" />
   </ItemGroup>
 </Project>

@@ -1,95 +1,67 @@
 ﻿const express = require('express');
 const path = require('path');
-const logger = require('@helpers/logger');
-require('dotenv').config();
-const http = require('http');
-const { Server } = require("socket.io");
+const { getLogger } = require('@services/logger'); // Adjusted path
 
-// Import routers
-const authRoutes = require('./routes/authRoutes');
-const srpRoutes = require('./routes/srpRoutes');
-const setupRoutes = require('./routes/setupRoutes');
-const webeditRoutes = require('./routes/webeditRoutes');
-const actionlogRoutes = require('./routes/actionlogRoutes');
-const residentAppRoutes = require('./routes/residentAppRoutes');
-const embedRoutes = require('./routes/embedRoutes');
-const logiRoutes = require('./routes/logiRoutes');
-const reactionRoleRoutes = require('./routes/reactionRoleRoutes');
-const trainingRoutes = require('./routes/trainingRoutes');
-const quizRoutes = require('./routes/quizRoutes');
-const quizManagerRoutes = require('./routes/quizManagerRoutes');
-const iskRoutes = require('./routes/iskRoutes');
-const logAnalysisRoutes = require('./routes/logAnalysisRoutes');
-const walletRoutes = require('./routes/walletRoutes'); // Import the new wallet routes
+const logger = getLogger('WebServer');
 
 /**
- * Initializes and starts the Express web server.
- * @param {import('discord.js').Client} client The Discord client instance.
+ * Initializes the Express web server.
+ * Creates the app instance but does not start listening.
+ * @returns {object} { expressApp, startWebServer }
  */
-function startServer(client) {
+function initializeWebServer() {
     const app = express();
-    const server = http.createServer(app);
-    const io = new Server(server);
-    const host = process.env.HOST_NAME || 'localhost:3000'; // Default host if not set
+    const port = process.env.PORT || 3000;
 
-    // Make the io instance available to all routes
-    app.set('io', io);
-    // Also attach it to the client for background tasks
-    client.io = io;
-
-    // Add maps for the new feature tokens
-    client.activeWalletTokens = new Map(); // Add map for wallet monitor tokens
-
-    app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-    app.use(express.json({ limit: '50mb' }));
-
-    app.set('view engine', 'ejs');
+    // View engine setup
     app.set('views', path.join(__dirname, 'views'));
+    app.set('view engine', 'ejs');
 
-    // WebSocket connection handler
-    io.on('connection', (socket) => {
-        logger.info('A user connected to the web interface via WebSocket.');
-        socket.on('disconnect', () => {
-            logger.info('A user disconnected from the web interface.');
-        });
-        // Example: Listen for a specific event from the client if needed
-        // socket.on('request-update', () => {
-        //    logger.info('Client requested data update via WebSocket.');
-        //    // Handle update logic, maybe fetch new data and emit back
-        // });
+    // Middleware
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
+    // app.use(express.static(path.join(__dirname, 'public'))); // If you have public assets
+
+    // --- CORE ROUTES ---
+    // Example: A simple health check route
+    app.get('/health', (req, res) => {
+        res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
-    // Load and use all the routers
-    app.use('/', authRoutes(client));
-    app.use('/', srpRoutes(client, client.activeSrpTokens));
-    app.use('/', setupRoutes(client, client.activeSetupTokens));
-    app.use('/', webeditRoutes(client, client.activeWebEditTokens));
-    app.use('/', actionlogRoutes(client));
-    app.use('/', residentAppRoutes(client, client.activeResidentAppTokens));
-    app.use('/', embedRoutes(client));
-    app.use('/', logiRoutes(client, io));
-    app.use('/', reactionRoleRoutes(client));
-    app.use('/training', trainingRoutes(client));
-    app.use('/', quizRoutes(client));
-    app.use('/', quizManagerRoutes(client));
-    app.use('/', iskRoutes(client));
-    app.use('/', logAnalysisRoutes(client));
-    app.use('/', walletRoutes(client)); // Use the new wallet routes
+    // NOTE: All application-specific routes (like /auth, /srp, etc.)
+    // should be moved into plugins.
+    // The old monolithic route loading logic is removed from here.
+    // Plugins will register their routes directly on the `app` object.
 
-    app.get('/', (req, res) => {
-        res.send('Web server is running.');
+    // --- Error Handling Middleware ---
+    // 404 Handler
+    app.use((req, res, next) => {
+        res.status(404).render('error', { message: 'Not Found', error: { status: 404 } });
     });
 
-    // Error handling middleware (optional but recommended)
+    // General error handler
     app.use((err, req, res, next) => {
-        logger.error('Unhandled error in Express route:', err);
-        res.status(500).render('error', { title: 'Server Error', message: 'An unexpected error occurred.' });
+        logger.error('Web server error:', { message: err.message, stack: err.stack, path: req.path });
+        res.status(err.status || 500);
+        res.render('error', {
+            message: err.message,
+            // Only show stack trace in development
+            error: process.env.NODE_ENV === 'development' ? err : {}
+        });
     });
 
+    /**
+     * Starts the web server.
+     */
+    function startWebServer() {
+        app.listen(port, () => {
+            // Logger is available via closure
+            logger.info(`Web server listening on http://localhost:${port}`);
+        });
+    }
 
-    server.listen(3000, () => {
-        logger.success(`✅ Server is running and listening on http://${host}`);
-    });
+    // Return the app instance for plugins to use, and the start function
+    return { expressApp: app, startWebServer };
 }
 
-module.exports = { startServer };
+module.exports = { initializeWebServer };

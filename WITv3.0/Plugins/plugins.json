@@ -1,14 +1,4 @@
 [
-  {
-    "name": "Example Plugin",
-    "directory": "example-plugin",
-    "description": "A simple plugin that adds a !ping command.",
-    "enabled": false
-  },
-  {
-    "name": "Bot -Core",
-    "directory": "core",
-    "description": "Hold Core Functionality (Legacy) of the bot",
-    "enabled": true
-  }
+  "core",
+  "ping-example"
 ]

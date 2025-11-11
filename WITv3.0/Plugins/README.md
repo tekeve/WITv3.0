@@ -1,103 +1,114 @@
-Bot Plugin System
+﻿WITv3.0 Plugin Architecture
+This document explains how to create plugins for the WITv3.0 bot.
+Plugin Structure
+A plugin is a self-contained module that adds features to the bot. It consists of a single index.js file (or a directory with an index.js as its entry point) located in the Plugins/ directory.
+Each plugin must be registered in plugins.json to be loaded.
+Plugin Definition (index.js)
+A plugin must export a class that defines its behavior. This class will be instantiated by the PluginManager during startup.
+The class must have:
+A constructor(client, sharedServices)
+A load() method.
+A name property (string).
+A version property (string).
+It can optionally provide:
+5. A commands property (array of Discord slash command objects).
+6. An eventListeners property (array of Discord event listener objects).
+7. A registerWebRoutes(webApp) method (function).
+Shared Services
+The sharedServices object is passed to your plugin's constructor and contains:
+db: The database connection pool (e.g., mysql.createPool()).
+webApp: The Express app instance, for registering routes.
+config: The process.env object.
+logger: The logger factory function, getLogger(contextName).
+Example Plugin Class
+const { SlashCommandBuilder } = require('discord.js');
 
-This directory contains all plugins for the bot. The modular system allows you to add or remove functionality without editing the core bot files.
+class MyAwesomePlugin {
+    /**
+     * Constructor is called by the PluginManager.
+     * @param {Client} client - The Discord.js Client instance.
+     * @param {object} sharedServices - An object containing shared services.
+     * @param {any} sharedServices.db - Database connection pool.
+     * @param {Express} sharedServices.webApp - Express app instance.
+     * @param {object} sharedServices.config - The process.env config.
+     * @param {function} sharedServices.logger - The getLogger factory.
+     */
+    constructor(client, sharedServices) {
+        // --- Required properties ---
+        this.name = "My Awesome Plugin";
+        this.version = "1.0.0";
 
-How to Enable/Disable a Plugin
+        // --- Store references ---
+        this.client = client;
+        this.db = sharedServices.db;
+        this.config = sharedServices.config;
+        this.logger = sharedServices.logger(this.name); // Create a context-aware logger
 
-Open the plugins.json file in this directory.
+        this.logger.info("Constructor called");
+    }
 
-This file contains a list of all available plugins.
+    /**
+     * Load method is called by the PluginManager after construction.
+     * This is where you should set up your plugin's properties.
+     */
+    load() {
+        this.logger.info("Plugin is loading...");
 
-To enable a plugin, find its entry and set "enabled": true.
+        // --- Define Commands ---
+        this.commands = [
+            {
+                data: new SlashCommandBuilder()
+                    .setName('my-command')
+                    .setDescription('A command from my awesome plugin.'),
+                execute: this.handleMyCommand.bind(this) // Bind 'this'
+            }
+        ];
 
-To disable a plugin, find its entry and set "enabled": false.
+        // --- Define Event Listeners ---
+        this.eventListeners = [
+            {
+                event: 'messageCreate',
+                once: false,
+                execute: this.handleMessage.bind(this) // Bind 'this'
+            }
+        ];
+        
+        this.logger.info("Plugin loaded successfully.");
+    }
 
-Restart the bot for the changes to take effect.
+    /**
+     * registerWebRoutes is called by the PluginManager if it exists.
+     * @param {Express} webApp - The Express app instance.
+     */
+    registerWebRoutes(webApp) {
+        this.logger.info("Registering web routes...");
+        
+        webApp.get('/my-plugin/dashboard', (req, res) => {
+            // Example:
+            // const data = await this.db.query("SELECT * FROM my_plugin_table");
+            // res.render('my-plugin-view', { data });
+            res.send(`Hello from ${this.name}!`);
+        });
+    }
 
-How to Create a New Plugin
+    // --- Command Handlers ---
+    async handleMyCommand(interaction) {
+        await interaction.reply(`Hello from ${this.name}!`);
+    }
 
-Create a new folder inside this plugins/ directory (e.g., my-new-plugin).
-
-Inside your new folder, create an index.js file. This is the main entry point for your plugin.
-
-Add a new entry for your plugin in the plugins.json file:
-
-{
-  "name": "My New Plugin",
-  "directory": "my-new-plugin",
-  "description": "What my plugin does.",
-  "enabled": true
-}
-
-
-Write your plugin's code in my-new-plugin/index.js.
-
-Plugin Structure (index.js)
-
-Your plugin's index.js file must export an initialize function. This function receives a services object from the main bot.
-
-// plugins/my-new-plugin/index.js
-
-/**
- * Initializes the plugin.
- * @param {object} services - Core services injected from the main bot.
- */
-function initialize(services) {
-    // You can now access all core services
-    const { client, database, logger } = services;
-
-    logger.info('Initializing My New Plugin...');
-
-    // Example: Registering a Discord event listener
-    client.on('messageCreate', (message) => {
+    // --- Event Handlers ---
+    async handleMessage(message) {
         if (message.author.bot) return;
-        if (message.content === '!my-command') {
-            message.reply('My new plugin works!');
+        if (message.content.includes('awesome')) {
+            this.logger.info(`Reacting to message ${message.id}`);
+            message.react('🎉');
         }
-    });
-
-    // Example: Registering a slash command (if you have a command handler)
-    const myCommand = {
-        name: 'my-command',
-        description: 'My new slash command',
-        execute: async (interaction) => {
-            // You can use the database service here
-            const userData = await database.getUser(interaction.user.id);
-            await interaction.reply(`Hello from my plugin! Your data: ${JSON.stringify(userData)}`);
-        }
-    };
-
-    // Assuming your client object has a "commands" Map
-    if (services.client.commands) {
-         services.client.commands.set(myCommand.name, myCommand);
     }
 }
 
-module.exports = {
-    initialize
-};
+// --- REQUIRED ---
+// Module must export the plugin class
+module.exports = MyAwesomePlugin;
 
 
-Available Core Services
 
-The services object passed to your initialize function contains all the core tools you can use.
-
-services.client: The main Discord.js Client object. You can use this to register event listeners (client.on(...)), access guilds, channels, etc.
-
-services.database: The bot's database connection/interface. Use this to get or set data.
-
-database.getUser(userId)
-
-database.setUser(userId, data)
-
-(add more functions as you create them)
-
-services.logger: The bot's central logger. Please use this instead of console.log so all logs are standardized.
-
-logger.info(message)
-
-logger.warn(message)
-
-logger.error(message)
-
-By using these shared services, your plugin can interact with the bot and other plugins seamlessly.
