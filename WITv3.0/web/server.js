@@ -21,6 +21,7 @@ const quizManagerRoutes = require('./routes/quizManagerRoutes');
 const iskRoutes = require('./routes/iskRoutes');
 const logAnalysisRoutes = require('./routes/logAnalysisRoutes');
 const walletRoutes = require('./routes/walletRoutes'); // Import the new wallet routes
+const voteRoutes = require('./routes/voteRoutes');
 
 /**
  * Initializes and starts the Express web server.
@@ -75,6 +76,7 @@ function startServer(client) {
     app.use('/', iskRoutes(client));
     app.use('/', logAnalysisRoutes(client));
     app.use('/', walletRoutes(client)); // Use the new wallet routes
+    app.use('/', voteRoutes(client));
 
     app.get('/', (req, res) => {
         res.send('Web server is running.');

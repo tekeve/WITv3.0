@@ -36,7 +36,7 @@ module.exports = {
 
 		// Initialize scheduled tasks (now doesn't include wallet init)
 		// Ensure scheduler.initialize is awaited if it does other async setup
-		await scheduler.initialize(client); // Await scheduler initialization
+		await scheduler.start(client); // Await scheduler initialization
 
 		// Initialize the new training data sync manager.
 		if (client.io) {
