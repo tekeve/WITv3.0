@@ -2,12 +2,14 @@ const { SlashCommandBuilder, REST, Routes } = require('discord.js');
 const { getLogger } = require('@services/logger');
 const WebTokenManager = require('./managers/webTokenManager');
 const IncursionManager = require('./managers/incursionManager');
+const AuthManager = require('./managers/authManager');
+const ConfigManager = require('./managers/configManager');
+const StatusManager = require('./managers/statusManager');
+const ReminderManager = require('./managers/reminderManager');
 const WalletMonitor = require('./walletMonitor');
 
 // legacy -- replace ---
 const esiService = require('@helpers/esiService');
-const authManager = require('@helpers/authManager');
-const configManager = require('@helpers/configManager');
 
 // --- IMPORT YOUR OLD HANDLERS/MANAGERS ---
 // We will now import the *logic* from the old files
@@ -28,6 +30,9 @@ class CoreFunctionalityPlugin {
         this.name = "WIT Core";
         this.version = "3.0.0";
 
+        // --- Legacy Helpers ---
+        this.esiService = esiService;
+
         // --- Store references ---
         this.client = client;
         this.db = sharedServices.db;
@@ -37,12 +42,13 @@ class CoreFunctionalityPlugin {
         // --- Inject Managers ---
         this.webTokenManager = new WebTokenManager(this.db, this.logger);
         this.incursionManager = new IncursionManager(this);
+        this.statusManager = new StatusManager(this);
+        this.reminderManager = new ReminderManager(this);
+        this.authManager = new AuthManager(this);
+        this.configManager = new ConfigManager(this);
+        // --- Dependancies authmanager & configManager --- 
         this.walletMonitor = new WalletMonitor(this);
-
-        // --- Legacy Helpers ---
-        this.esiService = esiService;
-        this.authManager = authManager;
-        this.configManager = configManager;
+        // --- End ---
 
         this.logger.info("Core plugin constructed.");
     }
@@ -148,7 +154,7 @@ class CoreFunctionalityPlugin {
                     this.logger.info('Starting incursion monitor...');
                     await this.incursionManager.updateIncursions()
 
-                    this.logger.info('All clientReady tasks completed.');
+                    this.logger.success('All clientReady tasks completed.');
                 } catch (error) {
                     this.logger.error('Error making clientReady:', { error });
                 }

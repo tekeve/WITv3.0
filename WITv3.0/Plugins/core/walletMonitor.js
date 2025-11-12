@@ -1,9 +1,5 @@
-// In-memory cache to store the last processed transaction ID for each corp/division
-// Key: `${corporationId}-${division}`
-// Value: BigInt(lastTransactionId)
-const lastTransactionIdCache = new Map();
-const SRP_PAYMENT_AMOUNT = 20000000; // Define the standard SRP amount
 
+lastTransactionIdCache = new Set();
 /**
  * Manages fetching and reporting SRP Corperation Wallet.
  */
@@ -11,10 +7,10 @@ class WalletMonitor {
      /**
      * @param {object} plugin - The core plugin instance.
      * @param {any} plugin.db - The database connection pool.
-     * @param {winston.Logger} plugin.logger - The plugin's logger.
+     * @param {winston.Logger} plugin.logger - The plugin's this.logger.
      * @param {object} plugin.esiService - The Plugins esiService.
-     * @param {object} plugin.authManager - The Plugins esiService.
-     * @param {object} plugin.configManager - The Plugins esiService.
+     * @param {object} plugin.authManager - The Plugins authManager.
+     * @param {object} plugin.configManager - The Plugins configManager.
      */
     constructor(plugin) {
         this.logger = plugin.logger;
@@ -23,6 +19,9 @@ class WalletMonitor {
         this.authManager = plugin.authManager;
         this.configManager = plugin.configManager;
         //this.characterManager = plugin.characterManager;  // To potentially get member names
+
+        //this.lastTransactionIdCache = lastTransactionIdCache = new Set();
+        this.SRP_PAYMENT_AMOUNT = 20000000; // Define the standard SRP amount
     }
 
     /**
@@ -31,14 +30,14 @@ class WalletMonitor {
      * @returns {Promise<void>}
      */
     async initializeLastTransactionIds() {
-        logger.info('[WalletMonitor InitCache] Starting initialization...');
+        this.logger.info('[WalletMonitor InitCache] Starting initialization...');
         try {
-            const rows = await db.query(`
+            const rows = await this.db.query(`
                 SELECT corporation_id, division, MAX(transaction_id) as max_id
                 FROM corp_wallet_transactions
                 GROUP BY corporation_id, division
             `);
-            logger.info(`[WalletMonitor InitCache] Fetched ${rows.length} rows from DB.`);
+            this.logger.info(`[WalletMonitor InitCache] Fetched ${rows.length} rows from db.`);
             lastTransactionIdCache.clear(); // Clear cache before repopulating
             rows.forEach(row => {
                 const key = `${row.corporation_id}-${row.division}`;
@@ -47,15 +46,15 @@ class WalletMonitor {
                     try {
                         lastTransactionIdCache.set(key, BigInt(row.max_id));
                     } catch (e) {
-                        logger.error(`[WalletMonitor InitCache] Failed to parse max_id '${row.max_id}' as BigInt for ${key}.`);
+                        this.logger.error(`[WalletMonitor InitCache] Failed to parse max_id '${row.max_id}' as BigInt for ${key}.`);
                     }
                 } else {
-                    logger.warn(`[WalletMonitor InitCache] max_id is null for ${key}. Skipping.`);
+                    this.logger.warn(`[WalletMonitor InitCache] max_id is null for ${key}. Skipping.`);
                 }
             });
-            logger.success(`[WalletMonitor InitCache] Initialization complete. Cache size: ${lastTransactionIdCache.size}`);
+            this.logger.success(`[WalletMonitor InitCache] Initialization complete. Cache size: ${lastTransactionIdCache.size}`);
         } catch (error) {
-            logger.error('[WalletMonitor InitCache] Failed:', error);
+            this.logger.error('[WalletMonitor InitCache] Failed:', error);
             // Do not re-throw, allow the application to continue but log the failure.
         }
     }
@@ -84,10 +83,10 @@ class WalletMonitor {
 
         // Check for SRP Contribution (Incoming) - Includes exact multiples
         if (transaction.amount > 0) {
-            const remainder = Math.abs(transaction.amount % SRP_PAYMENT_AMOUNT);
-            if (remainder <= tolerance || Math.abs(remainder - SRP_PAYMENT_AMOUNT) <= tolerance) {
-                const multiple = transaction.amount / SRP_PAYMENT_AMOUNT;
-                if (Math.abs(multiple - Math.round(multiple)) * SRP_PAYMENT_AMOUNT <= tolerance) {
+            const remainder = Math.abs(transaction.amount % this.SRP_PAYMENT_AMOUNT);
+            if (remainder <= tolerance || Math.abs(remainder - this.SRP_PAYMENT_AMOUNT) <= tolerance) {
+                const multiple = transaction.amount / this.SRP_PAYMENT_AMOUNT;
+                if (Math.abs(multiple - Math.round(multiple)) * this.SRP_PAYMENT_AMOUNT <= tolerance) {
                     return 'srp_in';
                 }
             }
@@ -130,13 +129,13 @@ class WalletMonitor {
             const chunkSize = 1000;
             for (let i = 0; i < idArray.length; i += chunkSize) {
                 const chunk = idArray.slice(i, i + chunkSize);
-                const response = await esiService.post({ endpoint: '/universe/names/', data: chunk, caller: __filename });
+                const response = await this.esiService.post({ endpoint: '/universe/names/', data: chunk, caller: __filename });
                 if (response && Array.isArray(response)) {
                     response.forEach(item => namesMap.set(item.id, item.name));
                 }
             }
         } catch (error) {
-            logger.error('[WalletMonitor NameFetch] Failed:', error);
+            this.logger.error('[WalletMonitor NameFetch] Failed:', error);
         }
         return namesMap;
     }
@@ -159,7 +158,7 @@ class WalletMonitor {
         try {
             while (page <= maxPagesToFetch) {
                 const endpoint = `/corporations/${corporationId}/wallets/${division}/journal/`;
-                const response = await esiService.get({
+                const response = await this.esiService.get({
                     endpoint: endpoint,
                     headers: { 'Authorization': `Bearer ${accessToken}` },
                     params: { page },
@@ -205,7 +204,7 @@ class WalletMonitor {
                 page++;
             }
         } catch (error) {
-            logger.error(`[WalletMonitor Fetch] Failed fetching journal page ${page} for Corp ${corporationId}, Div ${division}:`, error.message);
+            this.logger.error(`[WalletMonitor Fetch] Failed fetching journal page ${page} for Corp ${corporationId}, Div ${division}:`, error.message);
             throw error; // Re-throw to be handled by syncWalletTransactions
         }
 
@@ -218,20 +217,20 @@ class WalletMonitor {
      * @returns {Promise<number>} The minimum delay in milliseconds until the next check.
      */
     async syncWalletTransactions() {
-        logger.info('[WalletMonitor Sync] Starting wallet transaction sync...');
-        const config = configManager.get();
+        this.logger.info('[WalletMonitor Sync] Starting wallet transaction sync...');
+        const config = this.configManager.get();
         let overallEarliestExpiry = null; // Track the earliest expiry across all divisions
 
         const corporationIdStr = config.srpCorporationId?.[0];
         const divisionsToMonitorStr = config.srpWalletDivisions || [];
 
         if (!corporationIdStr) {
-            logger.warn('[WalletMonitor Sync] srpCorporationId not configured. Skipping.');
+            this.logger.warn('[WalletMonitor Sync] srpCorporationId not configured. Skipping.');
             return 60 * 60 * 1000; // 1 hour delay
         }
         const corporationId = parseInt(corporationIdStr, 10);
         if (isNaN(corporationId)) {
-            logger.warn(`[WalletMonitor Sync] Invalid srpCorporationId: "${corporationIdStr}". Skipping.`);
+            this.logger.warn(`[WalletMonitor Sync] Invalid srpCorporationId: "${corporationIdStr}". Skipping.`);
             return 60 * 60 * 1000;
         }
 
@@ -240,20 +239,20 @@ class WalletMonitor {
             .filter(d => !isNaN(d) && d >= 1 && d <= 7);
 
         if (divisionsToMonitor.length === 0) {
-            logger.warn('[WalletMonitor Sync] No valid srpWalletDivisions configured. Skipping.');
+            this.logger.warn('[WalletMonitor Sync] No valid srpWalletDivisions configured. Skipping.');
             return 60 * 60 * 1000;
         }
 
         const adminUsers = config.adminUsers || [];
         if (adminUsers.length === 0) {
-            logger.error('[WalletMonitor Sync] No adminUsers configured. Cannot authenticate. Skipping.');
+            this.logger.error('[WalletMonitor Sync] No adminUsers configured. Cannot authenticate. Skipping.');
             return 60 * 60 * 1000;
         }
         const authDiscordId = adminUsers[0];
 
         const accessToken = await authManager.getAccessToken(authDiscordId);
         if (!accessToken) {
-            logger.error(`[WalletMonitor Sync] Could not get ESI token for admin ${authDiscordId}. Skipping.`);
+            this.logger.error(`[WalletMonitor Sync] Could not get ESI token for admin ${authDiscordId}. Skipping.`);
             return 5 * 60 * 1000; // Retry sooner
         }
 
@@ -261,12 +260,12 @@ class WalletMonitor {
 
         for (const division of divisionsToMonitor) {
             const cacheKey = `${corporationId}-${division}`;
-            const lastKnownId = lastTransactionIdCache.get(cacheKey) || null;
+            const lastKnownId = this.lastTransactionIdCache.get(cacheKey) || null;
             let highestProcessedIdThisSync = lastKnownId; // Track the newest ID found in this run
             let divisionEarliestExpiry = null;
 
             try {
-                logger.info(`[WalletMonitor Sync Div ${division}] Starting sync. Last known ID from cache: ${lastKnownId || 'None'}.`);
+                this.logger.info(`[WalletMonitor Sync Div ${division}] Starting sync. Last known ID from cache: ${lastKnownId || 'None'}.`);
                 const { transactions: newTransactions, earliestExpiry } = await fetchWalletJournalPage(corporationId, division, accessToken, lastKnownId);
 
                 divisionEarliestExpiry = earliestExpiry;
@@ -275,7 +274,7 @@ class WalletMonitor {
                         overallEarliestExpiry = divisionEarliestExpiry;
                     }
                 } else {
-                    logger.info(`[WalletMonitor Sync Div ${division}] Fetched ${newTransactions.length} new txs. No ESI expiry header received.`);
+                    this.logger.info(`[WalletMonitor Sync Div ${division}] Fetched ${newTransactions.length} new txs. No ESI expiry header received.`);
                 }
 
                 if (newTransactions.length === 0) continue;
@@ -313,7 +312,7 @@ class WalletMonitor {
                 }
 
                 if (valuesToInsert.length > 0) {
-                    logger.info(`[WalletMonitor Sync Div ${division}] Preparing to insert ${valuesToInsert.length} new transactions...`);
+                    this.logger.info(`[WalletMonitor Sync Div ${division}] Preparing to insert ${valuesToInsert.length} new transactions...`);
                     const sql = `
                         INSERT IGNORE INTO corp_wallet_transactions (
                             transaction_id, corporation_id, division, date, ref_type,
@@ -322,27 +321,27 @@ class WalletMonitor {
                             context_id, context_type, description, custom_category
                         ) VALUES ?
                     `;
-                    const [result] = await db.pool.query(sql, [valuesToInsert]);
+                    const [result] = await this.db.pool.query(sql, [valuesToInsert]);
 
                     totalNewTransactionsProcessed += result.affectedRows;
-                    logger.info(`[WalletMonitor Sync Div ${division}] Insert result: Affected=${result.affectedRows}, Duplicates=${valuesToInsert.length - result.affectedRows}`);
+                    this.logger.info(`[WalletMonitor Sync Div ${division}] Insert result: Affected=${result.affectedRows}, Duplicates=${valuesToInsert.length - result.affectedRows}`);
 
                     if (highestProcessedIdThisSync !== null && (lastKnownId === null || highestProcessedIdThisSync > lastKnownId)) {
-                        lastTransactionIdCache.set(cacheKey, highestProcessedIdThisSync);
-                        logger.info(`[WalletMonitor Sync Div ${division}] Cache updated. New last ID: ${highestProcessedIdThisSync}.`);
+                        this.lastTransactionIdCache.set(cacheKey, highestProcessedIdThisSync);
+                        this.logger.info(`[WalletMonitor Sync Div ${division}] Cache updated. New last ID: ${highestProcessedIdThisSync}.`);
                     } else if (result.affectedRows === 0 && highestProcessedIdThisSync !== null) {
                         if (lastKnownId === null || highestProcessedIdThisSync > lastKnownId) {
-                            lastTransactionIdCache.set(cacheKey, highestProcessedIdThisSync);
-                            logger.info(`[WalletMonitor Sync Div ${division}] No rows inserted (likely duplicates), but updated cache as highest ID seen (${highestProcessedIdThisSync}) is newer than cached (${lastKnownId}).`);
+                            this.lastTransactionIdCache.set(cacheKey, highestProcessedIdThisSync);
+                            this.logger.info(`[WalletMonitor Sync Div ${division}] No rows inserted (likely duplicates), but updated cache as highest ID seen (${highestProcessedIdThisSync}) is newer than cached (${lastKnownId}).`);
                         }
                     }
 
                 } else {
-                    logger.info(`[WalletMonitor Sync Div ${division}] No valid new transactions to insert after processing.`);
+                    this.logger.info(`[WalletMonitor Sync Div ${division}] No valid new transactions to insert after processing.`);
                 }
 
             } catch (error) {
-                logger.error(`[WalletMonitor Sync Div ${division}] Failed:`, error.message);
+                this.logger.error(`[WalletMonitor Sync Div ${division}] Failed:`, error.message);
             }
         }
 
@@ -351,12 +350,12 @@ class WalletMonitor {
         if (overallEarliestExpiry !== null) {
             const timeUntilExpiry = overallEarliestExpiry - Date.now();
             nextCheckDelayMs = Math.max(10000, Math.min(timeUntilExpiry + 1000, 60 * 60 * 1000));
-            logger.info(`[WalletMonitor Sync] Earliest ESI cache expiry: ${new Date(overallEarliestExpiry).toLocaleTimeString()}.`);
+            this.logger.info(`[WalletMonitor Sync] Earliest ESI cache expiry: ${new Date(overallEarliestExpiry).toLocaleTimeString()}.`);
         } else {
-            logger.info(`[WalletMonitor Sync] No ESI expiry headers received, using default delay.`);
+            this.logger.info(`[WalletMonitor Sync] No ESI expiry headers received, using default delay.`);
         }
 
-        logger.success(`[WalletMonitor Sync] Finished. ${totalNewTransactionsProcessed} total inserted. Next check delay: ${Math.round(nextCheckDelayMs / 1000)}s.`);
+        this.logger.success(`[WalletMonitor Sync] Finished. ${totalNewTransactionsProcessed} total inserted. Next check delay: ${Math.round(nextCheckDelayMs / 1000)}s.`);
         return nextCheckDelayMs; // Return the calculated delay
     }
 
@@ -381,7 +380,7 @@ class WalletMonitor {
         let params = [];
         let dataSql = ''; // Declared outside try block
 
-        const config = configManager.get();
+        const config = this.configManager.get();
         const corporationIdStr = config.srpCorporationId?.[0];
         if (!corporationIdStr) return { transactions: [], total: 0 };
         const corporationId = parseInt(corporationIdStr, 10);
@@ -444,17 +443,17 @@ class WalletMonitor {
         const finalParams = [...params];
 
         try {
-            const [countResult] = await db.query(countSql, finalParams);
+            const [countResult] = await this.db.query(countSql, finalParams);
             const total = countResult ? countResult.total : 0;
 
-            const transactions = await db.query(dataSql, finalParams); // Pass only filter params
+            const transactions = await this.db.query(dataSql, finalParams); // Pass only filter params
 
             return { transactions, total, currentPage: numPage, totalPages: Math.ceil(total / limitInt) };
 
         } catch (error) {
-            logger.error('[WalletMonitor Web] Error fetching transactions. Query:\n' + dataSql);
-            logger.error('[WalletMonitor Web] Parameters:', finalParams);
-            logger.error('[WalletMonitor Web]', error); // Log the full error object
+            this.logger.error('[WalletMonitor Web] Error fetching transactions. Query:\n' + dataSql);
+            this.logger.error('[WalletMonitor Web] Parameters:', finalParams);
+            this.logger.error('[WalletMonitor Web]', error); // Log the full error object
             throw error;
         }
     }
@@ -471,7 +470,7 @@ class WalletMonitor {
         let payerBaseWhereClauses = ['amount > 0', 'custom_category = ?']; // Start payer queries filtered to srp_in
         let payerBaseParams = ['srp_in'];
 
-        const config = configManager.get();
+        const config = this.configManager.get();
         const corporationIdStr = config.srpCorporationId?.[0];
         if (!corporationIdStr) return {};
         const corporationId = parseInt(corporationIdStr, 10);
@@ -571,8 +570,8 @@ class WalletMonitor {
                     COALESCE(first_party_name, 'Unknown Payer') as commander_name,
                     SUM(
                         CASE
-                            WHEN amount > 0 AND CAST(amount AS DECIMAL(20,2)) % ${SRP_PAYMENT_AMOUNT} = 0
-                            THEN FLOOR(CAST(amount AS DECIMAL(20,2)) / ${SRP_PAYMENT_AMOUNT})
+                            WHEN amount > 0 AND CAST(amount AS DECIMAL(20,2)) % ${this.SRP_PAYMENT_AMOUNT} = 0
+                            THEN FLOOR(CAST(amount AS DECIMAL(20,2)) / ${this.SRP_PAYMENT_AMOUNT})
                             ELSE 1
                         END
                     ) AS transaction_count
@@ -593,12 +592,12 @@ class WalletMonitor {
                 topPayersByAmount,
                 payerIncomeOverTimeRaw
             ] = await Promise.all([
-                db.query(monthlySql, baseParams),
-                db.query(balanceSql, balanceParamsForQuery),
-                db.query(categorySql, baseParams),
-                db.query(topPayersByCountSql, payerBaseParams),
-                db.query(topPayersByAmountSql, payerBaseParams),
-                db.query(payerIncomeOverTimeSql, payerBaseParams) // Use payerBaseParams
+                this.db.query(monthlySql, baseParams),
+                this.db.query(balanceSql, balanceParamsForQuery),
+                this.db.query(categorySql, baseParams),
+                this.db.query(topPayersByCountSql, payerBaseParams),
+                this.db.query(topPayersByAmountSql, payerBaseParams),
+                this.db.query(payerIncomeOverTimeSql, payerBaseParams) // Use payerBaseParams
             ]);
 
             const payerIncomeOverTime = payerIncomeOverTimeRaw;
@@ -610,7 +609,7 @@ class WalletMonitor {
             };
 
         } catch (error) {
-            logger.error('[WalletMonitor Web] Error fetching aggregated data:', error);
+            this.logger.error('[WalletMonitor Web] Error fetching aggregated data:', error);
             throw error;
         }
     }
@@ -623,27 +622,25 @@ class WalletMonitor {
         // --- End Update ---
 
         if (!validCategories.includes(category)) {
-            logger.warn(`[WalletMonitor UpdateCat] Invalid category: "${category}" for tx ${transactionIdStr}`);
+            this.logger.warn(`[WalletMonitor UpdateCat] Invalid category: "${category}" for tx ${transactionIdStr}`);
             return false;
         }
         try {
             const sql = 'UPDATE corp_wallet_transactions SET custom_category = ? WHERE transaction_id = ?';
-            const [result] = await db.pool.query(sql, [category, transactionIdStr]);
+            const [result] = await this.db.pool.query(sql, [category, transactionIdStr]);
             const success = result.affectedRows > 0;
             if (success) {
-                logger.info(`[WalletMonitor UpdateCat] Tx ${transactionIdStr} category updated to "${category || 'NULL'}".`);
+                this.logger.info(`[WalletMonitor UpdateCat] Tx ${transactionIdStr} category updated to "${category || 'NULL'}".`);
             } else {
-                logger.warn(`[WalletMonitor UpdateCat] Tx ${transactionIdStr} not found for update.`);
+                this.logger.warn(`[WalletMonitor UpdateCat] Tx ${transactionIdStr} not found for update.`);
             }
             return success;
         } catch (error) {
-            logger.error(`[WalletMonitor UpdateCat] Error for tx ${transactionIdStr}:`, error);
+            this.logger.error(`[WalletMonitor UpdateCat] Error for tx ${transactionIdStr}:`, error);
             return false;
         }
     }
 }
 
-module.exports = {
-    WalletMonitor
-};
+module.exports = WalletMonitor;
 
