@@ -14,7 +14,6 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('start-vote')
         .setDescription('Starts a new anonymous STV vote.')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
         .addSubcommand(subcommand =>
             subcommand
                 .setName('leadership')

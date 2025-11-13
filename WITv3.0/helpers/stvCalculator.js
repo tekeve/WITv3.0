@@ -1,169 +1,201 @@
-const logger = require('./logger');
-
 /**
  * Calculates the winner(s) of a Single Transferable Vote (STV) election.
+ * This implementation uses the Droop quota and fractional surplus transfer.
  *
- * @param {string[]} candidates - An array of candidate names.
- * @param {string[][]} ballots - An array of ballots, where each ballot is an array of candidate names in order of preference.
- * @param {number} numWinners - The number of seats to fill.
- * @returns {{winners: string[], log: string[]}} - An object containing the list of winners and a detailed round-by-round log.
+ * @param {string[]} candidates - An array of all candidate names.
+ * @param {string[][]} ballots - An array of ballots, where each ballot is an array of candidate names in preference order.
+ * @param {number} numWinners - The number of seats to fill (e.g., 1 for leadership, 2 for officer).
+ * @returns {{winners: string[], log: string[]}} - An object containing an array of winner names and a log of the entire counting process.
  */
 function calculateSTV(candidates, ballots, numWinners) {
     const log = [];
     const numBallots = ballots.length;
 
-    // Quota = (Total Votes / (Seats + 1)) + 1 (using Droop quota, floored)
+    // Calculate Droop Quota: floor( (total_votes / (seats + 1)) + 1 )
     const quota = Math.floor(numBallots / (numWinners + 1)) + 1;
 
-    log.push(`--- Election Started ---`);
-    log.push(`Total Ballots: ${numBallots}`);
-    log.push(`Seats to Fill: ${numWinners}`);
-    log.push(`Quota to Win: ${quota}`);
-    log.push(`Candidates: ${candidates.join(', ')}`);
-    log.push(`--------------------------`);
+    let winners = new Set();
+    let eliminated = new Set();
 
-    let currentBallots = ballots.map(ballot => ({
-        choices: ballot.filter(c => candidates.includes(c)), // Clean ballot of invalid choices
+    // Create a mutable copy of ballots, where each ballot is an object
+    // { id: index, weight: 1.0, preferences: ['A', 'B', 'C'], currentTopPref: null }
+    let weightedBallots = ballots.map((b, index) => ({
+        id: index,
         weight: 1.0,
+        preferences: b,
+        currentTopPref: null // Will store the candidate this ballot is voting for *this round*
     }));
 
-    const winners = new Set();
-    const eliminated = new Set();
+    log.push(`Election Started.`);
+    log.push(`Total Ballots: ${numBallots}`);
+    log.push(`Seats to Fill: ${numWinners}`);
+    log.push(`Droop Quota: ${quota}`);
+    log.push(`Candidates: ${candidates.join(', ')}`);
+
     let round = 1;
 
     while (winners.size < numWinners) {
-        log.push(`\n--- Round ${round} ---`);
+        log.push(`\n\n--- Round ${round} ---`);
 
-        // Count first-preference votes for all non-winner, non-eliminated candidates
-        const counts = new Map(candidates.map(c => [c, 0]));
-        let validBallotsInRound = 0;
+        // 1. Calculate votes for all non-eliminated, non-winner candidates
+        const votes = new Map(candidates.map(c => [c, 0.0]));
 
-        for (const ballot of currentBallots) {
-            let firstChoiceFound = false;
-            for (const choice of ballot.choices) {
-                if (!winners.has(choice) && !eliminated.has(choice)) {
-                    counts.set(choice, counts.get(choice) + ballot.weight);
-                    firstChoiceFound = true;
-                    validBallotsInRound += ballot.weight;
-                    break;
+        for (const ballot of weightedBallots) {
+            // Skip ballots that have no weight
+            if (ballot.weight <= 0) {
+                ballot.currentTopPref = 'exhausted'; // Mark as exhausted
+                continue;
+            }
+
+            let preferenceFound = false;
+            for (const candidate of ballot.preferences) {
+                // If this candidate is still in the running (not won, not eliminated)
+                if (!winners.has(candidate) && !eliminated.has(candidate)) {
+                    votes.set(candidate, votes.get(candidate) + ballot.weight);
+                    preferenceFound = true;
+
+                    // --- FIX: "Stamp" the ballot with its current #1 choice ---
+                    ballot.currentTopPref = candidate;
+                    // --- End of FIX ---
+
+                    break; // Count only the highest-ranked active candidate
                 }
+            }
+            if (!preferenceFound) {
+                // Ballot is "exhausted" (all its preferences are won or eliminated)
+                ballot.weight = 0; // Set weight to 0
+                ballot.currentTopPref = 'exhausted'; // Mark as exhausted
             }
         }
 
-        // Log counts
-        const countLog = [];
-        counts.forEach((count, candidate) => {
-            if (!winners.has(candidate) && !eliminated.has(candidate)) {
-                countLog.push(`${candidate}: ${count.toFixed(4)}`);
+        // Log the current vote counts
+        log.push(`Current Vote Counts:`);
+        let sortedVotes = [...votes.entries()]
+            .filter(([c, v]) => !eliminated.has(c) && !winners.has(c))
+            .sort((a, b) => b[1] - a[1]);
+
+        for (const [candidate, count] of sortedVotes) {
+            log.push(`  - ${candidate}: ${count.toFixed(2)} votes`);
+        }
+
+        // 2. Check for winners
+        let newWinnersThisRound = new Set();
+        for (const [candidate, count] of sortedVotes) {
+            if (count >= quota) {
+                log.push(`\nCandidate ${candidate} has reached the quota (${count.toFixed(2)}) and is elected!`);
+                winners.add(candidate);
+                newWinnersThisRound.add(candidate);
             }
-        });
-        log.push(`Current Standings (Total Valid: ${validBallotsInRound.toFixed(4)}):`);
-        log.push(countLog.join('\n'));
+        }
 
-        // ---------------------------------
-        // 1. Check for new winners
-        // ---------------------------------
-        let newWinnersThisRound = [];
-        counts.forEach((count, candidate) => {
-            if (count >= quota && !winners.has(candidate)) {
-                newWinnersThisRound.push({ name: candidate, count: count });
-            }
-        });
+        // If we found all the winners we need, we can stop
+        if (winners.size === numWinners) {
+            break;
+        }
 
-        // Sort new winners by highest vote (in case multiple elected)
-        newWinnersThisRound.sort((a, b) => b.count - a.count);
+        // 3. Handle Surplus Transfers (if any new winners)
+        // This is the "Wright Method"
+        if (newWinnersThisRound.size > 0) {
+            // We transfer surplus from the highest-vote winner first
+            // Sort new winners by their vote count, descending
+            const sortedNewWinners = [...newWinnersThisRound].sort((a, b) => votes.get(b) - votes.get(a));
 
-        if (newWinnersThisRound.length > 0) {
-            for (const winner of newWinnersThisRound) {
-                if (winners.size < numWinners) {
-                    winners.add(winner.name);
-                    log.push(`\n[Elected] ${winner.name} is elected with ${winner.count.toFixed(4)} votes.`);
+            for (const winner of sortedNewWinners) {
+                const surplus = votes.get(winner) - quota;
+                const totalVotesForWinner = votes.get(winner);
 
-                    // Calculate surplus and transfer weight
-                    const surplus = winner.count - quota;
-                    const transferWeight = surplus / winner.count;
-                    log.push(`Surplus of ${surplus.toFixed(4)} to be transferred at a weight of ${transferWeight.toFixed(4)}.`);
+                if (surplus <= 0) continue; // No surplus to transfer
 
-                    // Redistribute surplus votes
-                    for (const ballot of currentBallots) {
-                        // Find the first valid choice on this ballot
-                        let firstChoice = null;
-                        for (const choice of ballot.choices) {
-                            if (!winners.has(choice) && !eliminated.has(choice)) {
-                                firstChoice = choice;
-                                break;
-                            }
-                        }
+                // This is the "Surplus Ratio"
+                const transferWeight = surplus / totalVotesForWinner;
+                log.push(`\nTransferring surplus from ${winner}:`);
+                log.push(`  - Surplus: ${surplus.toFixed(2)}`);
+                log.push(`  - Total Votes: ${totalVotesForWinner.toFixed(2)}`);
+                log.push(`  - Surplus Ratio (Wright): ${transferWeight.toFixed(4)}`);
 
-                        // If this ballot's first choice was the new winner, transfer its weight
-                        if (firstChoice === winner.name) {
-                            ballot.weight *= transferWeight;
-                        }
+                // Find all ballots whose *current* top-preference is the winner
+                // and re-weight them. Their next preference will be counted
+                // in the next round with this new, reduced weight.
+                for (const ballot of weightedBallots) {
+
+                    // --- FIX: Read the "stamp" instead of recalculating ---
+                    // if (firstActivePref === winner) {
+                    if (ballot.currentTopPref === winner) {
+                        // --- End of FIX ---
+
+                        // Re-weight the *entire ballot* by the surplus ratio
+                        ballot.weight *= transferWeight;
                     }
                 }
             }
+            // After transferring, we must re-run the count from scratch
+            // So we loop back to the start of the 'while'
             round++;
-            continue; // Start a new round to recount with new weights
+            continue;
         }
 
-        // ---------------------------------
-        // 2. Check for elimination
-        // ---------------------------------
-        const remainingCandidates = candidates.filter(c => !winners.has(c) && !eliminated.has(c));
+        // 4. If no new winners, check for elimination
 
-        // If remaining candidates <= number of remaining seats, elect them all
-        if (remainingCandidates.length <= (numWinners - winners.size)) {
-            log.push(`\nRemaining candidates (${remainingCandidates.length}) equals or is less than remaining seats (${numWinners - winners.size}).`);
-            for (const candidate of remainingCandidates) {
+        // Who is still in the running?
+        const activeCandidates = candidates.filter(c => !winners.has(c) && !eliminated.has(c));
+
+        // Check for edge case: If remaining candidates <= remaining seats,
+        // they are all elected by default.
+        const remainingSeats = numWinners - winners.size;
+        if (activeCandidates.length <= remainingSeats) {
+            log.push(`\nOnly ${activeCandidates.length} candidates remaining for ${remainingSeats} seats.`);
+            for (const candidate of activeCandidates) {
+                log.push(`${candidate} is elected by default.`);
                 winners.add(candidate);
-                log.push(`[Elected] ${candidate} is elected.`);
             }
             break; // Election is over
         }
 
-        // No new winner, so we must eliminate the candidate with the lowest votes
-        let lowestCount = Infinity;
-        let candidatesToEliminate = [];
-
-        remainingCandidates.forEach(candidate => {
-            const count = counts.get(candidate);
-            if (count < lowestCount) {
-                lowestCount = count;
-                candidatesToEliminate = [candidate];
-            } else if (count === lowestCount) {
-                candidatesToEliminate.push(candidate);
+        // Find the candidate(s) with the minimum number of votes
+        let minVotes = Infinity;
+        for (const [candidate, count] of sortedVotes) {
+            if (count < minVotes) {
+                minVotes = count;
             }
-        });
-
-        // Handle tie for last place (basic random tie-break)
-        // A better system might check previous round counts
-        let candidateToEliminate = candidatesToEliminate[0];
-        if (candidatesToEliminate.length > 1) {
-            log.push(`Tie for elimination between: ${candidatesToEliminate.join(', ')}. Randomly selecting one.`);
-            candidateToEliminate = candidatesToEliminate[Math.floor(Math.random() * candidatesToEliminate.length)];
         }
 
-        eliminated.add(candidateToEliminate);
-        log.push(`\n[Eliminated] ${candidateToEliminate} is eliminated with ${lowestCount.toFixed(4)} votes.`);
-        log.push(`Their votes will be redistributed in the next round.`);
+        // Get all candidates tied for last place
+        const lastPlaceCandidates = sortedVotes
+            .filter(([candidate, count]) => count === minVotes)
+            .map(([candidate, count]) => candidate);
 
-        // Note: We don't need to change ballot weights on elimination,
-        // just move to the next preference in the next round's count.
-
-        round++;
-
-        if (round > (candidates.length * 2)) {
-            log.push("\n[Error] Election exceeded maximum rounds. Halting calculation.");
-            logger.error("STV calculation hit round limit.", { vote_id: "N/A" });
+        if (lastPlaceCandidates.length === 0) {
+            // This should be impossible, but as a safeguard...
+            log.push(`\nERROR: Could not determine candidate to eliminate. Aborting.`);
             break;
         }
-    }
 
-    log.push(`\n--- Election Concluded ---`);
-    log.push(`Winner(s): ${Array.from(winners).join(', ')}`);
-    log.push(`--------------------------`);
+        // --- FIX: Eliminate all tied candidates simultaneously ---
+        log.push(`\nTie for last place with ${minVotes.toFixed(2)} votes.`);
+        log.push(`Eliminating all tied candidates: ${lastPlaceCandidates.join(', ')}`);
 
-    return { winners: Array.from(winners), log };
+        for (const candidateToEliminate of lastPlaceCandidates) {
+            eliminated.add(candidateToEliminate);
+        }
+
+        // When a candidate is eliminated, their ballots are *not* re-weighted.
+        // The *next* time we count (in the next round), the ballots will
+        // simply skip over the eliminated name and go to the next preference.
+
+        round++;
+    } // End of while loop
+
+    log.push(`\n\n--- Election Concluded ---`);
+    const finalWinners = Array.from(winners);
+    log.push(`The quota was ${quota}.`);
+    log.push(`The elected winner(s) are: ${finalWinners.join(', ')}`);
+
+    return {
+        winners: finalWinners,
+        log: log
+    };
 }
 
-module.exports = { calculateSTV };
+module.exports = {
+    calculateSTV
+};

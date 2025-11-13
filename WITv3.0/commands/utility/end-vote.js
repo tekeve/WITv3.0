@@ -12,8 +12,7 @@ module.exports = {
 
     data: new SlashCommandBuilder()
         .setName('end-vote')
-        .setDescription('ADMIN: Ends the active vote in this channel and tallies the results immediately.')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+        .setDescription('ADMIN: Ends the active vote in this channel and tallies the results immediately.'),
 
     async execute(interaction) {
         if (!interaction.inGuild()) {
