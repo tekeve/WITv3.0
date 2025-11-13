@@ -1,12 +1,12 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const db = require('../../helpers/database'); // Assuming database helper path
-const logger = require('../../helpers/logger');
-const scheduler = require('../../helpers/scheduler');
+const db = require('@helpers/database'); // Assuming database helper path
+const logger = require('@helpers/logger');
+const scheduler = require('@helpers/scheduler');
 const { parse, add } = require('date-fns');
 
 module.exports = {
     // Custom permissions property for your command handler
-    permissions: ['leadership'],
+    permissions: ['council'],
 
     // Autocomplete property, set to null as this command doesn't use it
     autocomplete: null,
@@ -54,7 +54,8 @@ module.exports = {
 
         // Check for existing active vote in this channel
         try {
-            const [existing] = await db.query('SELECT vote_id FROM votes WHERE channel_id = ? AND is_active = 1', [interaction.channelId]);
+            // FIX: Changed `const [existing]` to `const existing`
+            const existing = await db.query('SELECT vote_id FROM votes WHERE channel_id = ? AND is_active = 1', [interaction.channelId]);
             if (existing.length > 0) {
                 return interaction.editReply({ content: 'There is already an active vote in this channel. Please wait for it to conclude before starting a new one.', ephemeral: true });
             }
@@ -77,7 +78,8 @@ module.exports = {
             const endTime = add(new Date(), durationOptions);
 
             // Insert vote into DB
-            const [result] = await db.query(
+            // FIX: This one IS correct, as `result` is not an array of rows
+            const result = await db.query(
                 'INSERT INTO votes (guild_id, channel_id, title, type, candidates, end_time, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
                 [interaction.guildId, interaction.channelId, title, subcommand, JSON.stringify(candidates), endTime, 1]
             );
