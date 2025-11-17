@@ -2,7 +2,7 @@
  * Manages the creation and validation of single-use web tokens.
  * These tokens are used to authorize users for limited-time web pages.
  */
-class WebTokenManager {
+class WebTokenService {
     constructor(db, logger) {
         this.db = db;
         this.logger = logger;
@@ -67,4 +67,4 @@ class WebTokenManager {
     }
 }
 
-module.exports = WebTokenManager;
+module.exports = WebTokenService;

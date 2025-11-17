@@ -1,0 +1,105 @@
+<%- include(globalViewsPath + '/_header.ejs') %>
+
+<div class="container">
+        <h1>Ship Replacement Program</h1>
+        <p class="form-subtitle">Please fill out the details for your loss.</p>
+        <form action="/srp/<%= token %>" method="POST">
+            <input type="hidden" name="processed_killmail_data" id="processed_killmail_data">
+
+            <fieldset>
+                <legend>Pilot & Loss Details</legend>
+                 <div class="form-group">
+                    <label>Kill Report <span id="killmail-spinner" class="spinner"></span></label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="kill_report_option" value="link" required> Link Provided</label>
+                        <label><input type="radio" name="kill_report_option" value="not_obtained"> Not Obtained</label>
+                    </div>
+                    <div id="kill_report_link_container" class="conditional-input">
+                        <input 
+                            type="text" 
+                            name="kill_report_link" 
+                            id="kill_report_link"
+                            placeholder="Paste the full 'External Kill Link' from in-game"
+                            pattern="^https:\/\/esi\.evetech\.net\/v\d+\/killmails\/\d+\/[a-f0-9]+\/.*$"
+                            title="Please paste the full, unmodified ESI link copied from the in-game kill report.">
+                         <div id="killmail-status" class="status-message"></div>
+                    </div>
+                </div>
+
+                <div id="killmail-details-container">
+                    <h3>Killmail Details</h3>
+                    <div id="destroyed-items-list" class="item-list"></div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="pilot_name">Pilot's Name (in-game)</label>
+                        <input type="text" id="pilot_name" name="pilot_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ship_type">Type of Ship Lost</label>
+                        <input type="text" id="ship_type" name="ship_type" required>
+                    </div>
+                </div>
+                 <div class="form-group">
+                    <label for="kill_value">Estimated Kill Value (ISK)</label>
+                    <input type="number" id="kill_value" name="kill_value" placeholder="Auto-filled from killmail or enter manually" required>
+                </div>
+            </fieldset>
+            
+            <fieldset>
+                <legend>Fleet Information</legend>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="fc_name">FC Name</label>
+                        <input type="text" id="fc_name" name="fc_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>FC Status</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="backseat_info" value="Full FC" required> Full FC</label>
+                            <label><input type="radio" name="backseat_info" value="Solo T-FC"> Solo T-FC</label>
+                            <label><input type="radio" name="backseat_info" value="T-FC"> T-FC</col>
+                        </div>
+                         <div id="backseat_other_container" class="conditional-input">
+                            <input type="text" name="backseat_other_details" placeholder="Backseat Name">
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Eligibility & AAR</legend>
+                <div class="form-group">
+                    <label>Is this loss SRPable?</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="srpable" value="Yes" required> Yes</label>
+                        <label><input type="radio" name="srpable" value="No"> No</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Did the pilot pay SRP?</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="srp_paid" value="Yes" required> Yes</label>
+                        <label><input type="radio" name="srp_paid" value="No"> No</label>
+                        <label><input type="radio" name="srp_paid" value="First Day"> First Day</label>
+                        <label><input type="radio" name="srp_paid" value="Commander"> Commander</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="loss_description">Loss Description (AAR)</label>
+                    <textarea id="loss_description" name="loss_description" rows="5" maxlength="2000" placeholder="Provide a brief After-Action Report..."></textarea>
+                    <div class="char-counter"></div>
+                </div>
+                 <div class="form-group">
+                    <label for="loot_status">Loot Status</label>
+                    <textarea id="loot_status" name="loot_status" rows="3" maxlength="500" placeholder="Who grabbed the loot? Was it returned?"></textarea>
+                    <div class="char-counter"></div>
+                </div>
+            </fieldset>
+
+            <button type="submit">Submit SRP Request</button>
+        </form>
+    </div>
+
+<%- include(globalViewsPath + '/_footer.ejs') %>

@@ -1,6 +1,6 @@
 ﻿const express = require('express');
 const path = require('path');
-const { getLogger } = require('@services/logger'); // Adjusted path
+const { getLogger } = require('@services/logger');
 
 const logger = getLogger('WebServer');
 
@@ -14,13 +14,16 @@ function initializeWebServer() {
     const port = process.env.PORT || 3000;
 
     // View engine setup
-    app.set('views', path.join(__dirname, 'views'));
+    const globalViewsPath = path.join(__dirname, 'views');
+    app.set('views', globalViewsPath);
     app.set('view engine', 'ejs');
+
+    // Make global views available to all templates
+    app.locals.globalViewsPath = globalViewsPath;
 
     // Middleware
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
-    // app.use(express.static(path.join(__dirname, 'public'))); // If you have public assets
 
     // --- CORE ROUTES ---
     // Example: A simple health check route
@@ -46,7 +49,7 @@ function initializeWebServer() {
         res.render('error', {
             message: err.message,
             // Only show stack trace in development
-            error: process.env.NODE_ENV === 'development' ? err : {}
+            error: process.env.NODE_ENV === 'development' || 'dev' ? err : {}
         });
     });
 
@@ -56,7 +59,7 @@ function initializeWebServer() {
     function startWebServer() {
         app.listen(port, () => {
             // Logger is available via closure
-            logger.info(`Web server listening on http://localhost:${port}`);
+            logger.info(`Web server listening on http://${process.env.HOST_NAME}`);
         });
     }
 

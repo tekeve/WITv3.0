@@ -1,157 +1,225 @@
 const axios = require('axios');
-const logger = require('@helpers/logger');
-const path = require('path');
+const btoa = require('btoa'); // For Basic Auth: 'Basic ' + btoa(client_id:client_secret)
 
-const esiCache = new Map(); // In-memory cache for ESI responses
+// Helper for exponential backoff
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-const esi = axios.create({
-    baseURL: 'https://esi.evetech.net/latest',
-    headers: {
-        'User-Agent': 'WITv3.0/v1.1 (discord: teknick / discord: bladeravinger, eve: Bella Cadelanne)'
-    }
-});
+/**
+ * Manages all ESI (EVE Online API) requests, including authentication and token refreshing.
+ * This is a foundational service used by other managers.
+ */
+class EsiService {
 
+    /**
+     * @param {mysql.Pool} db - The database pool.
+     * @param {function} loggerFunc - The getLogger factory function.
+     * @param {object} config - The process.env config object.
+     */
+    constructor(db, loggerFunc, config) {
+        this.db = db;
+        this.logger = loggerFunc('EsiService'); // Create its own logger
+        this.config = config;
 
+        // ESI Configuration
+        this.esiBaseUrl = 'https.esi.evetech.net/latest';
+        this.tokenUrl = 'https://login.eveonline.com/v2/oauth/token';
+        this.clientId = this.config.EVE_CLIENT_ID;
+        this.clientSecret = this.config.EVE_CLIENT_SECRET;
 
-async function requestWithRetries(requestFunc, endpoint, caller, retries = 3, delay = 1000) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const response = await requestFunc();
-            const headers = response.headers;
-            const callerName = caller ? ` called by ${path.basename(caller)}` : '';
+        if (!this.clientId || !this.clientSecret) {
+            this.logger.error('EVE_CLIENT_ID or EVE_CLIENT_SECRET is not set in .env. ESI service will fail.');
+        }
 
-            // Log Rate Limit info on success
-            if (headers && headers['x-esi-error-limit-remain']) {
-                const limitRemain = parseInt(headers['x-esi-error-limit-remain'], 10);
-                const limitReset = headers['x-esi-error-limit-reset'];
-                let logFunc = logger.info;
-
-                if (limitRemain < 25) logFunc = logger.error;
-                else if (limitRemain < 50) logFunc = logger.warn;
-
-                logFunc(`ESI Rate Limit: ${limitRemain}/100 remaining. Resets in ${limitReset}s. [${endpoint}${callerName}]`);
+        // Create an axios instance for ESI requests
+        this.api = axios.create({
+            baseURL: this.esiBaseUrl,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'User-Agent': `WITv3.0 (${this.config.BOT_OWNER_CONTACT || 'unknown'})`
             }
+        });
+    }
 
-            // Log Cache Expiry on success
-            if (headers && headers['expires']) {
-                const expiryDate = new Date(headers['expires']);
-                const secondsUntilExpiry = Math.round((expiryDate - new Date()) / 1000);
-                if (secondsUntilExpiry > 0) {
-                    logger.info(`ESI Cache for ${endpoint}${callerName} expires in ${secondsUntilExpiry}s.`);
+    /**
+     * The new generic request method for all ESI calls.
+     * Handles authentication, rate limiting, and exponential backoff.
+     * @param {string} endpoint - The ESI endpoint (e.g., '/incursions/', '/characters/12345/').
+     * @param {string} [accessToken] - An optional ESI access token for secured endpoints.
+     * @param {object} [options] - Optional axios request options (e.g., { method: 'POST', data: {...} }).
+     * @returns {Promise<any>} The data from the ESI response.
+     * @throws {Error} If the request fails after all retries.
+     */
+    async request(endpoint, accessToken = null, options = {}) {
+        const maxRetries = 5;
+        let attempt = 0;
+        const baseDelay = 500; // 500ms
+
+        while (attempt < maxRetries) {
+            try {
+                const config = { ...options }; // Copy options (like method, data)
+                config.headers = { ...(options.headers || {}) }; // Copy headers
+
+                if (accessToken) {
+                    config.headers['Authorization'] = `Bearer ${accessToken}`;
+                }
+
+                // The actual request
+                const response = await this.api.request({
+                    url: endpoint,
+                    ...config
+                });
+
+                // Success! Return the data.
+                return response.data;
+
+            } catch (error) {
+                attempt++;
+                let shouldRetry = false;
+                let errorType = 'Unknown Error';
+
+                // Check if it's an ESI error or a different network error
+                if (error.response) {
+                    const status = error.response.status;
+                    const esiError = error.response.data ? error.response.data.error : 'Unknown ESI Error';
+
+                    // ESI Rate Limit (420) or Server Errors (5xx) are retryable
+                    if (status === 420 || status >= 500) {
+                        shouldRetry = true;
+                        errorType = `ESI Error ${status} (${esiError})`;
+                    }
+                    // Non-retryable errors (e.g., 400, 401, 403, 404)
+                    else {
+                        this.logger.warn(`[ESI] Request failed (Not Retryable): ${status} ${esiError}`, { endpoint });
+                        throw error; // Don't retry, just fail
+                    }
+                }
+                // Network error (no response)
+                else {
+                    shouldRetry = true; // Retry network errors
+                    errorType = `Network Error (${error.message})`;
+                }
+
+                // Handle retry logic
+                if (shouldRetry) {
+                    if (attempt >= maxRetries) {
+                        this.logger.error(`[ESI] Request failed after ${maxRetries} attempts: ${errorType}`, { endpoint });
+                        throw error; // Give up
+                    }
+
+                    // Exponential backoff with jitter
+                    const delay = (baseDelay * Math.pow(2, attempt - 1)) + (Math.random() * 100);
+                    this.logger.warn(`[ESI] Request failed (Attempt ${attempt}): ${errorType}. Retrying in ${delay.toFixed(0)}ms...`, { endpoint });
+                    await sleep(delay);
                 }
             }
+        }
+    }
 
-            return response;
+
+    /**
+     * Verifies an ESI SSO authorization code to get access/refresh tokens.
+     * This is a specific auth flow and does not use the generic 'request' method.
+     * @param {string} authCode - The authorization code from the ESI callback.
+     * @returns {Promise<object|null>} An object with { access_token, refresh_token, expires_at, character_info } or null.
+     */
+    async verifySsoCode(authCode) {
+        this.logger.info('[ESI] Verifying SSO auth code...');
+        const authHeader = 'Basic ' + btoa(`${this.clientId}:${this.clientSecret}`);
+
+        try {
+            // --- 1. Exchange code for tokens ---
+            const tokenResponse = await axios.post(this.tokenUrl,
+                new URLSearchParams({
+                    'grant_type': 'authorization_code',
+                    'code': authCode
+                }),
+                {
+                    headers: {
+                        'Authorization': authHeader,
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Host': 'login.eveonline.com'
+                    }
+                }
+            );
+
+            const tokenData = tokenResponse.data;
+            const accessToken = tokenData.access_token;
+            const refreshToken = tokenData.refresh_token;
+            const expires_at = Date.now() + (tokenData.expires_in * 1000);
+
+            // --- 2. Verify token and get Character ID ---
+            const verifyResponse = await axios.get('https://login.eveonline.com/oauth/verify', {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            const charInfo = verifyResponse.data;
+            this.logger.success(`[ESI] Verified SSO code for ${charInfo.CharacterName} (ID: ${charInfo.CharacterID})`);
+
+            return {
+                access_token: accessToken,
+                refresh_token: refreshToken,
+                expires_at: expires_at,
+                character_id: charInfo.CharacterID,
+                character_name: charInfo.CharacterName,
+            };
 
         } catch (error) {
-            const callerName = caller ? ` called by ${path.basename(caller)}` : '';
-            // Handle network errors or code bugs first
-            if (!error.response || !error.response.headers) {
-                logger.error(`Request to ${endpoint}${callerName} failed with no response: ${error.message}`);
-                throw error; // No point retrying if the server is unreachable
-            }
-
-            // If we have a response, log its rate limit info
-            const errorHeaders = error.response.headers;
-            if (errorHeaders && errorHeaders['x-esi-error-limit-remain']) {
-                const limitRemain = parseInt(errorHeaders['x-esi-error-limit-remain'], 10);
-                const limitReset = errorHeaders['x-esi-error-limit-reset'];
-                logger.warn(`ESI Rate Limit on error: ${limitRemain}/100 remaining (resets in ${limitReset}s). Caused by request to ${endpoint}${callerName}.`);
-            }
-
-            // Handle Retry
-            const status = error.response.status;
-            const hasRetriesLeft = i < retries - 1;
-
-            if (hasRetriesLeft) {
-                const waitTime = delay * Math.pow(2, i);
-                let shouldRetry = false;
-
-                switch (status) {
-                    case 420: // Rate Limited
-                        logger.warn(`ESI rate limit hit (420) on ${endpoint}${callerName}. Retrying in ${waitTime / 1000}s...`);
-                        shouldRetry = true;
-                        break;
-                    case 502: // Bad Gateway
-                    case 503: // Service Unavailable
-                    case 504: // Gateway Timeout
-                        logger.info(`ESI service unavailable (Status ${status}) on ${endpoint}${callerName}. Retrying in ${waitTime / 1000}s...`);
-                        shouldRetry = true;
-                        break;
-                }
-
-                if (shouldRetry) {
-                    await new Promise(res => setTimeout(res, waitTime));
-                    continue; // Go to the next iteration of the for loop
-                }
-            }
-
-            // If no retries are left, or the error was not retryable, throw
-            const errorData = JSON.stringify(error.response.data);
-            logger.error(`ESI request to ${endpoint}${callerName} failed after all retries with status ${status}. Data: ${errorData}`);
-            throw error;
+            this.logger.error('[ESI] Failed to verify SSO code:', {
+                error: error.response ? error.response.data : (error.stack || error.message)
+            });
+            return null;
         }
     }
+
+    /**
+     * Refreshes an expired ESI access token using a refresh token.
+     * This is a specific auth flow and does not use the generic 'request' method.
+     * @param {string} refreshToken - The ESI refresh token.
+     * @returns {Promise<object|null>} An object with { access_token, refresh_token, expires_at } or null.
+     */
+    async refreshAccessToken(refreshToken) {
+        this.logger.info('[ESI] Refreshing ESI access token...');
+        const authHeader = 'Basic ' + btoa(`${this.clientId}:${this.clientSecret}`);
+
+        try {
+            const response = await axios.post(this.tokenUrl,
+                new URLSearchParams({
+                    'grant_type': 'refresh_token',
+                    'refresh_token': refreshToken
+                }),
+                {
+                    headers: {
+                        'Authorization': authHeader,
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Host': 'login.eveonline.com'
+                    }
+                }
+            );
+
+            const tokenData = response.data;
+            const expires_at = Date.now() + (tokenData.expires_in * 1000); // Convert 'expires_in' (seconds) to a timestamp
+
+            this.logger.success('[ESI] Successfully refreshed access token.');
+            return {
+                access_token: tokenData.access_token,
+                refresh_token: tokenData.refresh_token, // ESI may return a new refresh token
+                expires_at: expires_at,
+            };
+        } catch (error) {
+            this.logger.error('[ESI] Failed to refresh access token:', {
+                error: error.response ? error.response.data : (error.stack || error.message)
+            });
+            // Handle 'invalid_token' or other specific errors that mean the refresh token is dead
+            if (error.response && error.response.data && error.response.data.error === 'invalid_token') {
+                this.logger.error(`[ESI] Refresh token is invalid. User must re-authenticate.`);
+            }
+            return null;
+        }
+    }
+
 }
 
-module.exports = {
-    /**
-     * Performs a GET request to the ESI API, utilizing an in-memory cache.
-     * @param {object} options - The request options.
-     * @param {string} options.endpoint - The ESI endpoint to call.
-     * @param {object} [options.params] - The URL parameters for the request.
-     * @param {object} [options.headers] - The request headers.
-     * @param {string} [options.caller] - The file path of the calling module.
-     * @returns {Promise<{data: any, expires: number|null}>} The data and expiry timestamp from the ESI response.
-     */
-    get: async ({ endpoint, params, headers, caller }) => {
-        // Sanitize the endpoint to ensure it doesn't start with a slash
-        const sanitizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-
-        // Create a unique key for the request based on the sanitized endpoint and params
-        const cacheKey = `${sanitizedEndpoint}?${JSON.stringify(params || {})}`;
-        const cachedItem = esiCache.get(cacheKey);
-        const callerName = caller ? path.basename(caller) : 'Unknown';
-
-        // Check if a valid, non-expired item is in the cache
-        if (cachedItem && cachedItem.expires > Date.now()) {
-            logger.info(`ESI Cache HIT for ${sanitizedEndpoint} from ${callerName}.`);
-            return { data: cachedItem.data, expires: cachedItem.expires }; // Return cached data
-        }
-
-        // If not in cache or expired, make the request
-        logger.info(`ESI Cache MISS for ${sanitizedEndpoint} from ${callerName}. Making a real ESI call...`);
-        const response = await requestWithRetries(() => esi.get(sanitizedEndpoint, { params, headers }), sanitizedEndpoint, caller);
-
-        // After a successful request, update the cache if an expires header is present
-        let expiryTimestamp = null;
-        if (response && response.headers && response.headers.expires) {
-            const expiryDate = new Date(response.headers.expires);
-            expiryTimestamp = expiryDate.getTime();
-            esiCache.set(cacheKey, {
-                data: response.data,
-                expires: expiryTimestamp
-            });
-        }
-
-        return { data: response.data, expires: expiryTimestamp };
-    },
-
-    /**
-     * Performs a POST request to the ESI API. POST requests are not cached.
-     * @param {object} options - The request options.
-     * @param {string} options.endpoint - The ESI endpoint to call.
-     * @param {object} [options.data] - The body of the request.
-     * @param {object} [options.headers] - The request headers.
-     * @param {string} [options.caller] - The file path of the calling module.
-     * @returns {Promise<any>} The data from the ESI response.
-     */
-    post: async ({ endpoint, data, headers, caller }) => {
-        // Sanitize the endpoint to ensure it doesn't start with a slash
-        const sanitizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-        const callerName = caller ? path.basename(caller) : 'Unknown';
-        logger.info(`Making a real ESI POST call to ${sanitizedEndpoint} from ${callerName}...`);
-        const response = await requestWithRetries(() => esi.post(sanitizedEndpoint, data, { headers }), sanitizedEndpoint, caller);
-        return response.data;
-    },
-};
+module.exports = EsiService;

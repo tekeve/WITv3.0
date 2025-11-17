@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, REST, Routes } = require('discord.js');
 const { getLogger } = require('@services/logger');
-const WebTokenManager = require('./managers/webTokenManager');
 const IncursionManager = require('./managers/incursionManager');
 const AuthManager = require('./managers/authManager');
 const ConfigManager = require('./managers/configManager');
@@ -9,7 +8,7 @@ const ReminderManager = require('./managers/reminderManager');
 const WalletMonitor = require('./walletMonitor');
 
 // legacy -- replace ---
-const esiService = require('@helpers/esiService');
+const esiService = require('@services/esiService');
 
 // --- IMPORT YOUR OLD HANDLERS/MANAGERS ---
 // We will now import the *logic* from the old files
@@ -38,9 +37,9 @@ class CoreFunctionalityPlugin {
         this.db = sharedServices.db;
         this.config = sharedServices.config;
         this.logger = sharedServices.logger(this.name);
+        this.WebTokenService = sharedServices.WebTokenService;
 
         // --- Inject Managers ---
-        this.webTokenManager = new WebTokenManager(this.db, this.logger);
         this.incursionManager = new IncursionManager(this);
         this.statusManager = new StatusManager(this);
         this.reminderManager = new ReminderManager(this);
@@ -186,7 +185,7 @@ class CoreFunctionalityPlugin {
         // 1. The GET route requires a valid token, but does NOT consume it
         webApp.get(
             '/srp/form',
-            this.webTokenManager.validateTokenMiddleware('srp', false), // <-- consumeToken = false
+            this.WebTokenService.validateTokenMiddleware('srp', false), // <-- consumeToken = false
             (req, res) => {
                 // If we get here, the token was valid.
                 // We *must* pass the token to the template.
@@ -200,7 +199,7 @@ class CoreFunctionalityPlugin {
         // 2. The POST route validates AND consumes the token
         webApp.post(
             '/srp/submit',
-            this.webTokenManager.validateTokenMiddleware('srp', true), // <-- consumeToken = true
+            this.WebTokenService.validateTokenMiddleware('srp', true), // <-- consumeToken = true
             (req, res) => {
                 // If we get here, the token was valid and has now been consumed.
                 // The token data is available from the middleware.

@@ -6,6 +6,8 @@ const { getLogger, initializeLogger } = require('@services/logger');
 initializeLogger();
 const { initializeDatabase } = require('@services/database');
 const { initializeWebServer } = require('./web/server');
+const EsiService = require('@services/esiService');
+const WebTokenService = require('@services/webTokenService');
 const PluginManager = require('@services/pluginManager');
 
 
@@ -54,7 +56,9 @@ async function main() {
         webApp: expressApp,
         config: process.env,
         logger: getLogger,
+        esiService: EsiService,
     };
+    sharedServices.webTokenService = new WebTokenService(sharedServices.db, logger);
 
     // --- 3. Initialize Plugin Manager ---
     // The PluginManager will now handle loading all commands, events, etc.
