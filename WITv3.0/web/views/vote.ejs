@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cast Your Vote</title>
+    <!-- Using Tailwind CSS from CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Sortable.js for drag-and-drop -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: #cceeff;
+        }
+        .candidate-item {
+            cursor: move; /* fallback 'grab' */
+            cursor: grab;
+        }
+        .candidate-item:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div id="vote-container" class="bg-gray-800 p-6 sm:p-8 rounded-lg shadow-xl w-full max-w-md">
+        
+        <!-- Loading State -->
+        <div id="loading" class="text-center">
+            <h2 class="text-2xl font-bold mb-4">Loading Election...</h2>
+            <p class="text-gray-400">Validating your voting token...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-message" class="hidden text-center p-4 bg-red-900 border border-red-700 rounded-lg">
+            <h2 class="text-2xl font-bold mb-2 text-red-300">Access Denied</h2>
+            <p id="error-text" class="text-red-300">Could not validate your voting token. It may be invalid, expired, or already used. Please request a new link from the bot.</p>
+        </div>
+
+        <!-- Success State -->
+        <div id="success-message" class="hidden text-center p-4 bg-green-900 border border-green-700 rounded-lg">
+            <h2 class="text-2xl font-bold mb-2 text-green-300">Vote Cast Successfully!</h2>
+            <p class="text-green-300">Your anonymous vote has been recorded. You may now safely close this window.</p>
+        </div>
+
+        <!-- Main Vote Form -->
+        <div id="vote-form" class="hidden">
+            <h1 id="vote-title" class="text-2xl sm:text-3xl font-bold mb-2 text-center text-blue-300"></h1>
+            <p class="text-gray-400 text-center mb-6">Rank your choices by dragging and dropping. Your most preferred choice should be at the top (Rank 1).</p>
+            
+            <ul id="candidate-list" class="space-y-3 mb-8">
+                <!-- Candidates will be injected here -->
+            </ul>
+
+            <button id="submit-vote" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                Submit Anonymous Vote
+            </button>
+            <p id="submit-error" class="text-red-400 text-sm mt-3 text-center hidden"></p>
+        </div>
+
+    </div>
+
+    <script>
+        const voteContainer = document.getElementById('vote-container');
+        const loadingDiv = document.getElementById('loading');
+        const errorDiv = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+        const successDiv = document.getElementById('success-message');
+        const voteFormDiv = document.getElementById('vote-form');
+        const voteTitleEl = document.getElementById('vote-title');
+        const candidateListEl = document.getElementById('candidate-list');
+        const submitButton = document.getElementById('submit-vote');
+        const submitErrorEl = document.getElementById('submit-error');
+
+        let sortable;
+        const token = new URLSearchParams(window.location.search).get('token');
+
+        window.onload = async () => {
+            if (!token) {
+                showError('No voting token provided. Please use the link from your DMs.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/vote-details?token=${token}`);
+                if (!response.ok) {
+                    const errorMsg = await response.text();
+                    throw new Error(errorMsg || 'Invalid or expired token.');
+                }
+                
+                const voteData = await response.json();
+                displayVoteForm(voteData);
+
+            } catch (err) {
+                console.error('Error fetching vote details:', err);
+                showError(err.message);
+            }
+        };
+
+        function showError(message) {
+            loadingDiv.classList.add('hidden');
+            successDiv.classList.add('hidden');
+            voteFormDiv.classList.add('hidden');
+            errorText.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function showSuccess() {
+            loadingDiv.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+            voteFormDiv.classList.add('hidden');
+            successDiv.classList.remove('hidden');
+            // Hide the main container to prevent any further action
+            voteContainer.classList.add('hidden');
+            // Show a standalone success message
+            document.body.innerHTML = successDiv.outerHTML;
+            successDiv.classList.remove('hidden');
+        }
+
+        function displayVoteForm(data) {
+            voteTitleEl.textContent = data.title;
+            
+            data.candidates.forEach((candidate, index) => {
+                const li = document.createElement('li');
+                li.className = 'candidate-item bg-gray-700 p-4 rounded-lg shadow-md flex items-center space-x-4';
+                li.dataset.candidateName = candidate;
+                
+                li.innerHTML = `
+                    <span class="text-xl font-bold text-blue-400 w-6 text-center rank-number">${index + 1}</span>
+                    <span class="text-lg font-medium">${candidate}</span>
+                `;
+                candidateListEl.appendChild(li);
+            });
+
+            // Init SortableJS
+            sortable = new Sortable(candidateListEl, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                onUpdate: () => updateRanks(),
+            });
+
+            loadingDiv.classList.add('hidden');
+            voteFormDiv.classList.remove('hidden');
+        }
+
+        function updateRanks() {
+            const items = candidateListEl.querySelectorAll('.candidate-item');
+            items.forEach((item, index) => {
+                item.querySelector('.rank-number').textContent = index + 1;
+            });
+        }
+
+        submitButton.onclick = async () => {
+            submitButton.disabled = true;
+            submitButton.textContent = 'Submitting...';
+            submitErrorEl.classList.add('hidden');
+
+            const rankedCandidates = Array.from(candidateListEl.querySelectorAll('.candidate-item'))
+                .map(item => item.dataset.candidateName);
+
+            try {
+                const response = await fetch('/api/submit-vote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token: token,
+                        ranks: rankedCandidates
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorMsg = await response.text();
+                    throw new Error(errorMsg || 'Failed to submit vote.');
+                }
+
+                showSuccess();
+
+            } catch (err) {
+                console.error('Error submitting vote:', err);
+                submitErrorEl.textContent = `Error: ${err.message}. Please try again.`;
+                submitErrorEl.classList.remove('hidden');
+                submitButton.disabled = false;
+                submitButton.textContent = 'Submit Anonymous Vote';
+            }
+        };
+
+    </script>
+</body>
+</html>
