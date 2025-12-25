@@ -41,9 +41,21 @@ function voteRoutes(client) {
                 return res.status(403).send('This election has concluded and is no longer active.');
             }
 
+            let candidates;
+            if (typeof vote.candidates === 'string') {
+                try {
+                    candidates = JSON.parse(vote.candidates);
+                } catch (e) {
+                    logger.error('Failed to parse candidates JSON:', e);
+                    candidates = [];
+                }
+            } else {
+                candidates = vote.candidates;
+            }
+
             res.json({
                 title: vote.title,
-                candidates: JSON.parse(vote.candidates)
+                candidates: candidates
             });
 
         } catch (error) {
@@ -92,7 +104,19 @@ function voteRoutes(client) {
             }
 
             // 3. Validate the submitted ranks
-            const validCandidates = new Set(JSON.parse(vote.candidates));
+            let candidatesList;
+            if (typeof vote.candidates === 'string') {
+                try {
+                    candidatesList = JSON.parse(vote.candidates);
+                } catch (e) {
+                    logger.error('Failed to parse candidates JSON during submission:', e);
+                    return res.status(500).send('Internal server error: Invalid vote configuration.');
+                }
+            } else {
+                candidatesList = vote.candidates;
+            }
+
+            const validCandidates = new Set(candidatesList);
             if (ranks.length !== validCandidates.size || ranks.some(r => !validCandidates.has(r))) {
                 return res.status(400).send('Invalid ballot. The ranked list does not match the candidates.');
             }
