@@ -41,9 +41,21 @@ function voteRoutes(client) {
                 return res.status(403).send('This election has concluded and is no longer active.');
             }
 
+
+            let parsedCandidates = vote.candidates;
+
+            if (typeof parsedCandidates === 'string') {
+                try {
+                    parsedCandidates = JSON.parse(parsedCandidates);
+                } catch (e) {
+                    logger.warn(`Vote ID ${tokenData.vote_id} candidates parsing failed. Raw value: "${vote.candidates}". Treating as string literal.`);
+                    parsedCandidates = [vote.candidates];
+                }
+            }
+
             res.json({
                 title: vote.title,
-                candidates: JSON.parse(vote.candidates)
+                candidates: parsedCandidates
             });
 
         } catch (error) {
