@@ -62,7 +62,7 @@ async function tallyVote(voteId, client) {
             }
         } else {
             // We have votes, run the STV calculation
-            const candidates = JSON.parse(vote.candidates);
+            const candidates = vote.candidates;
             const numWinners = (vote.type === 'officer') ? 2 : 1;
 
             const { winners, log } = calculateSTV(candidates, ballots, numWinners);
