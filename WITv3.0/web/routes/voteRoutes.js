@@ -43,7 +43,7 @@ function voteRoutes(client) {
 
             res.json({
                 title: vote.title,
-                candidates: JSON.parse(vote.candidates)
+                candidates: vote.candidates
             });
 
         } catch (error) {

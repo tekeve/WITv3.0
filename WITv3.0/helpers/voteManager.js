@@ -39,7 +39,7 @@ async function tallyVote(voteId, client) {
 
         // 2. Fetch all Ballots
         const ballotsQuery = await db.query('SELECT ranked_choices FROM ballots WHERE vote_id = ?', [voteId]);
-        const ballots = ballotsQuery.map(b => JSON.parse(b.ranked_choices));
+        const ballots = ballotsQuery.map(b => b.ranked_choices);
 
         // 3. Find Discord Channel
         channel = await client.channels.cache.get(vote.channel_id);
