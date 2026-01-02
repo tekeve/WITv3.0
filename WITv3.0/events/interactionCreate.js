@@ -9,13 +9,13 @@ const ErrorHandler = require('@helpers/errorHandler');
 
 module.exports = {
     name: Events.InteractionCreate,
-    async execute(interaction, client) {
+    async execute(client, interaction) {
         try {
             if (interaction.isChatInputCommand()) {
-                await handleChatInputCommand(interaction, client);
+                await handleChatInputCommand((client, interaction);
             }
             else if (interaction.isAutocomplete()) {
-                await handleAutocomplete(interaction, client);
+                await handleAutocomplete(client, interaction);
             }
             else if (interaction.isStringSelectMenu()) {
                 await handleStringSelectMenu(interaction);
@@ -45,7 +45,7 @@ module.exports = {
  * @param {import('discord.js').ChatInputCommandInteraction} interaction 
  * @param {import('discord.js').Client} client 
  */
-async function handleChatInputCommand(interaction, client) {
+async function handleChatInputCommand(client, interaction) {
     const command = client.commands.get(interaction.commandName);
     if (!command) {
         logger.warn(`Command not found: ${interaction.commandName}`);
@@ -120,7 +120,7 @@ async function handleChatInputCommand(interaction, client) {
  * @param {import('discord.js').AutocompleteInteraction} interaction 
  * @param {import('discord.js').Client} client 
  */
-async function handleAutocomplete(interaction, client) {
+async function handleAutocomplete(client, interaction) {
     const command = client.commands.get(interaction.commandName);
     if (!command || !command.autocomplete) {
         logger.warn(`Autocomplete not found for command: ${interaction.commandName}`);

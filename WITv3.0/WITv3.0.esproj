@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.2752196">
   <ItemGroup>
+    <Folder Include="Plugins\isk-per-hour\" />
+    <Folder Include="Plugins\roles-manager\" />
+    <Folder Include="Plugins\trackers\" />
+    <Folder Include="Plugins\wallet-monitor\" />
     <Folder Include="Plugins\ping-example\" />
   </ItemGroup>
 </Project>
