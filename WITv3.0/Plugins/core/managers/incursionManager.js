@@ -1,7 +1,7 @@
 // --- LIKELY DEPENDENCIES ---
 // Add any other dependencies your old file needed
 const { EmbedBuilder } = require('discord.js');
-const { createIncursionEmbed } = require('../../../embeds/incursionEmbed');
+const { buildActiveIncursionEmbed } = require('../embeds/incursionEmbed');
 
 /**
  * Manages fetching and reporting EVE Online incursions.
@@ -46,10 +46,15 @@ class IncursionManager {
             this.lastIncursionState = incursionData;
 
             // 3. Find the configured channel to post in
-            const channelId = this.config.INCURSION_CHANNEL_ID;
-            if (!channelId) {
-                this.logger.warn('INCURSION_CHANNEL_ID not set, cannot post update.');
-                return;
+            let channelId = null;
+            try {
+                const [rows] = await this.db.query('SELECT value FROM config WHERE key_name = ?', ['incursionChannelId']);
+
+                if (rows && rows.length > 0) {
+                    channelId = JSON.parse(rows[0].value);
+                }
+            } catch (err) {
+                this.logger.error('Database error fetching incursionChannelId:', err);
             }
 
             const channel = await this.client.channels.fetch(channelId);
@@ -59,7 +64,7 @@ class IncursionManager {
             }
 
             // 4. Create the embed
-            const embed = createIncursionEmbed(incursionData);
+            const embed = buildActiveIncursionEmbed(incursionData);
 
             // 5. Post the update
             await channel.send({ embeds: [embed] });

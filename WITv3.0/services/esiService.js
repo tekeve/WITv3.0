@@ -23,11 +23,11 @@ class EsiService {
         // ESI Configuration
         this.esiBaseUrl = 'https://esi.evetech.net/latest';
         this.tokenUrl = 'https://login.eveonline.com/v2/oauth/token';
-        this.clientId = this.config.EVE_CLIENT_ID;
-        this.clientSecret = this.config.EVE_CLIENT_SECRET;
+        this.clientId = this.config.ESI_CLIENT_ID;
+        this.clientSecret = this.config.ESI_SECRET_KEY;
 
         if (!this.clientId || !this.clientSecret) {
-            this.logger.error('EVE_CLIENT_ID or EVE_CLIENT_SECRET is not set in .env. ESI service will fail.');
+            this.logger.error('ESI_CLIENT_ID or ESI_SECRET_KEY is not set in .env. ESI service will fail.');
         }
 
         // Create an axios instance for ESI requests
