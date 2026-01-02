@@ -64,7 +64,7 @@ class SrpPlugin {
     registerWebRoutes(webApp) {
         this.logger.info("Registering SRP web routes...");
 
-        const WebTokenService = this.shared.WebTokenService;
+        const WebTokenService = this.shared.webTokenService;
 
         // --- 1. The GET route for the form ---
         webApp.get(

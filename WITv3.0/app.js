@@ -56,7 +56,7 @@ async function main() {
         webApp: expressApp,
         config: process.env,
         logger: getLogger,
-        esiService: EsiService,
+        esiService: new EsiService(dbPool, getLogger, process.env),
     };
     sharedServices.webTokenService = new WebTokenService(sharedServices.db, logger);
 

@@ -8,7 +8,7 @@ const ReminderManager = require('./managers/reminderManager');
 const WalletMonitor = require('./walletMonitor');
 
 // legacy -- replace ---
-const esiService = require('@services/esiService');
+//const esiService = require('@services/esiService');
 
 // --- IMPORT YOUR OLD HANDLERS/MANAGERS ---
 // We will now import the *logic* from the old files
@@ -30,10 +30,10 @@ class CoreFunctionalityPlugin {
         this.version = "3.0.0";
 
         // --- Legacy Helpers ---
-        this.esiService = esiService;
 
         // --- Store references ---
         this.client = client;
+        this.esiService = sharedServices.esiService;
         this.db = sharedServices.db;
         this.config = sharedServices.config;
         this.logger = sharedServices.logger(this.name);
@@ -96,7 +96,6 @@ class CoreFunctionalityPlugin {
         this.eventListeners.push({
             event: 'interactionCreate',
             once: false,
-            // We pass 'this.client' because the old handler expects it as the first arg
             execute: (...args) => interactionCreateHandler.execute(this.client, ...args)
         });
 

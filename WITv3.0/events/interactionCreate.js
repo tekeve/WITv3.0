@@ -12,7 +12,7 @@ module.exports = {
     async execute(client, interaction) {
         try {
             if (interaction.isChatInputCommand()) {
-                await handleChatInputCommand((client, interaction);
+                await handleChatInputCommand(client, interaction);
             }
             else if (interaction.isAutocomplete()) {
                 await handleAutocomplete(client, interaction);

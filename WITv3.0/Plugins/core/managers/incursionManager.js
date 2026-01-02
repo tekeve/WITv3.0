@@ -34,11 +34,9 @@ class IncursionManager {
     async updateIncursions() {
         this.logger.info('Fetching incursion data...');
         try {
-            // --- This is just example logic ---
-            // --- Replace this with your actual logic from the old file ---
 
             // 1. Fetch data from ESI
-            const incursionData = await esiService.getIncursions(); // Assumes esiService exists
+            const incursionData = await this.esiService.request('/incursions/');
 
             // 2. Check if the state has changed
             if (JSON.stringify(incursionData) === JSON.stringify(this.lastIncursionState)) {

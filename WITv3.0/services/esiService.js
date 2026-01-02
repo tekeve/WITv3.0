@@ -21,7 +21,7 @@ class EsiService {
         this.config = config;
 
         // ESI Configuration
-        this.esiBaseUrl = 'https.esi.evetech.net/latest';
+        this.esiBaseUrl = 'https://esi.evetech.net/latest';
         this.tokenUrl = 'https://login.eveonline.com/v2/oauth/token';
         this.clientId = this.config.EVE_CLIENT_ID;
         this.clientSecret = this.config.EVE_CLIENT_SECRET;
