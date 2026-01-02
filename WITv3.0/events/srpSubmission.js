@@ -108,42 +108,40 @@ module.exports = {
             // --- Send EVE Mail ---
             const srpMailingListId = config.srpMailingListId ? config.srpMailingListId[0] : null;
             if (!srpMailingListId) {
-                logger.warn('srpMailingListId is not configured in the database. Skipping EVE mail.');
-            } else {
-                const authData = await authManager.getUserAuthData(user.id);
-                if (!authData) {
-                    logger.warn(`User ${user.tag} submitted an SRP but does not have an authenticated mailing character. Cannot send EVE mail.`);
-                } else {
-                    try {
-                        const accessToken = await authManager.getAccessToken(user.id);
-                        const submitterCharData = await charManager.getChars(user.id);
-                        const submitterName = submitterCharData?.main?.character_name || user.tag;
+                return logger.warn('srpMailingListId is not configured in the database. Skipping EVE mail.');
+            }
+            const authData = await authManager.getUserAuthData(user.id);
+            if (!authData) {
+                return logger.warn(`User ${user.tag} submitted an SRP but does not have an authenticated mailing character. Cannot send EVE mail.`);
+            }
+            try {
+                const accessToken = await authManager.getAccessToken(user.id);
+                const submitterCharData = await charManager.getChars(user.id);
+                const submitterName = submitterCharData?.main?.character_name || user.tag;
 
-                        const mailSubject = `SRP Request: ${formData.pilot_name} - ${formData.ship_type}`;
-                        const mailBody = formatEveMailBody(formData, submitterName, processedKillmail);
+                const mailSubject = `SRP Request: ${formData.pilot_name} - ${formData.ship_type}`;
+                const mailBody = formatEveMailBody(formData, submitterName, processedKillmail);
 
-                        await esiService.post({
-                            endpoint: `/characters/${authData.character_id}/mail/`,
-                            data: {
-                                approved_cost: 0,
-                                body: mailBody,
-                                recipients: [{
-                                    recipient_id: parseInt(srpMailingListId, 10),
-                                    recipient_type: 'mailing_list'
-                                }],
-                                subject: mailSubject,
-                            },
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            caller: __filename
-                        });
-                        logger.success(`Successfully sent SRP EVE mail for ${formData.pilot_name} from ${authData.character_name}.`);
-                    } catch (esiError) {
-                        logger.error('Failed to send SRP EVE mail via ESI:', esiError);
-                    }
-                }
+                await esiService.post({
+                    endpoint: `/characters/${authData.character_id}/mail`,
+                    data: {
+                        approved_cost: 0,
+                        body: mailBody,
+                        recipients: [{
+                            recipient_id: parseInt(srpMailingListId, 10),
+                            recipient_type: 'mailing_list'
+                        }],
+                        subject: mailSubject,
+                    },
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    caller: __filename
+                });
+                logger.success(`Successfully sent SRP EVE mail for ${formData.pilot_name} from ${authData.character_name}.`);
+            } catch (esiError) {
+                logger.error('Failed to send SRP EVE mail via ESI:', esiError);
             }
 
             // --- Final Confirmation to User ---
