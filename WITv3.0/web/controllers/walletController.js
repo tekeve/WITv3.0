@@ -1,7 +1,6 @@
 const logger = require('@helpers/logger');
 const walletMonitor = require('@helpers/walletMonitor');
 const roleManager = require('@helpers/roleManager');
-const { getNextWalletSyncTime } = require('@helpers/scheduler'); // Import the function
 
 // Permissions required to view the page at all
 const VIEW_PERMISSION = ['council', 'admin'];
@@ -108,16 +107,11 @@ exports.showMonitor = (client) => [
                 initialAggregatedData = { monthly: [], balances: [], categories: [] };
             }
 
-            // --- ADDED: Get next sync time ---
-            const nextSyncTimestamp = getNextWalletSyncTime();
-            // --- END ADDED ---
-
             res.render('walletMonitor', {
                 token,
                 canEdit: canEditCategories, // Pass permission flag to the template
                 // Pass initially fetched aggregated data (or empty object)
-                initialAggregatedData: initialAggregatedData,
-                nextSyncTimestamp: nextSyncTimestamp // Pass the timestamp to the template
+                initialAggregatedData: initialAggregatedData
             });
             logger.info(`[WalletController] Successfully rendered walletMonitor.ejs for ${member.user.tag}.`);
         } catch (error) {
@@ -243,3 +237,4 @@ exports.updateCategory = (client) => [
         }
     }
 ];
+
