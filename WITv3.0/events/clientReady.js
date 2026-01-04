@@ -4,26 +4,14 @@ const statusManager = require('@helpers/statusManager');
 const githubWatcher = require('@helpers/githubWatcher');
 const reminderManager = require('@helpers/reminderManager');
 const scheduler = require('@helpers/scheduler');
-const trainingSyncManager = require('@helpers/trainingSyncManager');
-const { initializeLastTransactionIds } = require('@helpers/walletMonitor'); // Import the init function
+const trainingSyncManager = require('@helpers/trainingSyncManager'); // Import the training sync manager
 
 module.exports = {
 	name: Events.ClientReady,
 	once: true,
-	async execute(client) { // Make sure this is async
+	// Make this handler async
+	async execute(client) {
 		logger.success(`Ready! Logged in as ${client.user.tag}`);
-
-		// --- Initialize Wallet Cache First ---
-		try {
-			logger.info('[ClientReady] Initializing wallet transaction ID cache...');
-			await initializeLastTransactionIds(); // Await the cache initialization
-			logger.success('[ClientReady] Wallet transaction ID cache initialized successfully.');
-		} catch (error) {
-			logger.error('[ClientReady] CRITICAL: Failed to initialize wallet transaction ID cache during startup!', error);
-			// Decide if the bot should proceed without the cache or exit.
-			// For now, we'll log the error and continue, but sync might fetch excessive data initially.
-		}
-		// --- End Wallet Cache Init ---
 
 		// Load status from DB
 		await statusManager.loadStatus(client);
@@ -34,11 +22,11 @@ module.exports = {
 		// Initial call to update incursions, which will then schedule the next call itself.
 		client.updateIncursions();
 
-		// Initialize scheduled tasks (now doesn't include wallet init)
-		// Ensure scheduler.initialize is awaited if it does other async setup
-		await scheduler.start(client); // Await scheduler initialization
+		// Await the scheduler initialization to ensure wallet cache loads first
+		await scheduler.initialize(client);
 
 		// Initialize the new training data sync manager.
+		// This needs the `io` instance from the webserver, which we attached to the client.
 		if (client.io) {
 			trainingSyncManager.initialize(client);
 		} else {
