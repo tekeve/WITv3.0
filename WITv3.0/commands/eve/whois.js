@@ -5,7 +5,7 @@ module.exports = {
     permissions: ['commander'],
 
     data: new SlashCommandBuilder()
-        .setname('whois')
+        .setName('whois')
         .setDescription('Search for a user by character name')
         .addStringOption(option => option.setName('name').setDescription('The name of the character for which a user should be searched').setRequired(true)),
 
