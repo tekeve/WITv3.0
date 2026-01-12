@@ -231,7 +231,8 @@ module.exports = {
     */
     getMainCharacterByAlt: async (altName) => {
         const sql = 'SELECT discord_id, character_name FROM users WHERE discord_id = (SELECT discord_id FROM users WHERE character_name = ?) AND is_main = 1';
-        return await db.query(sql, [altName]);
+        const rows = await db.query(sql, [altName]);
+        return rows.length > 0 ? rows[0] : null;
     }
 };
 
