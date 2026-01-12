@@ -223,5 +223,15 @@ module.exports = {
         const sql = 'SELECT DISTINCT discord_id FROM users WHERE is_main = 1';
         return await db.query(sql);
     },
+
+    /*
+    * Get discord ID and main character name by alt character name.
+    * @param {string} altName - The name of the alt character.
+    * @returns {Promise<{discord_id: string, character_name: string}|null>}
+    */
+    getMainCharacterByAlt: async (altName) => {
+        const sql = 'SELECT discord_id, character_name FROM users WHERE discord_id = (SELECT discord_id FROM users WHERE character_name = ?) AND is_main = 1';
+        return await db.query(sql, [altName]);
+    }
 };
 
