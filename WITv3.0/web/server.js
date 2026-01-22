@@ -90,7 +90,7 @@ function startServer(client) {
 
 
     server.listen(3000, () => {
-        logger.success(`✅ Server is running and listening on http://${host}`);
+        logger.success(`✅ Server is running and listening on https://${host}`);
     });
 }
 
