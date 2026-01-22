@@ -29,7 +29,7 @@ module.exports = {
 
         if (subcommand === 'login') {
             const ESI_CLIENT_ID = process.env.ESI_CLIENT_ID;
-            const ESI_CALLBACK_URL = `https://${process.env.HOST_NAME}/callback`;
+            const ESI_CALLBACK_URL = `http://${process.env.HOST_NAME}/callback`;
             const ESI_SCOPES = process.env.ESI_DEFAULT_SCOPES || '';
 
             if (!ESI_CLIENT_ID || !ESI_CALLBACK_URL) {
